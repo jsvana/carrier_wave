@@ -174,12 +174,18 @@ struct QRZApiKeySheet: View {
         NavigationStack {
             Form {
                 Section {
+                    Text("Enter your QRZ Logbook API key. You can find this in your QRZ logbook settings.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Link(destination: URL(string: "https://logbook.qrz.com/logbook")!) {
+                        Label("Get API key from QRZ Logbook", systemImage: "arrow.up.right.square")
+                    }
+
                     TextField("API Key", text: $apiKey)
                         .textContentType(.password)
                         .autocapitalization(.none)
                         .autocorrectionDisabled()
-                } footer: {
-                    Text("Get your API key from QRZ.com > Settings > API")
                 }
 
                 Section {
