@@ -20,4 +20,14 @@ final class QRZClientTests: XCTestCase {
         XCTAssertEqual(result["RESULT"], "FAIL")
         XCTAssertEqual(result["REASON"], "Invalid credentials")
     }
+
+    func testParseStatusResponse() throws {
+        let response = "RESULT=OK&CALLSIGN=W1ABC&COUNT=1234&CONFIRMED=567"
+
+        let result = QRZClient.parseResponse(response)
+
+        XCTAssertEqual(result["RESULT"], "OK")
+        XCTAssertEqual(result["CALLSIGN"], "W1ABC")
+        XCTAssertEqual(result["COUNT"], "1234")
+    }
 }

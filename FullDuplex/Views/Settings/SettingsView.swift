@@ -5,8 +5,8 @@ struct SettingsMainView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var potaAuth = POTAAuthService()
 
-    @State private var qrzUsername = ""
-    @State private var qrzPassword = ""
+    @State private var qrzApiKey = ""
+    @State private var qrzCallsign: String?
     @State private var qrzIsAuthenticated = false
     @State private var showingQRZLogin = false
     @State private var showingPOTALogin = false
@@ -19,8 +19,15 @@ struct SettingsMainView: View {
                 Section {
                     if qrzIsAuthenticated {
                         HStack {
-                            Label("Connected", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
+                            VStack(alignment: .leading) {
+                                Label("Connected", systemImage: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                if let callsign = qrzCallsign {
+                                    Text(callsign)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
                             Spacer()
                             Button("Logout") {
                                 logoutQRZ()
@@ -28,14 +35,14 @@ struct SettingsMainView: View {
                             .foregroundStyle(.red)
                         }
                     } else {
-                        Button("Login to QRZ") {
+                        Button("Connect to QRZ") {
                             showingQRZLogin = true
                         }
                     }
                 } header: {
                     Text("QRZ Logbook")
                 } footer: {
-                    Text("Upload your logs to QRZ.com logbook")
+                    Text("Enter your QRZ API key to upload logs. Get your key from QRZ.com Settings > API.")
                 }
 
                 Section {
@@ -110,9 +117,9 @@ struct SettingsMainView: View {
             }
             .navigationTitle("Settings")
             .sheet(isPresented: $showingQRZLogin) {
-                QRZLoginSheet(
-                    username: $qrzUsername,
-                    password: $qrzPassword,
+                QRZApiKeySheet(
+                    apiKey: $qrzApiKey,
+                    callsign: $qrzCallsign,
                     isAuthenticated: $qrzIsAuthenticated,
                     errorMessage: $errorMessage,
                     showingError: $showingError
@@ -134,58 +141,63 @@ struct SettingsMainView: View {
 
     private func checkQRZAuth() {
         do {
-            _ = try KeychainHelper.shared.readString(for: KeychainHelper.Keys.qrzSessionKey)
+            _ = try KeychainHelper.shared.readString(for: KeychainHelper.Keys.qrzApiKey)
             qrzIsAuthenticated = true
+            qrzCallsign = try? KeychainHelper.shared.readString(for: KeychainHelper.Keys.qrzCallsign)
         } catch {
             qrzIsAuthenticated = false
+            qrzCallsign = nil
         }
     }
 
     private func logoutQRZ() {
-        try? KeychainHelper.shared.delete(for: KeychainHelper.Keys.qrzSessionKey)
-        try? KeychainHelper.shared.delete(for: KeychainHelper.Keys.qrzUsername)
-        qrzIsAuthenticated = false
+        Task {
+            let client = QRZClient()
+            await client.logout()
+            qrzIsAuthenticated = false
+            qrzCallsign = nil
+        }
     }
 }
 
-struct QRZLoginSheet: View {
-    @Binding var username: String
-    @Binding var password: String
+struct QRZApiKeySheet: View {
+    @Binding var apiKey: String
+    @Binding var callsign: String?
     @Binding var isAuthenticated: Bool
     @Binding var errorMessage: String
     @Binding var showingError: Bool
 
     @Environment(\.dismiss) private var dismiss
-    @State private var isLoggingIn = false
+    @State private var isValidating = false
 
     var body: some View {
         NavigationStack {
             Form {
                 Section {
-                    TextField("Username", text: $username)
-                        .textContentType(.username)
-                        .autocapitalization(.none)
-
-                    SecureField("Password", text: $password)
+                    TextField("API Key", text: $apiKey)
                         .textContentType(.password)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                } footer: {
+                    Text("Get your API key from QRZ.com > Settings > API")
                 }
 
                 Section {
                     Button {
-                        Task { await login() }
+                        Task { await validateAndSave() }
                     } label: {
-                        if isLoggingIn {
+                        if isValidating {
                             ProgressView()
                                 .frame(maxWidth: .infinity)
                         } else {
-                            Text("Login")
+                            Text("Connect")
                                 .frame(maxWidth: .infinity)
                         }
                     }
-                    .disabled(username.isEmpty || password.isEmpty || isLoggingIn)
+                    .disabled(apiKey.isEmpty || isValidating)
                 }
             }
-            .navigationTitle("QRZ Login")
+            .navigationTitle("QRZ API Key")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
@@ -195,13 +207,16 @@ struct QRZLoginSheet: View {
         }
     }
 
-    private func login() async {
-        isLoggingIn = true
-        defer { isLoggingIn = false }
+    private func validateAndSave() async {
+        isValidating = true
+        defer { isValidating = false }
 
         do {
             let client = QRZClient()
-            _ = try await client.authenticate(username: username, password: password)
+            let status = try await client.validateApiKey(apiKey)
+            try await client.saveApiKey(apiKey)
+            try await client.saveCallsign(status.callsign)
+            callsign = status.callsign
             isAuthenticated = true
             dismiss()
         } catch {
