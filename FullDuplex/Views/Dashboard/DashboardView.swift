@@ -448,8 +448,8 @@ struct ActivityGrid: View {
         return Color.green.opacity(0.3 + intensity * 0.7)
     }
 
-    /// Returns array of (column index, month name) for month labels
-    private func monthLabels(cellWidth: CGFloat) -> [(column: Int, label: String)] {
+    /// Get month label positions
+    private var monthLabelPositions: [(column: Int, label: String)] {
         var labels: [(Int, String)] = []
         var lastMonth = -1
 
@@ -471,6 +471,7 @@ struct ActivityGrid: View {
             let gridWidth = geometry.size.width
             let cellSize = (gridWidth - CGFloat(columns - 1) * spacing) / CGFloat(columns)
             let gridHeight = CGFloat(rows) * cellSize + CGFloat(rows - 1) * spacing
+            let columnWidth = cellSize + spacing
 
             VStack(alignment: .leading, spacing: 4) {
                 // Grid cells
@@ -490,21 +491,17 @@ struct ActivityGrid: View {
                 }
                 .frame(height: gridHeight)
 
-                // Month labels - aligned with grid columns
-                HStack(alignment: .top, spacing: spacing) {
-                    ForEach(0..<columns, id: \.self) { column in
-                        let date = dateFor(column: column, row: 0)
-                        let month = calendar.component(.month, from: date)
-                        let prevDate = column > 0 ? dateFor(column: column - 1, row: 0) : nil
-                        let prevMonth = prevDate.map { calendar.component(.month, from: $0) }
-                        let isFirstOfMonth = prevMonth == nil || prevMonth != month
-
-                        Text(isFirstOfMonth ? monthFormatter.string(from: date) : "")
-                            .font(.system(size: 9))
+                // Month labels - positioned absolutely
+                ZStack(alignment: .topLeading) {
+                    ForEach(monthLabelPositions, id: \.column) { item in
+                        Text(item.label)
+                            .font(.system(size: 10))
                             .foregroundStyle(.secondary)
-                            .frame(width: cellSize)
+                            .fixedSize()
+                            .offset(x: CGFloat(item.column) * columnWidth)
                     }
                 }
+                .frame(width: gridWidth, height: 14, alignment: .topLeading)
             }
         }
     }
