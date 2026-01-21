@@ -192,6 +192,102 @@ class ImportService: ObservableObject {
             importSource: .lofi
         )
     }
+
+    // MARK: - QRZ Import (with merge)
+
+    func importFromQRZ(qsos: [QRZFetchedQSO], myCallsign: String) async throws -> ImportResult {
+        isImporting = true
+        defer { isImporting = false }
+
+        var imported = 0
+        var updated = 0
+
+        // Fetch existing QSOs for matching
+        let descriptor = FetchDescriptor<QSO>()
+        let existingQSOs = try modelContext.fetch(descriptor)
+
+        // Build lookup maps
+        let byQrzLogId = Dictionary(grouping: existingQSOs.filter { $0.qrzLogId != nil }) { $0.qrzLogId! }
+        let byDedupeKey = Dictionary(grouping: existingQSOs) { $0.deduplicationKey }
+
+        for qrzQso in qsos {
+            // Try to find existing by QRZ log ID first
+            if let qrzLogId = qrzQso.qrzLogId, let existing = byQrzLogId[qrzLogId]?.first {
+                // Update confirmation status
+                existing.qrzConfirmed = qrzQso.qrzConfirmed
+                existing.lotwConfirmedDate = qrzQso.lotwConfirmedDate
+                updated += 1
+                continue
+            }
+
+            // Try to find by deduplication key
+            let tempQso = QSO(
+                callsign: qrzQso.callsign,
+                band: qrzQso.band,
+                mode: qrzQso.mode,
+                timestamp: qrzQso.timestamp,
+                myCallsign: qrzQso.myCallsign ?? myCallsign,
+                importSource: .qrz
+            )
+            let dedupeKey = tempQso.deduplicationKey
+
+            if let existing = byDedupeKey[dedupeKey]?.first {
+                // Update with QRZ data
+                existing.qrzLogId = qrzQso.qrzLogId
+                existing.qrzConfirmed = qrzQso.qrzConfirmed
+                existing.lotwConfirmedDate = qrzQso.lotwConfirmedDate
+                updated += 1
+                continue
+            }
+
+            // Create new QSO
+            let newQso = QSO(
+                callsign: qrzQso.callsign,
+                band: qrzQso.band,
+                mode: qrzQso.mode,
+                frequency: qrzQso.frequency,
+                timestamp: qrzQso.timestamp,
+                rstSent: qrzQso.rstSent,
+                rstReceived: qrzQso.rstReceived,
+                myCallsign: qrzQso.myCallsign ?? myCallsign,
+                myGrid: qrzQso.myGrid,
+                theirGrid: qrzQso.theirGrid,
+                parkReference: qrzQso.parkReference,
+                notes: qrzQso.notes,
+                importSource: .qrz,
+                rawADIF: qrzQso.rawADIF,
+                qrzLogId: qrzQso.qrzLogId,
+                qrzConfirmed: qrzQso.qrzConfirmed,
+                lotwConfirmedDate: qrzQso.lotwConfirmedDate
+            )
+
+            modelContext.insert(newQso)
+
+            // Create sync records for other destinations (not QRZ since it came from there)
+            let potaSyncRecord = SyncRecord(destinationType: .pota, qso: newQso)
+            modelContext.insert(potaSyncRecord)
+            newQso.syncRecords.append(potaSyncRecord)
+
+            // Mark QRZ as already uploaded
+            let qrzSyncRecord = SyncRecord(destinationType: .qrz, status: .uploaded, uploadedAt: Date(), qso: newQso)
+            modelContext.insert(qrzSyncRecord)
+            newQso.syncRecords.append(qrzSyncRecord)
+
+            imported += 1
+        }
+
+        try modelContext.save()
+
+        let result = ImportResult(
+            totalRecords: qsos.count,
+            imported: imported,
+            duplicates: updated,  // Using duplicates field for "updated" count
+            errors: 0
+        )
+
+        lastImportResult = result
+        return result
+    }
 }
 
 enum ImportError: Error, LocalizedError {
