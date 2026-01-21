@@ -4,6 +4,7 @@ enum ImportSource: String, Codable {
     case lofi
     case adifFile
     case icloud
+    case qrz
 }
 
 enum SyncStatus: String, Codable {
