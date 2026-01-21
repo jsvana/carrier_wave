@@ -33,6 +33,20 @@ struct DashboardView: View {
     @State private var lastSyncDate: Date?
     @State private var lofiImportResult: String?
 
+    // QRZ stats
+    @State private var qrzTotalUploaded: Int = 0
+    @State private var qrzTotalDownloaded: Int = 0
+    @State private var qrzLastUploadDate: Date?
+    @State private var qrzLastDownloadDate: Date?
+    @State private var qrzCallsign: String?
+    @State private var qrzIsConfigured: Bool = false
+    @State private var showingQRZSetup: Bool = false
+    @State private var qrzApiKey: String = ""
+    @State private var qrzErrorMessage: String = ""
+    @State private var showingQRZError: Bool = false
+
+    private let qrzClient = QRZClient()
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -48,7 +62,7 @@ struct DashboardView: View {
 
                     // Destination Cards
                     HStack(spacing: 12) {
-                        destinationCard(for: .qrz)
+                        qrzCard
                         destinationCard(for: .pota)
                     }
 
@@ -61,6 +75,9 @@ struct DashboardView: View {
                     }
                 }
                 .padding()
+            }
+            .task {
+                await loadQRZStats()
             }
             .navigationTitle("Full Duplex")
             .toolbar {
@@ -237,6 +254,100 @@ struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
+    // MARK: - QRZ Card
+
+    private var qrzCard: some View {
+        let pendingQRZ = pendingSyncs.filter { $0.destinationType == .qrz }.count
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("QRZ Logbook")
+                    .font(.headline)
+                Spacer()
+                if qrzIsConfigured {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    if let callsign = qrzCallsign {
+                        Text(callsign)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else {
+                    Text("Not configured")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if qrzIsConfigured {
+                // Upload stats
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.up.circle")
+                        .foregroundStyle(.blue)
+                    Text("\(qrzTotalUploaded) uploaded")
+                        .font(.subheadline)
+                }
+
+                if let lastUpload = qrzLastUploadDate {
+                    Text("Last: \(lastUpload, style: .relative) ago")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Download stats
+                HStack(spacing: 4) {
+                    Image(systemName: "arrow.down.circle")
+                        .foregroundStyle(.green)
+                    Text("\(qrzTotalDownloaded) downloaded")
+                        .font(.subheadline)
+                }
+
+                if let lastDownload = qrzLastDownloadDate {
+                    Text("Last: \(lastDownload, style: .relative) ago")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                // Pending uploads
+                if pendingQRZ > 0 {
+                    Text("\(pendingQRZ) pending upload")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            } else {
+                Button {
+                    showingQRZSetup = true
+                } label: {
+                    Label("Configure QRZ", systemImage: "gear")
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .sheet(isPresented: $showingQRZSetup) {
+            QRZApiKeySheet(
+                apiKey: $qrzApiKey,
+                callsign: $qrzCallsign,
+                isAuthenticated: $qrzIsConfigured,
+                errorMessage: $qrzErrorMessage,
+                showingError: $showingQRZError
+            )
+        }
+        .alert("Error", isPresented: $showingQRZError) {
+            Button("OK") { }
+        } message: {
+            Text(qrzErrorMessage)
+        }
+        .onChange(of: qrzIsConfigured) { _, isConfigured in
+            if isConfigured {
+                Task { await loadQRZStats() }
+            }
+        }
+    }
+
     // MARK: - Destination Card
 
     private func destinationCard(for type: DestinationType) -> some View {
@@ -350,6 +461,15 @@ struct DashboardView: View {
 
     // MARK: - Actions
 
+    private func loadQRZStats() async {
+        qrzIsConfigured = await qrzClient.hasApiKey()
+        qrzCallsign = await qrzClient.getCallsign()
+        qrzTotalUploaded = await qrzClient.getTotalUploaded()
+        qrzTotalDownloaded = await qrzClient.getTotalDownloaded()
+        qrzLastUploadDate = await qrzClient.getLastUploadDate()
+        qrzLastDownloadDate = await qrzClient.getLastDownloadDate()
+    }
+
     private func performSync() async {
         isSyncing = true
         defer {
@@ -361,12 +481,20 @@ struct DashboardView: View {
             await syncFromLoFi()
         }
 
+        // Sync from QRZ (download)
+        if qrzIsConfigured {
+            await syncFromQRZ()
+        }
+
         do {
             let result = try await syncService.syncAll()
             print("Sync complete: QRZ uploaded \(result.qrzUploaded), POTA uploaded \(result.potaUploaded)")
         } catch {
             print("Sync error: \(error.localizedDescription)")
         }
+
+        // Reload QRZ stats after sync
+        await loadQRZStats()
     }
 
     private func syncFromLoFi() async {
@@ -381,6 +509,17 @@ struct DashboardView: View {
             lofiImportResult = "+\(result.imported) QSOs"
         } catch {
             lofiImportResult = "Error: \(error.localizedDescription)"
+        }
+    }
+
+    private func syncFromQRZ() async {
+        do {
+            let qsos = try await qrzClient.fetchQSOs(since: qrzLastDownloadDate)
+            if qsos.isEmpty { return }
+            let callsign = await qrzClient.getCallsign() ?? "UNKNOWN"
+            _ = try await importService.importFromQRZ(qsos: qsos, myCallsign: callsign)
+        } catch {
+            print("QRZ sync error: \(error.localizedDescription)")
         }
     }
 }
