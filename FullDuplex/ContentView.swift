@@ -24,6 +24,12 @@ struct ContentView: View {
         .onAppear {
             iCloudMonitor.startMonitoring()
         }
+        .onReceive(NotificationCenter.default.publisher(for: .didReceiveADIFFile)) { notification in
+            if let url = notification.object as? URL {
+                // Handle import - for now just print
+                print("Received ADIF file: \(url.lastPathComponent)")
+            }
+        }
     }
 }
 

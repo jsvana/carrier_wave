@@ -7,6 +7,12 @@ struct DashboardView: View {
     @Query private var allSyncRecords: [SyncRecord]
 
     @ObservedObject var iCloudMonitor: ICloudMonitor
+    @StateObject private var potaAuth = POTAAuthService()
+
+    // Computed property for sync service (needs modelContext)
+    private var syncService: SyncService {
+        SyncService(modelContext: modelContext, potaAuthService: potaAuth)
+    }
 
     private var pendingSyncs: [SyncRecord] {
         allSyncRecords.filter { $0.status == .pending }
@@ -162,7 +168,11 @@ struct DashboardView: View {
             lastSyncDate = Date()
         }
 
-        // TODO: Implement actual sync logic
-        try? await Task.sleep(nanoseconds: 1_000_000_000)
+        do {
+            let result = try await syncService.syncAll()
+            print("Sync complete: QRZ uploaded \(result.qrzUploaded), POTA uploaded \(result.potaUploaded)")
+        } catch {
+            print("Sync error: \(error.localizedDescription)")
+        }
     }
 }
