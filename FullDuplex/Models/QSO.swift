@@ -65,4 +65,37 @@ final class QSO {
         let rounded = Int(roundedTimestamp / 120) * 120 // 2 minute buckets
         return "\(callsign.uppercased())|\(band.uppercased())|\(mode.uppercased())|\(rounded)"
     }
+
+    /// Extract callsign prefix (approximate DXCC entity)
+    var callsignPrefix: String {
+        let upper = callsign.uppercased()
+        // Simple prefix extraction - takes letters/numbers before any /
+        let base = upper.components(separatedBy: "/").first ?? upper
+        // Extract prefix (first 1-3 chars that form entity)
+        var prefix = ""
+        for char in base {
+            if char.isLetter || char.isNumber {
+                prefix.append(char)
+                // Most prefixes are 1-3 characters
+                if prefix.count >= 2 && char.isNumber {
+                    break
+                }
+                if prefix.count >= 3 {
+                    break
+                }
+            }
+        }
+        return prefix
+    }
+
+    /// Check if this is likely a US station (for state counting)
+    var isUSStation: Bool {
+        let prefix = callsignPrefix
+        return prefix.hasPrefix("K") || prefix.hasPrefix("W") || prefix.hasPrefix("N") || prefix.hasPrefix("A")
+    }
+
+    /// Date only (for activity tracking)
+    var dateOnly: Date {
+        Calendar.current.startOfDay(for: timestamp)
+    }
 }

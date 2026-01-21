@@ -9,7 +9,6 @@ struct DashboardView: View {
     @ObservedObject var iCloudMonitor: ICloudMonitor
     @StateObject private var potaAuth = POTAAuthService()
 
-    // Computed property for sync service (needs modelContext)
     private var syncService: SyncService {
         SyncService(modelContext: modelContext, potaAuthService: potaAuth)
     }
@@ -24,6 +23,11 @@ struct DashboardView: View {
         allSyncRecords.filter { $0.status == .pending }
     }
 
+    // Statistics
+    private var stats: QSOStatistics {
+        QSOStatistics(qsos: qsos)
+    }
+
     @State private var isSyncing = false
     @State private var lastSyncDate: Date?
     @State private var lofiImportResult: String?
@@ -32,19 +36,25 @@ struct DashboardView: View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
+                    // Activity Grid
+                    activityCard
+
+                    // Summary Stats
                     summaryCard
 
+                    // LoFi Card (always show if configured)
+                    lofiCard
+
+                    // Destination Cards
                     HStack(spacing: 12) {
                         destinationCard(for: .qrz)
                         destinationCard(for: .pota)
                     }
 
-                    if lofiClient.isConfigured && lofiClient.isLinked {
-                        lofiCard
-                    }
-
+                    // Recent Imports
                     recentImportsCard
 
+                    // Pending iCloud Files
                     if !iCloudMonitor.pendingFiles.isEmpty {
                         pendingFilesCard
                     }
@@ -69,19 +79,53 @@ struct DashboardView: View {
         }
     }
 
-    private var summaryCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Summary")
-                .font(.headline)
+    // MARK: - Activity Card (GitHub-style)
 
+    private var activityCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label("\(qsos.count) QSOs", systemImage: "antenna.radiowaves.left.and.right")
+                Text("Activity")
+                    .font(.headline)
+                Spacer()
+                Text("\(stats.totalQSOs) QSOs")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            ActivityGrid(activityData: stats.activityByDate)
+                .frame(height: 100)
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Summary Card
+
+    private var summaryCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Statistics")
+                    .font(.headline)
                 Spacer()
                 if let lastSync = lastSyncDate {
-                    Text("Last sync: \(lastSync, style: .relative) ago")
+                    Text("Synced \(lastSync, style: .relative) ago")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            LazyVGrid(columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible())
+            ], spacing: 12) {
+                StatBox(title: "QSOs", value: "\(stats.totalQSOs)", icon: "antenna.radiowaves.left.and.right")
+                StatBox(title: "Entities", value: "\(stats.uniqueEntities)", icon: "globe")
+                StatBox(title: "Grids", value: "\(stats.uniqueGrids)", icon: "square.grid.3x3")
+                StatBox(title: "Bands", value: "\(stats.uniqueBands)", icon: "waveform")
+                StatBox(title: "Modes", value: "\(stats.uniqueModes)", icon: "dot.radiowaves.right")
+                StatBox(title: "Parks", value: "\(stats.uniqueParks)", icon: "leaf")
             }
         }
         .padding()
@@ -89,27 +133,110 @@ struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
+    // MARK: - LoFi Card
+
+    private var lofiCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("Ham2K LoFi", systemImage: "antenna.radiowaves.left.and.right")
+                    .font(.headline)
+                Spacer()
+
+                if lofiClient.isConfigured && lofiClient.isLinked {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    if let callsign = lofiClient.getCallsign() {
+                        Text(callsign)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } else if lofiClient.isConfigured {
+                    Image(systemName: "clock")
+                        .foregroundStyle(.orange)
+                    Text("Pending")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Not configured")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            // Show LoFi-imported QSO count
+            let lofiQSOs = qsos.filter { $0.importSource == .lofi }
+            if !lofiQSOs.isEmpty {
+                Text("\(lofiQSOs.count) QSOs from LoFi")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            if let result = lofiImportResult {
+                Text(result)
+                    .font(.caption)
+                    .foregroundStyle(.blue)
+            }
+
+            if lofiClient.isConfigured && lofiClient.isLinked {
+                Button {
+                    Task { await syncFromLoFi() }
+                } label: {
+                    Label("Sync from LoFi", systemImage: "arrow.down.circle")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isSyncing)
+            } else {
+                NavigationLink {
+                    LoFiSettingsView()
+                } label: {
+                    Label("Configure LoFi", systemImage: "gear")
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Destination Card
+
     private func destinationCard(for type: DestinationType) -> some View {
         let totalForDest = qsos.count
         let pending = pendingSyncs.filter { $0.destinationType == type }.count
         let synced = totalForDest - pending
 
         return VStack(alignment: .leading, spacing: 8) {
-            Text(type.displayName)
-                .font(.headline)
+            HStack {
+                Text(type.displayName)
+                    .font(.headline)
+                Spacer()
+                if pending > 0 {
+                    Image(systemName: "exclamationmark.triangle")
+                        .foregroundStyle(.orange)
+                } else if synced > 0 {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+            }
+
+            Text("\(synced)/\(totalForDest) synced")
+                .font(.subheadline)
 
             if pending > 0 {
-                Label("\(synced)/\(totalForDest)", systemImage: "exclamationmark.triangle")
-                    .foregroundStyle(.orange)
                 Text("\(pending) pending")
                     .font(.caption)
-                    .foregroundStyle(.secondary)
-            } else {
-                Label("\(synced)/\(totalForDest)", systemImage: "checkmark.circle")
-                    .foregroundStyle(.green)
-                Text("Synced")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.orange)
+            }
+
+            // Type-specific stats
+            if type == .pota {
+                let parksCount = stats.uniqueParks
+                if parksCount > 0 {
+                    Text("\(parksCount) parks")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -118,12 +245,14 @@ struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
+    // MARK: - Recent Imports Card
+
     private var recentImportsCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("Recent Imports")
+            Text("Recent QSOs")
                 .font(.headline)
 
-            let recentQSOs = Array(qsos.sorted { $0.importedAt > $1.importedAt }.prefix(5))
+            let recentQSOs = Array(qsos.sorted { $0.timestamp > $1.timestamp }.prefix(5))
 
             if recentQSOs.isEmpty {
                 Text("No logs imported yet")
@@ -135,8 +264,15 @@ struct DashboardView: View {
                             .fontWeight(.medium)
                         Spacer()
                         Text(qso.band)
+                            .font(.caption)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.2))
+                            .clipShape(Capsule())
+                        Text(qso.mode)
+                            .font(.caption)
                             .foregroundStyle(.secondary)
-                        Text(qso.importedAt, style: .relative)
+                        Text(qso.timestamp, style: .relative)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
@@ -147,6 +283,8 @@ struct DashboardView: View {
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
+
+    // MARK: - Pending Files Card
 
     private var pendingFilesCard: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -172,37 +310,7 @@ struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    private var lofiCard: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Label("Ham2K LoFi", systemImage: "antenna.radiowaves.left.and.right")
-                    .font(.headline)
-                Spacer()
-                if let callsign = lofiClient.getCallsign() {
-                    Text(callsign)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            if let result = lofiImportResult {
-                Text(result)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-
-            Button {
-                Task { await syncFromLoFi() }
-            } label: {
-                Label("Sync from LoFi", systemImage: "arrow.down.circle")
-            }
-            .buttonStyle(.bordered)
-            .disabled(isSyncing)
-        }
-        .padding()
-        .background(Color(.systemGray6))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
+    // MARK: - Actions
 
     private func performSync() async {
         isSyncing = true
@@ -211,12 +319,10 @@ struct DashboardView: View {
             lastSyncDate = Date()
         }
 
-        // First sync from LoFi if configured
         if lofiClient.isConfigured && lofiClient.isLinked {
             await syncFromLoFi()
         }
 
-        // Then upload to destinations
         do {
             let result = try await syncService.syncAll()
             print("Sync complete: QRZ uploaded \(result.qrzUploaded), POTA uploaded \(result.potaUploaded)")
@@ -229,15 +335,134 @@ struct DashboardView: View {
         do {
             let qsos = try await lofiClient.fetchAllQsosSinceLastSync()
             if qsos.isEmpty {
-                lofiImportResult = "No new QSOs from LoFi"
+                lofiImportResult = "No new QSOs"
                 return
             }
 
             let result = try await importService.importFromLoFi(qsos: qsos)
-            lofiImportResult = "Imported \(result.imported) QSOs (\(result.duplicates) duplicates)"
+            lofiImportResult = "+\(result.imported) QSOs"
         } catch {
-            lofiImportResult = "LoFi error: \(error.localizedDescription)"
-            print("LoFi sync error: \(error.localizedDescription)")
+            lofiImportResult = "Error: \(error.localizedDescription)"
         }
     }
 }
+
+// MARK: - Statistics
+
+struct QSOStatistics {
+    let qsos: [QSO]
+
+    var totalQSOs: Int { qsos.count }
+
+    var uniqueEntities: Int {
+        Set(qsos.map(\.callsignPrefix)).count
+    }
+
+    var uniqueGrids: Int {
+        Set(qsos.compactMap(\.theirGrid).filter { !$0.isEmpty }).count
+    }
+
+    var uniqueBands: Int {
+        Set(qsos.map(\.band)).count
+    }
+
+    var uniqueModes: Int {
+        Set(qsos.map(\.mode)).count
+    }
+
+    var uniqueParks: Int {
+        Set(qsos.compactMap(\.parkReference).filter { !$0.isEmpty }).count
+    }
+
+    var activityByDate: [Date: Int] {
+        var activity: [Date: Int] = [:]
+        for qso in qsos {
+            let date = qso.dateOnly
+            activity[date, default: 0] += 1
+        }
+        return activity
+    }
+}
+
+// MARK: - Stat Box
+
+struct StatBox: View {
+    let title: String
+    let value: String
+    let icon: String
+
+    var body: some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundStyle(.blue)
+            Text(value)
+                .font(.title2)
+                .fontWeight(.bold)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color(.systemGray5))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+// MARK: - Activity Grid (GitHub-style)
+
+struct ActivityGrid: View {
+    let activityData: [Date: Int]
+
+    private let columns = 26 // ~6 months of weeks
+    private let rows = 7 // days of week
+
+    private var maxCount: Int {
+        activityData.values.max() ?? 1
+    }
+
+    private func dateFor(column: Int, row: Int) -> Date {
+        let calendar = Calendar.current
+        let today = calendar.startOfDay(for: Date())
+        let todayWeekday = calendar.component(.weekday, from: today)
+
+        // Calculate offset: column 0 is oldest, last column is current week
+        let weeksBack = columns - 1 - column
+        let daysBack = weeksBack * 7 + (todayWeekday - 1 - row)
+
+        return calendar.date(byAdding: .day, value: -daysBack, to: today) ?? today
+    }
+
+    private func colorFor(count: Int) -> Color {
+        if count == 0 {
+            return Color(.systemGray5)
+        }
+        let intensity = min(Double(count) / Double(max(maxCount, 1)), 1.0)
+        return Color.green.opacity(0.3 + intensity * 0.7)
+    }
+
+    var body: some View {
+        GeometryReader { geometry in
+            let cellSize = min((geometry.size.width - CGFloat(columns - 1) * 2) / CGFloat(columns),
+                              (geometry.size.height - CGFloat(rows - 1) * 2) / CGFloat(rows))
+
+            HStack(alignment: .top, spacing: 2) {
+                ForEach(0..<columns, id: \.self) { column in
+                    VStack(spacing: 2) {
+                        ForEach(0..<rows, id: \.self) { row in
+                            let date = dateFor(column: column, row: row)
+                            let count = activityData[date] ?? 0
+
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(colorFor(count: count))
+                                .frame(width: cellSize, height: cellSize)
+                        }
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+        }
+    }
+}
+
