@@ -92,10 +92,23 @@ struct KeychainHelper {
 // Keychain keys for each service
 extension KeychainHelper {
     enum Keys {
+        // QRZ - token-based auth (new)
+        static let qrzApiKey = "qrz.api.key"
+        static let qrzCallsign = "qrz.callsign"
+        static let qrzTotalUploaded = "qrz.total.uploaded"
+        static let qrzTotalDownloaded = "qrz.total.downloaded"
+        static let qrzLastUploadDate = "qrz.last.upload.date"
+        static let qrzLastDownloadDate = "qrz.last.download.date"
+
+        // QRZ - session-based auth (deprecated, remove after migration)
         static let qrzSessionKey = "qrz.session.key"
         static let qrzUsername = "qrz.username"
+
+        // POTA
         static let potaIdToken = "pota.id.token"
         static let potaTokenExpiry = "pota.token.expiry"
+
+        // LoFi
         static let lofiAuthToken = "lofi.auth.token"
         static let lofiClientKey = "lofi.client.key"
         static let lofiClientSecret = "lofi.client.secret"
