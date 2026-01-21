@@ -109,6 +109,89 @@ class ImportService: ObservableObject {
             rawADIF: record.rawADIF
         )
     }
+
+    // MARK: - LoFi Import
+
+    func importFromLoFi(qsos: [(LoFiQso, LoFiOperation)]) async throws -> ImportResult {
+        isImporting = true
+        defer { isImporting = false }
+
+        var imported = 0
+        var duplicates = 0
+        var errors = 0
+
+        let existingKeys = try fetchExistingDeduplicationKeys()
+
+        for (lofiQso, operation) in qsos {
+            do {
+                let qso = try createQSO(from: lofiQso, operation: operation)
+
+                if existingKeys.contains(qso.deduplicationKey) {
+                    duplicates += 1
+                    continue
+                }
+
+                modelContext.insert(qso)
+
+                for destType in DestinationType.allCases {
+                    let syncRecord = SyncRecord(destinationType: destType, qso: qso)
+                    modelContext.insert(syncRecord)
+                    qso.syncRecords.append(syncRecord)
+                }
+
+                imported += 1
+            } catch {
+                errors += 1
+            }
+        }
+
+        try modelContext.save()
+
+        let result = ImportResult(
+            totalRecords: qsos.count,
+            imported: imported,
+            duplicates: duplicates,
+            errors: errors
+        )
+
+        lastImportResult = result
+        return result
+    }
+
+    private func createQSO(from lofiQso: LoFiQso, operation: LoFiOperation) throws -> QSO {
+        guard let callsign = lofiQso.theirCall else {
+            throw ImportError.parseError("Missing their callsign")
+        }
+
+        guard let band = lofiQso.band else {
+            throw ImportError.parseError("Missing band")
+        }
+
+        guard let mode = lofiQso.mode else {
+            throw ImportError.parseError("Missing mode")
+        }
+
+        let myCallsign = lofiQso.ourCall ?? operation.stationCall
+
+        // Get park reference from operation refs
+        let parkRef = lofiQso.myPotaRef(from: operation.refs)
+
+        return QSO(
+            callsign: callsign,
+            band: band,
+            mode: mode,
+            frequency: lofiQso.freqMHz,
+            timestamp: lofiQso.timestamp,
+            rstSent: lofiQso.rstSent,
+            rstReceived: lofiQso.rstRcvd,
+            myCallsign: myCallsign,
+            myGrid: operation.grid,
+            theirGrid: lofiQso.theirGrid,
+            parkReference: parkRef,
+            notes: lofiQso.notes,
+            importSource: .lofi
+        )
+    }
 }
 
 enum ImportError: Error, LocalizedError {

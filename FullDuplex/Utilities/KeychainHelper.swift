@@ -97,5 +97,11 @@ extension KeychainHelper {
         static let potaIdToken = "pota.id.token"
         static let potaTokenExpiry = "pota.token.expiry"
         static let lofiAuthToken = "lofi.auth.token"
+        static let lofiClientKey = "lofi.client.key"
+        static let lofiClientSecret = "lofi.client.secret"
+        static let lofiCallsign = "lofi.callsign"
+        static let lofiEmail = "lofi.email"
+        static let lofiDeviceLinked = "lofi.device.linked"
+        static let lofiLastSyncMillis = "lofi.last.sync.millis"
     }
 }

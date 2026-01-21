@@ -14,12 +14,19 @@ struct DashboardView: View {
         SyncService(modelContext: modelContext, potaAuthService: potaAuth)
     }
 
+    private var importService: ImportService {
+        ImportService(modelContext: modelContext)
+    }
+
+    private let lofiClient = LoFiClient()
+
     private var pendingSyncs: [SyncRecord] {
         allSyncRecords.filter { $0.status == .pending }
     }
 
     @State private var isSyncing = false
     @State private var lastSyncDate: Date?
+    @State private var lofiImportResult: String?
 
     var body: some View {
         NavigationStack {
@@ -30,6 +37,10 @@ struct DashboardView: View {
                     HStack(spacing: 12) {
                         destinationCard(for: .qrz)
                         destinationCard(for: .pota)
+                    }
+
+                    if lofiClient.isConfigured && lofiClient.isLinked {
+                        lofiCard
                     }
 
                     recentImportsCard
@@ -161,6 +172,38 @@ struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
+    private var lofiCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label("Ham2K LoFi", systemImage: "antenna.radiowaves.left.and.right")
+                    .font(.headline)
+                Spacer()
+                if let callsign = lofiClient.getCallsign() {
+                    Text(callsign)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if let result = lofiImportResult {
+                Text(result)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Button {
+                Task { await syncFromLoFi() }
+            } label: {
+                Label("Sync from LoFi", systemImage: "arrow.down.circle")
+            }
+            .buttonStyle(.bordered)
+            .disabled(isSyncing)
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
     private func performSync() async {
         isSyncing = true
         defer {
@@ -168,11 +211,33 @@ struct DashboardView: View {
             lastSyncDate = Date()
         }
 
+        // First sync from LoFi if configured
+        if lofiClient.isConfigured && lofiClient.isLinked {
+            await syncFromLoFi()
+        }
+
+        // Then upload to destinations
         do {
             let result = try await syncService.syncAll()
             print("Sync complete: QRZ uploaded \(result.qrzUploaded), POTA uploaded \(result.potaUploaded)")
         } catch {
             print("Sync error: \(error.localizedDescription)")
+        }
+    }
+
+    private func syncFromLoFi() async {
+        do {
+            let qsos = try await lofiClient.fetchAllQsosSinceLastSync()
+            if qsos.isEmpty {
+                lofiImportResult = "No new QSOs from LoFi"
+                return
+            }
+
+            let result = try await importService.importFromLoFi(qsos: qsos)
+            lofiImportResult = "Imported \(result.imported) QSOs (\(result.duplicates) duplicates)"
+        } catch {
+            lofiImportResult = "LoFi error: \(error.localizedDescription)"
+            print("LoFi sync error: \(error.localizedDescription)")
         }
     }
 }
