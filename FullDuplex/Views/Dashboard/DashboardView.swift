@@ -8,6 +8,7 @@ struct DashboardView: View {
 
     @ObservedObject var iCloudMonitor: ICloudMonitor
     @StateObject private var potaAuth = POTAAuthService()
+    @Binding var selectedTab: AppTab
 
     private var syncService: SyncService {
         SyncService(modelContext: modelContext, potaAuthService: potaAuth)
@@ -120,12 +121,49 @@ struct DashboardView: View {
                 GridItem(.flexible()),
                 GridItem(.flexible())
             ], spacing: 12) {
-                StatBox(title: "QSOs", value: "\(stats.totalQSOs)", icon: "antenna.radiowaves.left.and.right")
-                StatBox(title: "Entities", value: "\(stats.uniqueEntities)", icon: "globe")
-                StatBox(title: "Grids", value: "\(stats.uniqueGrids)", icon: "square.grid.3x3")
-                StatBox(title: "Bands", value: "\(stats.uniqueBands)", icon: "waveform")
-                StatBox(title: "Modes", value: "\(stats.uniqueModes)", icon: "dot.radiowaves.right")
-                StatBox(title: "Parks", value: "\(stats.uniqueParks)", icon: "leaf")
+                // Total QSOs - switches to Logs tab
+                Button {
+                    selectedTab = .logs
+                } label: {
+                    StatBox(title: "QSOs", value: "\(stats.totalQSOs)", icon: "antenna.radiowaves.left.and.right")
+                }
+                .buttonStyle(.plain)
+
+                // Category stats - navigate to detail views
+                NavigationLink {
+                    StatDetailView(category: .entities, items: stats.items(for: .entities))
+                } label: {
+                    StatBox(title: "Entities", value: "\(stats.uniqueEntities)", icon: "globe")
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    StatDetailView(category: .grids, items: stats.items(for: .grids))
+                } label: {
+                    StatBox(title: "Grids", value: "\(stats.uniqueGrids)", icon: "square.grid.3x3")
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    StatDetailView(category: .bands, items: stats.items(for: .bands))
+                } label: {
+                    StatBox(title: "Bands", value: "\(stats.uniqueBands)", icon: "waveform")
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    StatDetailView(category: .modes, items: stats.items(for: .modes))
+                } label: {
+                    StatBox(title: "Modes", value: "\(stats.uniqueModes)", icon: "dot.radiowaves.right")
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
+                    StatDetailView(category: .parks, items: stats.items(for: .parks))
+                } label: {
+                    StatBox(title: "Parks", value: "\(stats.uniqueParks)", icon: "leaf")
+                }
+                .buttonStyle(.plain)
             }
         }
         .padding()
