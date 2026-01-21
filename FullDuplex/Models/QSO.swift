@@ -20,6 +20,11 @@ final class QSO {
     var importedAt: Date
     var rawADIF: String?
 
+    // QRZ sync tracking
+    var qrzLogId: String?
+    var qrzConfirmed: Bool = false
+    var lotwConfirmedDate: Date?
+
     @Relationship(deleteRule: .cascade, inverse: \SyncRecord.qso)
     var syncRecords: [SyncRecord] = []
 
@@ -39,7 +44,10 @@ final class QSO {
         notes: String? = nil,
         importSource: ImportSource,
         importedAt: Date = Date(),
-        rawADIF: String? = nil
+        rawADIF: String? = nil,
+        qrzLogId: String? = nil,
+        qrzConfirmed: Bool = false,
+        lotwConfirmedDate: Date? = nil
     ) {
         self.id = id
         self.callsign = callsign
@@ -57,6 +65,9 @@ final class QSO {
         self.importSource = importSource
         self.importedAt = importedAt
         self.rawADIF = rawADIF
+        self.qrzLogId = qrzLogId
+        self.qrzConfirmed = qrzConfirmed
+        self.lotwConfirmedDate = lotwConfirmedDate
     }
 
     /// Deduplication key: callsign + band + mode + timestamp (rounded to 2 min)
