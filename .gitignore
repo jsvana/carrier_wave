@@ -19,3 +19,6 @@ Pods/
 .DS_Store
 *.swp
 *~
+
+# Worktrees
+.worktrees/
