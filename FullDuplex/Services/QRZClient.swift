@@ -260,23 +260,23 @@ actor QRZClient {
         let pageSize = 250
 
         while true {
-            var components = URLComponents(string: baseURL)!
-            var queryItems = [
-                URLQueryItem(name: "ACTION", value: "FETCH"),
-                URLQueryItem(name: "KEY", value: apiKey),
-                URLQueryItem(name: "MAX", value: String(pageSize)),
-                URLQueryItem(name: "OFFSET", value: String(offset))
-            ]
+            // Build OPTION parameter with comma-separated filters
+            var optionParts = ["MAX:\(pageSize)", "OFFSET:\(offset)"]
 
             // Add MODSINCE filter if date provided
             if let since = since {
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd"
                 formatter.timeZone = TimeZone(identifier: "UTC")
-                queryItems.append(URLQueryItem(name: "MODSINCE", value: formatter.string(from: since)))
+                optionParts.append("MODSINCE:\(formatter.string(from: since))")
             }
 
-            components.queryItems = queryItems
+            var components = URLComponents(string: baseURL)!
+            components.queryItems = [
+                URLQueryItem(name: "ACTION", value: "FETCH"),
+                URLQueryItem(name: "KEY", value: apiKey),
+                URLQueryItem(name: "OPTION", value: optionParts.joined(separator: ","))
+            ]
 
             guard let url = components.url else {
                 throw QRZError.invalidResponse
