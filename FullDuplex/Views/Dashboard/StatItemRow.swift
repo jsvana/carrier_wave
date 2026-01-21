@@ -65,17 +65,32 @@ struct StatItemRow: View {
             }
 
             if visibleQSOCount < item.qsos.count {
-                Button {
-                    withAnimation {
-                        visibleQSOCount += batchSize
+                HStack(spacing: 16) {
+                    Button {
+                        withAnimation {
+                            visibleQSOCount += batchSize
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "ellipsis")
+                            Text("Show more")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.blue)
                     }
-                } label: {
-                    HStack {
-                        Image(systemName: "ellipsis")
-                        Text("Show more (\(item.qsos.count - visibleQSOCount) remaining)")
+
+                    Button {
+                        withAnimation {
+                            visibleQSOCount = item.qsos.count
+                        }
+                    } label: {
+                        HStack {
+                            Image(systemName: "list.bullet")
+                            Text("Show all (\(item.qsos.count - visibleQSOCount))")
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.blue)
                     }
-                    .font(.caption)
-                    .foregroundStyle(.blue)
                 }
                 .padding(.top, 4)
             }
