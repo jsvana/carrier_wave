@@ -1,10 +1,3 @@
-//
-//  FullDuplexApp.swift
-//  FullDuplex
-//
-//  Created by Jay Vana on 1/20/26.
-//
-
 import SwiftUI
 import SwiftData
 
@@ -12,12 +5,20 @@ import SwiftData
 struct FullDuplexApp: App {
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
-            Item.self,
+            QSO.self,
+            SyncRecord.self,
+            UploadDestination.self,
         ])
-        let modelConfiguration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
+        let modelConfiguration = ModelConfiguration(
+            schema: schema,
+            isStoredInMemoryOnly: false
+        )
 
         do {
-            return try ModelContainer(for: schema, configurations: [modelConfiguration])
+            return try ModelContainer(
+                for: schema,
+                configurations: [modelConfiguration]
+            )
         } catch {
             fatalError("Could not create ModelContainer: \(error)")
         }
