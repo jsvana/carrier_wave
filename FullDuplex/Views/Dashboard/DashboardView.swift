@@ -449,12 +449,12 @@ struct ActivityGrid: View {
     }
 
     /// Returns array of (column index, month name) for month labels
-    private var monthLabels: [(column: Int, label: String)] {
+    private func monthLabels(cellWidth: CGFloat) -> [(column: Int, label: String)] {
         var labels: [(Int, String)] = []
         var lastMonth = -1
 
         for column in 0..<columns {
-            let date = dateFor(column: column, row: 0) // First day of week
+            let date = dateFor(column: column, row: 0)
             let month = calendar.component(.month, from: date)
 
             if month != lastMonth {
@@ -466,18 +466,17 @@ struct ActivityGrid: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            // Grid
-            GeometryReader { geometry in
-                let availableHeight = geometry.size.height
-                let cellSize = min(
-                    (geometry.size.width - CGFloat(columns - 1) * 2) / CGFloat(columns),
-                    (availableHeight - CGFloat(rows - 1) * 2) / CGFloat(rows)
-                )
+        GeometryReader { geometry in
+            let spacing: CGFloat = 2
+            let gridWidth = geometry.size.width
+            let cellSize = (gridWidth - CGFloat(columns - 1) * spacing) / CGFloat(columns)
+            let gridHeight = CGFloat(rows) * cellSize + CGFloat(rows - 1) * spacing
 
-                HStack(alignment: .top, spacing: 2) {
+            VStack(alignment: .leading, spacing: 4) {
+                // Grid cells
+                HStack(alignment: .top, spacing: spacing) {
                     ForEach(0..<columns, id: \.self) { column in
-                        VStack(spacing: 2) {
+                        VStack(spacing: spacing) {
                             ForEach(0..<rows, id: \.self) { row in
                                 let date = dateFor(column: column, row: row)
                                 let count = activityData[date] ?? 0
@@ -489,24 +488,24 @@ struct ActivityGrid: View {
                         }
                     }
                 }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
-            }
+                .frame(height: gridHeight)
 
-            // Month labels
-            GeometryReader { geometry in
-                let cellWidth = (geometry.size.width - CGFloat(columns - 1) * 2) / CGFloat(columns)
+                // Month labels - aligned with grid columns
+                HStack(alignment: .top, spacing: spacing) {
+                    ForEach(0..<columns, id: \.self) { column in
+                        let date = dateFor(column: column, row: 0)
+                        let month = calendar.component(.month, from: date)
+                        let prevDate = column > 0 ? dateFor(column: column - 1, row: 0) : nil
+                        let prevMonth = prevDate.map { calendar.component(.month, from: $0) }
+                        let isFirstOfMonth = prevMonth == nil || prevMonth != month
 
-                ZStack(alignment: .leading) {
-                    ForEach(monthLabels, id: \.column) { item in
-                        Text(item.label)
+                        Text(isFirstOfMonth ? monthFormatter.string(from: date) : "")
                             .font(.system(size: 9))
                             .foregroundStyle(.secondary)
-                            .offset(x: CGFloat(item.column) * (cellWidth + 2))
+                            .frame(width: cellSize)
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .frame(height: 12)
         }
     }
 }
