@@ -314,6 +314,15 @@ struct DashboardView: View {
                         .font(.caption)
                         .foregroundStyle(.orange)
                 }
+
+                // Sync button
+                Button {
+                    Task { await performQRZSync() }
+                } label: {
+                    Label("Sync with QRZ", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .buttonStyle(.bordered)
+                .disabled(isSyncing)
             } else {
                 Button {
                     showingQRZSetup = true
@@ -521,6 +530,24 @@ struct DashboardView: View {
         } catch {
             print("QRZ sync error: \(error.localizedDescription)")
         }
+    }
+
+    private func performQRZSync() async {
+        isSyncing = true
+        defer { isSyncing = false }
+
+        // Download from QRZ
+        await syncFromQRZ()
+
+        // Upload pending to QRZ
+        do {
+            _ = try await syncService.syncToQRZ()
+        } catch {
+            print("QRZ upload error: \(error.localizedDescription)")
+        }
+
+        // Reload stats
+        await loadQRZStats()
     }
 }
 
