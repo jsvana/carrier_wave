@@ -93,7 +93,7 @@ struct DashboardView: View {
             }
 
             ActivityGrid(activityData: stats.activityByDate)
-                .frame(height: 100)
+                .frame(height: 115) // Extra height for month labels
         }
         .padding()
         .background(Color(.systemGray6))
@@ -422,8 +422,14 @@ struct ActivityGrid: View {
         activityData.values.max() ?? 1
     }
 
+    private let calendar = Calendar.current
+    private let monthFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM"
+        return f
+    }()
+
     private func dateFor(column: Int, row: Int) -> Date {
-        let calendar = Calendar.current
         let today = calendar.startOfDay(for: Date())
         let todayWeekday = calendar.component(.weekday, from: today)
 
@@ -442,26 +448,65 @@ struct ActivityGrid: View {
         return Color.green.opacity(0.3 + intensity * 0.7)
     }
 
+    /// Returns array of (column index, month name) for month labels
+    private var monthLabels: [(column: Int, label: String)] {
+        var labels: [(Int, String)] = []
+        var lastMonth = -1
+
+        for column in 0..<columns {
+            let date = dateFor(column: column, row: 0) // First day of week
+            let month = calendar.component(.month, from: date)
+
+            if month != lastMonth {
+                labels.append((column, monthFormatter.string(from: date)))
+                lastMonth = month
+            }
+        }
+        return labels
+    }
+
     var body: some View {
-        GeometryReader { geometry in
-            let cellSize = min((geometry.size.width - CGFloat(columns - 1) * 2) / CGFloat(columns),
-                              (geometry.size.height - CGFloat(rows - 1) * 2) / CGFloat(rows))
+        VStack(alignment: .leading, spacing: 4) {
+            // Grid
+            GeometryReader { geometry in
+                let availableHeight = geometry.size.height
+                let cellSize = min(
+                    (geometry.size.width - CGFloat(columns - 1) * 2) / CGFloat(columns),
+                    (availableHeight - CGFloat(rows - 1) * 2) / CGFloat(rows)
+                )
 
-            HStack(alignment: .top, spacing: 2) {
-                ForEach(0..<columns, id: \.self) { column in
-                    VStack(spacing: 2) {
-                        ForEach(0..<rows, id: \.self) { row in
-                            let date = dateFor(column: column, row: row)
-                            let count = activityData[date] ?? 0
+                HStack(alignment: .top, spacing: 2) {
+                    ForEach(0..<columns, id: \.self) { column in
+                        VStack(spacing: 2) {
+                            ForEach(0..<rows, id: \.self) { row in
+                                let date = dateFor(column: column, row: row)
+                                let count = activityData[date] ?? 0
 
-                            RoundedRectangle(cornerRadius: 2)
-                                .fill(colorFor(count: count))
-                                .frame(width: cellSize, height: cellSize)
+                                RoundedRectangle(cornerRadius: 2)
+                                    .fill(colorFor(count: count))
+                                    .frame(width: cellSize, height: cellSize)
+                            }
                         }
                     }
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .trailing)
+
+            // Month labels
+            GeometryReader { geometry in
+                let cellWidth = (geometry.size.width - CGFloat(columns - 1) * 2) / CGFloat(columns)
+
+                ZStack(alignment: .leading) {
+                    ForEach(monthLabels, id: \.column) { item in
+                        Text(item.label)
+                            .font(.system(size: 9))
+                            .foregroundStyle(.secondary)
+                            .offset(x: CGFloat(item.column) * (cellWidth + 2))
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
+            }
+            .frame(height: 12)
         }
     }
 }
