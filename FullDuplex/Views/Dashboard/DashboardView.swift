@@ -382,6 +382,78 @@ struct QSOStatistics {
         }
         return activity
     }
+
+    func items(for category: StatCategoryType) -> [StatCategoryItem] {
+        switch category {
+        case .entities:
+            return groupedByEntity()
+        case .grids:
+            return groupedByGrid()
+        case .bands:
+            return groupedByBand()
+        case .modes:
+            return groupedByMode()
+        case .parks:
+            return groupedByPark()
+        }
+    }
+
+    private func groupedByEntity() -> [StatCategoryItem] {
+        let grouped = Dictionary(grouping: qsos) { $0.callsignPrefix }
+        return grouped.map { prefix, qsos in
+            StatCategoryItem(
+                identifier: prefix,
+                description: DescriptionLookup.entityDescription(for: prefix),
+                qsos: qsos
+            )
+        }
+    }
+
+    private func groupedByGrid() -> [StatCategoryItem] {
+        let gridsOnly = qsos.filter { $0.theirGrid != nil && !$0.theirGrid!.isEmpty }
+        let grouped = Dictionary(grouping: gridsOnly) { $0.theirGrid! }
+        return grouped.map { grid, qsos in
+            StatCategoryItem(
+                identifier: grid,
+                description: DescriptionLookup.gridDescription(for: grid),
+                qsos: qsos
+            )
+        }
+    }
+
+    private func groupedByBand() -> [StatCategoryItem] {
+        let grouped = Dictionary(grouping: qsos) { $0.band }
+        return grouped.map { band, qsos in
+            StatCategoryItem(
+                identifier: band,
+                description: DescriptionLookup.bandDescription(for: band),
+                qsos: qsos
+            )
+        }
+    }
+
+    private func groupedByMode() -> [StatCategoryItem] {
+        let grouped = Dictionary(grouping: qsos) { $0.mode }
+        return grouped.map { mode, qsos in
+            StatCategoryItem(
+                identifier: mode,
+                description: DescriptionLookup.modeDescription(for: mode),
+                qsos: qsos
+            )
+        }
+    }
+
+    private func groupedByPark() -> [StatCategoryItem] {
+        let parksOnly = qsos.filter { $0.parkReference != nil && !$0.parkReference!.isEmpty }
+        let grouped = Dictionary(grouping: parksOnly) { $0.parkReference! }
+        return grouped.map { park, qsos in
+            StatCategoryItem(
+                identifier: park,
+                description: DescriptionLookup.parkDescription(for: park),
+                qsos: qsos
+            )
+        }
+    }
 }
 
 // MARK: - Stat Box
