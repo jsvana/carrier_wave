@@ -44,6 +44,7 @@ struct DashboardView: View {
     @State private var qrzApiKey: String = ""
     @State private var qrzErrorMessage: String = ""
     @State private var showingQRZError: Bool = false
+    @State private var qrzSyncResult: String?
 
     private let qrzClient = QRZClient()
 
@@ -315,6 +316,13 @@ struct DashboardView: View {
                         .foregroundStyle(.orange)
                 }
 
+                // Sync result
+                if let result = qrzSyncResult {
+                    Text(result)
+                        .font(.caption)
+                        .foregroundStyle(.blue)
+                }
+
                 // Sync button
                 Button {
                     Task { await performQRZSync() }
@@ -534,20 +542,49 @@ struct DashboardView: View {
 
     private func performQRZSync() async {
         isSyncing = true
+        qrzSyncResult = "Syncing..."
         defer { isSyncing = false }
 
+        var downloaded = 0
+        var uploaded = 0
+        var errorMsg: String?
+
         // Download from QRZ
-        await syncFromQRZ()
+        do {
+            let qsos = try await qrzClient.fetchQSOs(since: qrzLastDownloadDate)
+            if !qsos.isEmpty {
+                let callsign = await qrzClient.getCallsign() ?? "UNKNOWN"
+                let result = try await importService.importFromQRZ(qsos: qsos, myCallsign: callsign)
+                downloaded = result.imported + result.duplicates
+            }
+        } catch {
+            errorMsg = "Download: \(error.localizedDescription)"
+        }
 
         // Upload pending to QRZ
-        do {
-            _ = try await syncService.syncToQRZ()
-        } catch {
-            print("QRZ upload error: \(error.localizedDescription)")
+        if errorMsg == nil {
+            do {
+                let result = try await syncService.syncToQRZ()
+                uploaded = result.uploaded
+            } catch {
+                errorMsg = "Upload: \(error.localizedDescription)"
+            }
         }
 
         // Reload stats
         await loadQRZStats()
+
+        // Show result
+        if let error = errorMsg {
+            qrzSyncResult = "Error: \(error)"
+        } else if downloaded == 0 && uploaded == 0 {
+            qrzSyncResult = "Already in sync"
+        } else {
+            var parts: [String] = []
+            if downloaded > 0 { parts.append("↓\(downloaded)") }
+            if uploaded > 0 { parts.append("↑\(uploaded)") }
+            qrzSyncResult = parts.joined(separator: " ")
+        }
     }
 }
 
