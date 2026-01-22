@@ -25,8 +25,8 @@ final class QSO {
     var qrzConfirmed: Bool = false
     var lotwConfirmedDate: Date?
 
-    @Relationship(deleteRule: .cascade, inverse: \SyncRecord.qso)
-    var syncRecords: [SyncRecord] = []
+    @Relationship(deleteRule: .cascade, inverse: \ServicePresence.qso)
+    var servicePresence: [ServicePresence] = []
 
     init(
         id: UUID = UUID(),
@@ -105,8 +105,68 @@ final class QSO {
         return prefix.hasPrefix("K") || prefix.hasPrefix("W") || prefix.hasPrefix("N") || prefix.hasPrefix("A")
     }
 
+    /// Count of populated optional fields (for deduplication tiebreaker)
+    var fieldRichnessScore: Int {
+        var score = 0
+        if rstSent != nil { score += 1 }
+        if rstReceived != nil { score += 1 }
+        if myGrid != nil { score += 1 }
+        if theirGrid != nil { score += 1 }
+        if parkReference != nil { score += 1 }
+        if notes != nil { score += 1 }
+        if qrzLogId != nil { score += 1 }
+        if rawADIF != nil { score += 1 }
+        if frequency != nil { score += 1 }
+        return score
+    }
+
     /// Date only (for activity tracking)
     var dateOnly: Date {
         Calendar.current.startOfDay(for: timestamp)
+    }
+
+    // MARK: - Service Presence Helpers
+
+    /// Get presence record for a specific service
+    func presence(for service: ServiceType) -> ServicePresence? {
+        servicePresence.first { $0.serviceType == service }
+    }
+
+    /// Check if QSO is present in a service
+    func isPresent(in service: ServiceType) -> Bool {
+        presence(for: service)?.isPresent ?? false
+    }
+
+    /// Check if QSO needs upload to a service
+    func needsUpload(to service: ServiceType) -> Bool {
+        presence(for: service)?.needsUpload ?? false
+    }
+
+    /// Mark QSO as present in a service
+    func markPresent(in service: ServiceType, context: ModelContext) {
+        if let existing = presence(for: service) {
+            existing.isPresent = true
+            existing.needsUpload = false
+            existing.lastConfirmedAt = Date()
+        } else {
+            let newPresence = ServicePresence.downloaded(from: service, qso: self)
+            context.insert(newPresence)
+            servicePresence.append(newPresence)
+        }
+    }
+
+    /// Mark QSO as needing upload to a service (if it supports upload)
+    func markNeedsUpload(to service: ServiceType, context: ModelContext) {
+        guard service.supportsUpload else { return }
+
+        if let existing = presence(for: service) {
+            if !existing.isPresent {
+                existing.needsUpload = true
+            }
+        } else {
+            let newPresence = ServicePresence.needsUpload(to: service, qso: self)
+            context.insert(newPresence)
+            servicePresence.append(newPresence)
+        }
     }
 }
