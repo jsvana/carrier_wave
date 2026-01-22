@@ -4,28 +4,54 @@ import SwiftData
 enum AppTab: Hashable {
     case dashboard
     case logs
+    case potaUploads
     case settings
 }
 
 struct ContentView: View {
+    @Environment(\.modelContext) private var modelContext
     @StateObject private var iCloudMonitor = ICloudMonitor()
+    @StateObject private var potaAuthService = POTAAuthService()
     @State private var selectedTab: AppTab = .dashboard
+    @State private var syncService: SyncService?
+    @State private var potaClient: POTAClient?
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            DashboardView(iCloudMonitor: iCloudMonitor, selectedTab: $selectedTab)
+            if let syncService = syncService {
+                DashboardView(
+                    iCloudMonitor: iCloudMonitor,
+                    potaAuth: potaAuthService,
+                    syncService: syncService,
+                    selectedTab: $selectedTab
+                )
                 .tabItem {
                     Label("Dashboard", systemImage: "square.grid.2x2")
                 }
                 .tag(AppTab.dashboard)
+            } else {
+                ProgressView()
+                    .tabItem {
+                        Label("Dashboard", systemImage: "square.grid.2x2")
+                    }
+                    .tag(AppTab.dashboard)
+            }
 
             LogsListView()
                 .tabItem {
-                    Label("Logs", systemImage: "list.bullet")
+                    Label("QSOs", systemImage: "list.bullet")
                 }
                 .tag(AppTab.logs)
 
-            SettingsMainView()
+            if let potaClient = potaClient {
+                POTAUploadsView(potaClient: potaClient, potaAuth: potaAuthService)
+                    .tabItem {
+                        Label("POTA Uploads", systemImage: "arrow.up.doc")
+                    }
+                    .tag(AppTab.potaUploads)
+            }
+
+            SettingsMainView(potaAuth: potaAuthService)
                 .tabItem {
                     Label("Settings", systemImage: "gear")
                 }
@@ -33,6 +59,15 @@ struct ContentView: View {
         }
         .onAppear {
             iCloudMonitor.startMonitoring()
+            if syncService == nil {
+                syncService = SyncService(
+                    modelContext: modelContext,
+                    potaAuthService: potaAuthService
+                )
+            }
+            if potaClient == nil {
+                potaClient = POTAClient(authService: potaAuthService)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .didReceiveADIFFile)) { notification in
             if let url = notification.object as? URL {
@@ -45,5 +80,5 @@ struct ContentView: View {
 
 #Preview {
     ContentView()
-        .modelContainer(for: [QSO.self, SyncRecord.self, UploadDestination.self], inMemory: true)
+        .modelContainer(for: [QSO.self, ServicePresence.self, UploadDestination.self, POTAUploadAttempt.self], inMemory: true)
 }
