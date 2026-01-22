@@ -77,7 +77,7 @@ final class QSO {
         return "\(callsign.uppercased())|\(band.uppercased())|\(mode.uppercased())|\(rounded)"
     }
 
-    /// Extract callsign prefix (approximate DXCC entity)
+    /// Extract callsign prefix (for display/grouping)
     var callsignPrefix: String {
         let upper = callsign.uppercased()
         // Simple prefix extraction - takes letters/numbers before any /
@@ -99,10 +99,14 @@ final class QSO {
         return prefix
     }
 
+    /// DXCC entity for this QSO (official DXCC entity number and name)
+    var dxccEntity: DXCCEntity? {
+        DescriptionLookup.dxccEntity(for: callsign)
+    }
+
     /// Check if this is likely a US station (for state counting)
     var isUSStation: Bool {
-        let prefix = callsignPrefix
-        return prefix.hasPrefix("K") || prefix.hasPrefix("W") || prefix.hasPrefix("N") || prefix.hasPrefix("A")
+        dxccEntity?.number == 291  // United States DXCC number
     }
 
     /// Count of populated optional fields (for deduplication tiebreaker)

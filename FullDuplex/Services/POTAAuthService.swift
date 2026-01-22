@@ -1,3 +1,9 @@
+// POTA WebView authentication module
+//
+// This module handles authentication with POTA using an in-app WebView
+// to navigate the Cognito Hosted UI, then caches the resulting JWT tokens
+// for subsequent direct API calls.
+
 import Combine
 import Foundation
 import WebKit
@@ -41,6 +47,12 @@ struct POTAToken: Codable {
 class POTAAuthService: NSObject, ObservableObject {
     @Published var isAuthenticating = false
     @Published var currentToken: POTAToken?
+
+    /// Check if we have a valid (non-expired) POTA authentication token
+    var isAuthenticated: Bool {
+        guard let token = currentToken else { return false }
+        return !token.isExpired
+    }
 
     private let keychain = KeychainHelper.shared
     private var webView: WKWebView?

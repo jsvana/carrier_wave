@@ -1,3 +1,7 @@
+// POTA authentication WebView UI components
+//
+// SwiftUI wrapper for WKWebView used in POTA Cognito login flow.
+
 import SwiftUI
 import WebKit
 

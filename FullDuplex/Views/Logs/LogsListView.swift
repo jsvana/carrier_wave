@@ -39,7 +39,7 @@ struct LogsListView: View {
                 .onDelete(perform: deleteQSOs)
             }
             .searchable(text: $searchText, prompt: "Search callsigns or parks")
-            .navigationTitle("Logs")
+            .navigationTitle("QSOs")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -64,7 +64,7 @@ struct LogsListView: View {
             .overlay {
                 if qsos.isEmpty {
                     ContentUnavailableView(
-                        "No Logs",
+                        "No QSOs",
                         systemImage: "antenna.radiowaves.left.and.right",
                         description: Text("Import ADIF files or sync from LoFi to see your QSOs")
                     )
@@ -84,6 +84,10 @@ struct LogsListView: View {
 struct QSORow: View {
     let qso: QSO
 
+    private var sortedPresence: [ServicePresence] {
+        qso.servicePresence.sorted { $0.serviceType.rawValue < $1.serviceType.rawValue }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
             HStack {
@@ -92,13 +96,16 @@ struct QSORow: View {
 
                 Spacer()
 
-                Text(qso.timestamp, style: .date)
+                Text(qso.timestamp, format: .dateTime.month(.abbreviated).day().hour().minute())
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
 
             HStack {
-                Label(qso.band, systemImage: "waveform")
+                if let freq = qso.frequency {
+                    Label(String(format: "%.3f", freq), systemImage: "waveform")
+                }
+                Label(qso.band, systemImage: "antenna.radiowaves.left.and.right")
                 Label(qso.mode, systemImage: "dot.radiowaves.left.and.right")
 
                 if let park = qso.parkReference {
@@ -107,17 +114,13 @@ struct QSORow: View {
                 }
 
                 Spacer()
-
-                Text(qso.timestamp, style: .time)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
             .font(.caption)
             .foregroundStyle(.secondary)
 
             HStack(spacing: 8) {
-                ForEach(qso.syncRecords) { record in
-                    SyncStatusBadge(record: record)
+                ForEach(sortedPresence) { presence in
+                    ServicePresenceBadge(presence: presence)
                 }
             }
         }
@@ -125,13 +128,13 @@ struct QSORow: View {
     }
 }
 
-struct SyncStatusBadge: View {
-    let record: SyncRecord
+struct ServicePresenceBadge: View {
+    let presence: ServicePresence
 
     var body: some View {
         HStack(spacing: 2) {
             Image(systemName: iconName)
-            Text(record.destinationType.displayName)
+            Text(presence.serviceType.displayName)
         }
         .font(.caption2)
         .padding(.horizontal, 6)
@@ -142,18 +145,22 @@ struct SyncStatusBadge: View {
     }
 
     private var iconName: String {
-        switch record.status {
-        case .pending: return "clock"
-        case .uploaded: return "checkmark"
-        case .failed: return "exclamationmark.triangle"
+        if presence.isPresent {
+            return "checkmark"
+        } else if presence.needsUpload {
+            return "clock"
+        } else {
+            return "minus"
         }
     }
 
     private var backgroundColor: Color {
-        switch record.status {
-        case .pending: return .orange
-        case .uploaded: return .green
-        case .failed: return .red
+        if presence.isPresent {
+            return .green
+        } else if presence.needsUpload {
+            return .orange
+        } else {
+            return .gray
         }
     }
 }

@@ -276,6 +276,11 @@ actor LoFiClient {
 
     // MARK: - Clear
 
+    /// Reset just the sync timestamp so QSOs can be re-downloaded
+    func resetSyncTimestamp() {
+        try? keychain.delete(for: KeychainHelper.Keys.lofiLastSyncMillis)
+    }
+
     func clearCredentials() throws {
         try? keychain.delete(for: KeychainHelper.Keys.lofiAuthToken)
         try? keychain.delete(for: KeychainHelper.Keys.lofiClientKey)

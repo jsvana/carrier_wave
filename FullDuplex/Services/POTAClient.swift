@@ -1,3 +1,8 @@
+// POTA (Parks on the Air) ADIF export and upload functionality.
+//
+// Groups QSOs by UTC date and park reference, generating separate
+// ADIF files suitable for upload to pota.app.
+
 import Foundation
 import SwiftData
 

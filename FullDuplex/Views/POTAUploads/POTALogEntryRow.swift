@@ -1,3 +1,8 @@
+// POTA log entry row view component
+//
+// Expandable row displaying upload attempt and job status with
+// detailed request/response information when expanded.
+
 import SwiftUI
 
 struct POTALogEntryRow: View {

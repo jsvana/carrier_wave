@@ -182,4 +182,87 @@ final class DeduplicationServiceTests: XCTestCase {
         XCTAssertNotNil(qsos[0].rstReceived)
         XCTAssertNotNil(qsos[0].theirGrid)
     }
+
+    @MainActor
+    func testPOTADeduplicationWithoutBand() async throws {
+        // POTA.app QSOs don't include frequency/band info
+        let baseTime = Date()
+
+        // QSO from POTA with no band
+        let potaQSO = QSO(callsign: "W1AW", band: "", mode: "SSB",
+                          timestamp: baseTime, myCallsign: "N0CALL",
+                          parkReference: "US-0001", importSource: .pota)
+
+        // Same QSO from another source with band info
+        let lofiQSO = QSO(callsign: "W1AW", band: "20m", mode: "SSB",
+                          timestamp: baseTime.addingTimeInterval(30),
+                          myCallsign: "N0CALL", importSource: .lofi)
+
+        modelContext.insert(potaQSO)
+        modelContext.insert(lofiQSO)
+        try modelContext.save()
+
+        let service = DeduplicationService(modelContext: modelContext)
+        let result = try await service.findAndMergeDuplicates(timeWindowMinutes: 5)
+
+        XCTAssertEqual(result.duplicateGroupsFound, 1)
+        XCTAssertEqual(result.qsosRemoved, 1)
+
+        let qsos = try modelContext.fetch(FetchDescriptor<QSO>())
+        XCTAssertEqual(qsos.count, 1)
+        // Should absorb band from the QSO that has it
+        XCTAssertEqual(qsos[0].band, "20m")
+        // Should keep park reference
+        XCTAssertEqual(qsos[0].parkReference, "US-0001")
+    }
+
+    @MainActor
+    func testPOTADeduplicationBothWithoutBand() async throws {
+        // Two POTA QSOs, both without band
+        let baseTime = Date()
+
+        let qso1 = QSO(callsign: "K3LR", band: "", mode: "CW",
+                       timestamp: baseTime, myCallsign: "N0CALL",
+                       parkReference: "US-0001", importSource: .pota)
+        let qso2 = QSO(callsign: "K3LR", band: "", mode: "CW",
+                       timestamp: baseTime.addingTimeInterval(60),
+                       myCallsign: "N0CALL", importSource: .pota)
+
+        modelContext.insert(qso1)
+        modelContext.insert(qso2)
+        try modelContext.save()
+
+        let service = DeduplicationService(modelContext: modelContext)
+        let result = try await service.findAndMergeDuplicates(timeWindowMinutes: 5)
+
+        XCTAssertEqual(result.duplicateGroupsFound, 1)
+        XCTAssertEqual(result.qsosRemoved, 1)
+
+        let qsos = try modelContext.fetch(FetchDescriptor<QSO>())
+        XCTAssertEqual(qsos.count, 1)
+    }
+
+    @MainActor
+    func testDifferentModesNotDuplicateWithoutBand() async throws {
+        // Same call, no band, but different modes - should NOT be duplicates
+        let baseTime = Date()
+
+        let qso1 = QSO(callsign: "W1AW", band: "", mode: "SSB",
+                       timestamp: baseTime, myCallsign: "N0CALL", importSource: .pota)
+        let qso2 = QSO(callsign: "W1AW", band: "", mode: "CW",
+                       timestamp: baseTime.addingTimeInterval(60),
+                       myCallsign: "N0CALL", importSource: .pota)
+
+        modelContext.insert(qso1)
+        modelContext.insert(qso2)
+        try modelContext.save()
+
+        let service = DeduplicationService(modelContext: modelContext)
+        let result = try await service.findAndMergeDuplicates(timeWindowMinutes: 5)
+
+        XCTAssertEqual(result.duplicateGroupsFound, 0)
+
+        let qsos = try modelContext.fetch(FetchDescriptor<QSO>())
+        XCTAssertEqual(qsos.count, 2)
+    }
 }

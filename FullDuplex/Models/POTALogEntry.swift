@@ -1,3 +1,8 @@
+// POTA unified log entry for timeline display
+//
+// Merges local upload attempts with remote POTA job status into a single
+// timeline view, correlating by park reference, callsign, and timestamp.
+
 import Foundation
 
 enum POTALogEntry: Identifiable {

@@ -4,13 +4,13 @@ import SwiftData
 @Model
 final class UploadDestination {
     var id: UUID
-    var type: DestinationType
+    var type: ServiceType
     var isEnabled: Bool
     var lastSyncAt: Date?
 
     init(
         id: UUID = UUID(),
-        type: DestinationType,
+        type: ServiceType,
         isEnabled: Bool = false,
         lastSyncAt: Date? = nil
     ) {

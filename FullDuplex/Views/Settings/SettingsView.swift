@@ -18,62 +18,63 @@ struct SettingsMainView: View {
     @State private var showingDedupeResult = false
     @State private var dedupeResultMessage = ""
 
+    @AppStorage("debugMode") private var debugMode = false
+
+    private let lofiClient = LoFiClient()
+
     var body: some View {
         NavigationStack {
             List {
                 Section {
+                    // QRZ
                     if qrzIsAuthenticated {
                         HStack {
-                            VStack(alignment: .leading) {
-                                Label("Connected", systemImage: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                if let callsign = qrzCallsign {
-                                    Text(callsign)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
+                            Label("QRZ Logbook", systemImage: "globe")
                             Spacer()
-                            Button("Logout") {
+                            if let callsign = qrzCallsign {
+                                Text(callsign)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button("Logout", role: .destructive) {
                                 logoutQRZ()
                             }
-                            .foregroundStyle(.red)
                         }
                     } else {
-                        Button("Connect to QRZ") {
+                        Button {
                             showingQRZLogin = true
+                        } label: {
+                            HStack {
+                                Label("QRZ Logbook", systemImage: "globe")
+                                Spacer()
+                                Text("Connect")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
-                } header: {
-                    Text("QRZ Logbook")
-                } footer: {
-                    Text("Enter your QRZ API key to upload logs. Get your key from QRZ.com Settings > API.")
-                }
 
-                Section {
+                    // POTA
                     if let token = potaAuth.currentToken, !token.isExpired {
                         HStack {
-                            VStack(alignment: .leading) {
-                                Label("Connected", systemImage: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                if let callsign = token.callsign {
-                                    Text(callsign)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-                            }
+                            Label("POTA", systemImage: "leaf")
                             Spacer()
-                            Button("Logout") {
+                            if let callsign = token.callsign {
+                                Text(callsign)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                        }
+                        .swipeActions(edge: .trailing) {
+                            Button("Logout", role: .destructive) {
                                 potaAuth.logout()
                             }
-                            .foregroundStyle(.red)
                         }
-
-                        Text("Token expires: \(token.expiresAt, style: .relative)")
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
                     } else {
-                        Button("Login to POTA") {
+                        Button {
                             showingPOTALogin = true
                             Task {
                                 do {
@@ -85,28 +86,31 @@ struct SettingsMainView: View {
                                     showingError = true
                                 }
                             }
+                        } label: {
+                            HStack {
+                                Label("POTA", systemImage: "leaf")
+                                Spacer()
+                                Text("Connect")
+                                    .foregroundStyle(.secondary)
+                            }
                         }
                     }
-                } header: {
-                    Text("POTA")
-                } footer: {
-                    Text("Upload activation logs to Parks on the Air")
-                }
 
-                Section {
+                    // LoFi
                     NavigationLink {
                         LoFiSettingsView()
                     } label: {
                         Label("Ham2K LoFi", systemImage: "antenna.radiowaves.left.and.right")
                     }
 
+                    // iCloud
                     NavigationLink {
                         ICloudSettingsView()
                     } label: {
                         Label("iCloud Folder", systemImage: "icloud")
                     }
                 } header: {
-                    Text("Import Sources")
+                    Text("Sync Sources")
                 }
 
                 Section {
@@ -143,6 +147,22 @@ struct SettingsMainView: View {
                 }
 
                 Section {
+                    Toggle("Debug Mode", isOn: $debugMode)
+
+                    if debugMode {
+                        NavigationLink {
+                            SyncDebugView()
+                        } label: {
+                            Label("Sync Debug Log", systemImage: "doc.text.magnifyingglass")
+                        }
+                    }
+                } header: {
+                    Text("Developer")
+                } footer: {
+                    Text("Shows individual sync buttons on service cards and debug tools")
+                }
+
+                Section {
                     HStack {
                         Text("Version")
                         Spacer()
@@ -174,7 +194,7 @@ struct SettingsMainView: View {
             .alert("Clear All QSOs?", isPresented: $showingClearAllConfirmation) {
                 Button("Cancel", role: .cancel) { }
                 Button("Clear All", role: .destructive) {
-                    clearAllQSOs()
+                    Task { await clearAllQSOs() }
                 }
             } message: {
                 Text("This will permanently delete all QSOs from this device. This cannot be undone.")
@@ -210,7 +230,7 @@ struct SettingsMainView: View {
         }
     }
 
-    private func clearAllQSOs() {
+    private func clearAllQSOs() async {
         do {
             // Delete all ServicePresence records first (due to relationships)
             let presenceDescriptor = FetchDescriptor<ServicePresence>()
@@ -227,6 +247,9 @@ struct SettingsMainView: View {
             }
 
             try modelContext.save()
+
+            // Reset LoFi sync timestamp so QSOs can be re-downloaded
+            await lofiClient.resetSyncTimestamp()
         } catch {
             errorMessage = "Failed to clear QSOs: \(error.localizedDescription)"
             showingError = true

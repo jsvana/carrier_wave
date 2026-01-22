@@ -15,6 +15,7 @@ class ImportService: ObservableObject {
         let imported: Int
         let duplicates: Int
         let errors: Int
+        let matched: Int
     }
 
     init(modelContext: ModelContext) {
@@ -56,11 +57,8 @@ class ImportService: ObservableObject {
 
                 modelContext.insert(qso)
 
-                for destType in DestinationType.allCases {
-                    let syncRecord = SyncRecord(destinationType: destType, qso: qso)
-                    modelContext.insert(syncRecord)
-                    qso.syncRecords.append(syncRecord)
-                }
+                // Create service presence records
+                createServicePresenceRecords(for: qso, importedFrom: nil)
 
                 imported += 1
             } catch {
@@ -74,7 +72,8 @@ class ImportService: ObservableObject {
             totalRecords: records.count,
             imported: imported,
             duplicates: duplicates,
-            errors: errors
+            errors: errors,
+            matched: 0
         )
 
         lastImportResult = result
@@ -110,6 +109,27 @@ class ImportService: ObservableObject {
         )
     }
 
+    /// Create ServicePresence records for a new QSO
+    /// - Parameters:
+    ///   - qso: The QSO to create presence records for
+    ///   - importedFrom: The service the QSO was imported from (if any)
+    private func createServicePresenceRecords(for qso: QSO, importedFrom: ServiceType?) {
+        for service in ServiceType.allCases {
+            if service == importedFrom {
+                // This QSO came from this service, mark as present
+                let presence = ServicePresence.downloaded(from: service, qso: qso)
+                modelContext.insert(presence)
+                qso.servicePresence.append(presence)
+            } else if service.supportsUpload {
+                // Needs to be uploaded to this service
+                let presence = ServicePresence.needsUpload(to: service, qso: qso)
+                modelContext.insert(presence)
+                qso.servicePresence.append(presence)
+            }
+            // LoFi is download-only, so if it wasn't the source, don't create a presence record
+        }
+    }
+
     // MARK: - LoFi Import
 
     func importFromLoFi(qsos: [(LoFiQso, LoFiOperation)]) async throws -> ImportResult {
@@ -133,11 +153,8 @@ class ImportService: ObservableObject {
 
                 modelContext.insert(qso)
 
-                for destType in DestinationType.allCases {
-                    let syncRecord = SyncRecord(destinationType: destType, qso: qso)
-                    modelContext.insert(syncRecord)
-                    qso.syncRecords.append(syncRecord)
-                }
+                // Mark as present in LoFi, needs upload to others
+                createServicePresenceRecords(for: qso, importedFrom: .lofi)
 
                 imported += 1
             } catch {
@@ -151,7 +168,8 @@ class ImportService: ObservableObject {
             totalRecords: qsos.count,
             imported: imported,
             duplicates: duplicates,
-            errors: errors
+            errors: errors,
+            matched: 0
         )
 
         lastImportResult = result
@@ -216,6 +234,8 @@ class ImportService: ObservableObject {
                 // Update confirmation status
                 existing.qrzConfirmed = qrzQso.qrzConfirmed
                 existing.lotwConfirmedDate = qrzQso.lotwConfirmedDate
+                // Mark QRZ as present (it's already in QRZ)
+                existing.markPresent(in: .qrz, context: modelContext)
                 updated += 1
                 continue
             }
@@ -236,6 +256,8 @@ class ImportService: ObservableObject {
                 existing.qrzLogId = qrzQso.qrzLogId
                 existing.qrzConfirmed = qrzQso.qrzConfirmed
                 existing.lotwConfirmedDate = qrzQso.lotwConfirmedDate
+                // Mark QRZ as present (it's already in QRZ)
+                existing.markPresent(in: .qrz, context: modelContext)
                 updated += 1
                 continue
             }
@@ -263,15 +285,8 @@ class ImportService: ObservableObject {
 
             modelContext.insert(newQso)
 
-            // Create sync records for other destinations (not QRZ since it came from there)
-            let potaSyncRecord = SyncRecord(destinationType: .pota, qso: newQso)
-            modelContext.insert(potaSyncRecord)
-            newQso.syncRecords.append(potaSyncRecord)
-
-            // Mark QRZ as already uploaded
-            let qrzSyncRecord = SyncRecord(destinationType: .qrz, status: .uploaded, uploadedAt: Date(), qso: newQso)
-            modelContext.insert(qrzSyncRecord)
-            newQso.syncRecords.append(qrzSyncRecord)
+            // Mark as present in QRZ, needs upload to POTA
+            createServicePresenceRecords(for: newQso, importedFrom: .qrz)
 
             imported += 1
         }
@@ -281,8 +296,80 @@ class ImportService: ObservableObject {
         let result = ImportResult(
             totalRecords: qsos.count,
             imported: imported,
-            duplicates: updated,  // Using duplicates field for "updated" count
-            errors: 0
+            duplicates: 0,
+            errors: 0,
+            matched: updated
+        )
+
+        lastImportResult = result
+        return result
+    }
+
+    // MARK: - POTA Import
+
+    func importFromPOTA(qsos: [POTAFetchedQSO]) async throws -> ImportResult {
+        isImporting = true
+        defer { isImporting = false }
+
+        var imported = 0
+        var updated = 0
+
+        // Fetch existing QSOs for matching
+        let descriptor = FetchDescriptor<QSO>()
+        let existingQSOs = try modelContext.fetch(descriptor)
+        let byDedupeKey = Dictionary(grouping: existingQSOs) { $0.deduplicationKey }
+
+        for potaQso in qsos {
+            // Build deduplication key
+            let roundedTimestamp = potaQso.timestamp.timeIntervalSince1970
+            let rounded = Int(roundedTimestamp / 120) * 120
+            let dedupeKey = "\(potaQso.callsign.uppercased())|\(potaQso.band.uppercased())|\(potaQso.mode.uppercased())|\(rounded)"
+
+            if let existing = byDedupeKey[dedupeKey]?.first {
+                // Update with POTA data if richer
+                existing.parkReference = existing.parkReference.nonEmpty ?? potaQso.parkReference
+                existing.rstSent = existing.rstSent.nonEmpty ?? potaQso.rstSent
+                existing.rstReceived = existing.rstReceived.nonEmpty ?? potaQso.rstReceived
+                // Mark POTA as present
+                existing.markPresent(in: .pota, context: modelContext)
+                updated += 1
+                continue
+            }
+
+            // Create new QSO
+            let newQso = QSO(
+                callsign: potaQso.callsign,
+                band: potaQso.band,
+                mode: potaQso.mode,
+                frequency: nil,
+                timestamp: potaQso.timestamp,
+                rstSent: potaQso.rstSent,
+                rstReceived: potaQso.rstReceived,
+                myCallsign: potaQso.myCallsign,
+                myGrid: nil,
+                theirGrid: nil,
+                parkReference: potaQso.parkReference,
+                notes: nil,
+                importSource: .pota,
+                rawADIF: nil
+            )
+
+            modelContext.insert(newQso)
+
+            // Mark as present in POTA, needs upload to QRZ
+            createServicePresenceRecords(for: newQso, importedFrom: .pota)
+
+            imported += 1
+        }
+
+        try modelContext.save()
+
+        let result = ImportResult(
+            totalRecords: qsos.count,
+            imported: imported,
+            duplicates: 0,
+            errors: 0,
+            matched: updated
         )
 
         lastImportResult = result

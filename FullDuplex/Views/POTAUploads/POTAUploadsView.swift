@@ -1,3 +1,8 @@
+// POTA Uploads tab main view
+//
+// Displays unified timeline of local upload attempts and remote POTA job
+// status, with refresh capability and authentication state handling.
+
 import SwiftUI
 import SwiftData
 

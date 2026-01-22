@@ -4,6 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Build and Test Commands
 
+**Prefer using the `ios-simulator-skill` over running xcodebuild commands directly.** The skill provides optimized scripts for building, testing, and simulator management with minimal token output.
+
+The commands below are provided as reference when the skill is not available:
+
 ```bash
 # Build for simulator
 xcodebuild -project FullDuplex.xcodeproj -scheme FullDuplex \

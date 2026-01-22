@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(qrz-logbook-api)",
+      "Bash(xcodebuild:*)",
+      "Bash(xcrun devicectl device install app:*)",
+      "Bash(xcrun devicectl device process launch:*)",
+      "Skill(pota-api)",
+      "Skill(ios-simulator-skill)",
+      "Bash(python /Users/jsvana/.claude/skills/ios-simulator-skill/scripts/build_and_test.py:*)",
+      "Bash(python3:*)",
+      "Bash(bd list:*)"
+    ]
+  }
+}

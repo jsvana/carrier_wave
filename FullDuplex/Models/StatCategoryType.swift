@@ -11,11 +11,11 @@ enum StatCategoryType: String, CaseIterable, Identifiable {
 
     var title: String {
         switch self {
-        case .entities: return "Entities"
+        case .entities: return "DXCC Entities"
         case .grids: return "Grids"
         case .bands: return "Bands"
         case .modes: return "Modes"
-        case .parks: return "Parks"
+        case .parks: return "Activations"
         }
     }
 

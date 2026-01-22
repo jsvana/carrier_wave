@@ -9,7 +9,7 @@ final class ImportServiceTests: XCTestCase {
 
     @MainActor
     override func setUp() async throws {
-        let schema = Schema([QSO.self, SyncRecord.self, UploadDestination.self])
+        let schema = Schema([QSO.self, ServicePresence.self, UploadDestination.self])
         let config = ModelConfiguration(isStoredInMemoryOnly: true)
         modelContainer = try ModelContainer(for: schema, configurations: [config])
         modelContext = modelContainer.mainContext
@@ -50,14 +50,15 @@ final class ImportServiceTests: XCTestCase {
     }
 
     @MainActor
-    func testSyncRecordsCreated() async throws {
+    func testServicePresenceCreated() async throws {
         let adif = "<call:4>W1AW <band:3>20m <mode:2>CW <qso_date:8>20240115 <time_on:4>1430 <eor>"
 
         _ = try await importService.importADIF(content: adif, source: .adifFile, myCallsign: "N0CALL")
 
         let qsos = try modelContext.fetch(FetchDescriptor<QSO>())
-        XCTAssertEqual(qsos[0].syncRecords.count, 2) // QRZ and POTA
-        XCTAssertTrue(qsos[0].syncRecords.allSatisfy { $0.status == .pending })
+        // Should have 2 ServicePresence records: QRZ (needsUpload) and POTA (needsUpload)
+        XCTAssertEqual(qsos[0].servicePresence.count, 2)
+        XCTAssertTrue(qsos[0].servicePresence.allSatisfy { $0.needsUpload })
     }
 
     @MainActor

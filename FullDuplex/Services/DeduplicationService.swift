@@ -76,11 +76,25 @@ actor DeduplicationService {
         )
     }
 
-    /// Check if two QSOs are duplicates (same callsign, band, mode)
+    /// Check if two QSOs are duplicates (same callsign, mode, and optionally band)
+    /// When either QSO has no band (empty string), matches on callsign+mode+time only.
+    /// This handles POTA.app QSOs which don't include frequency/band info.
     private func isDuplicate(_ a: QSO, _ b: QSO) -> Bool {
-        return a.callsign.uppercased() == b.callsign.uppercased() &&
-               a.band.uppercased() == b.band.uppercased() &&
-               a.mode.uppercased() == b.mode.uppercased()
+        let callsignMatch = a.callsign.uppercased() == b.callsign.uppercased()
+        let modeMatch = a.mode.uppercased() == b.mode.uppercased()
+
+        guard callsignMatch && modeMatch else { return false }
+
+        // If either QSO has no band, consider it a match (band-agnostic)
+        let aBand = a.band.trimmingCharacters(in: .whitespaces)
+        let bBand = b.band.trimmingCharacters(in: .whitespaces)
+
+        if aBand.isEmpty || bBand.isEmpty {
+            return true
+        }
+
+        // Both have bands - require match
+        return aBand.uppercased() == bBand.uppercased()
     }
 
     /// Merge a group of duplicates, keeping the best one
@@ -111,7 +125,7 @@ actor DeduplicationService {
         return (1, losers.count)
     }
 
-    /// Fill nil fields in winner from loser
+    /// Fill nil/empty fields in winner from loser
     private func absorbFields(from loser: QSO, into winner: QSO) {
         if winner.rstSent == nil { winner.rstSent = loser.rstSent }
         if winner.rstReceived == nil { winner.rstReceived = loser.rstReceived }
@@ -122,6 +136,11 @@ actor DeduplicationService {
         if winner.qrzLogId == nil { winner.qrzLogId = loser.qrzLogId }
         if winner.rawADIF == nil { winner.rawADIF = loser.rawADIF }
         if winner.frequency == nil { winner.frequency = loser.frequency }
+        // Absorb band if winner has empty band (e.g., from POTA)
+        if winner.band.trimmingCharacters(in: .whitespaces).isEmpty &&
+           !loser.band.trimmingCharacters(in: .whitespaces).isEmpty {
+            winner.band = loser.band
+        }
     }
 
     /// Transfer service presence records from loser to winner
