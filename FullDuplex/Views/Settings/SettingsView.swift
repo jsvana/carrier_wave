@@ -3,7 +3,7 @@ import SwiftData
 
 struct SettingsMainView: View {
     @Environment(\.modelContext) private var modelContext
-    @StateObject private var potaAuth = POTAAuthService()
+    @ObservedObject var potaAuth: POTAAuthService
 
     @State private var qrzApiKey = ""
     @State private var qrzCallsign: String?
@@ -12,6 +12,11 @@ struct SettingsMainView: View {
     @State private var showingPOTALogin = false
     @State private var showingError = false
     @State private var errorMessage = ""
+    @State private var showingClearAllConfirmation = false
+    @State private var dedupeTimeWindow = 5
+    @State private var isDeduplicating = false
+    @State private var showingDedupeResult = false
+    @State private var dedupeResultMessage = ""
 
     var body: some View {
         NavigationStack {
@@ -105,6 +110,39 @@ struct SettingsMainView: View {
                 }
 
                 Section {
+                    Stepper("Time window: \(dedupeTimeWindow) min", value: $dedupeTimeWindow, in: 1...15)
+
+                    Button {
+                        Task { await runDeduplication() }
+                    } label: {
+                        if isDeduplicating {
+                            HStack {
+                                ProgressView()
+                                    .padding(.trailing, 4)
+                                Text("Scanning...")
+                            }
+                        } else {
+                            Text("Find & Merge Duplicates")
+                        }
+                    }
+                    .disabled(isDeduplicating)
+                } header: {
+                    Text("Deduplication")
+                } footer: {
+                    Text("Find QSOs with same callsign, band, and mode within \(dedupeTimeWindow) minutes and merge them.")
+                }
+
+                Section {
+                    Button("Clear All QSOs", role: .destructive) {
+                        showingClearAllConfirmation = true
+                    }
+                } header: {
+                    Text("Data")
+                } footer: {
+                    Text("Permanently delete all QSOs from this device")
+                }
+
+                Section {
                     HStack {
                         Text("Version")
                         Spacer()
@@ -133,6 +171,19 @@ struct SettingsMainView: View {
             } message: {
                 Text(errorMessage)
             }
+            .alert("Clear All QSOs?", isPresented: $showingClearAllConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Clear All", role: .destructive) {
+                    clearAllQSOs()
+                }
+            } message: {
+                Text("This will permanently delete all QSOs from this device. This cannot be undone.")
+            }
+            .alert("Deduplication Complete", isPresented: $showingDedupeResult) {
+                Button("OK") { }
+            } message: {
+                Text(dedupeResultMessage)
+            }
             .onAppear {
                 checkQRZAuth()
             }
@@ -156,6 +207,49 @@ struct SettingsMainView: View {
             await client.logout()
             qrzIsAuthenticated = false
             qrzCallsign = nil
+        }
+    }
+
+    private func clearAllQSOs() {
+        do {
+            // Delete all ServicePresence records first (due to relationships)
+            let presenceDescriptor = FetchDescriptor<ServicePresence>()
+            let allPresence = try modelContext.fetch(presenceDescriptor)
+            for presence in allPresence {
+                modelContext.delete(presence)
+            }
+
+            // Delete all QSOs
+            let qsoDescriptor = FetchDescriptor<QSO>()
+            let allQSOs = try modelContext.fetch(qsoDescriptor)
+            for qso in allQSOs {
+                modelContext.delete(qso)
+            }
+
+            try modelContext.save()
+        } catch {
+            errorMessage = "Failed to clear QSOs: \(error.localizedDescription)"
+            showingError = true
+        }
+    }
+
+    private func runDeduplication() async {
+        isDeduplicating = true
+        defer { isDeduplicating = false }
+
+        do {
+            let service = DeduplicationService(modelContext: modelContext)
+            let result = try await service.findAndMergeDuplicates(timeWindowMinutes: dedupeTimeWindow)
+
+            if result.duplicateGroupsFound == 0 {
+                dedupeResultMessage = "No duplicates found."
+            } else {
+                dedupeResultMessage = "Found \(result.duplicateGroupsFound) duplicate groups.\nMerged \(result.qsosMerged) QSOs, removed \(result.qsosRemoved) duplicates."
+            }
+            showingDedupeResult = true
+        } catch {
+            errorMessage = "Deduplication failed: \(error.localizedDescription)"
+            showingError = true
         }
     }
 }
