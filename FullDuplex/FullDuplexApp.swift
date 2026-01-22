@@ -5,10 +5,14 @@ import UniformTypeIdentifiers
 @main
 struct FullDuplexApp: App {
     var sharedModelContainer: ModelContainer = {
+        // Register value transformer before creating container
+        DictionaryTransformer.register()
+
         let schema = Schema([
             QSO.self,
-            SyncRecord.self,
+            ServicePresence.self,
             UploadDestination.self,
+            POTAUploadAttempt.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
@@ -21,6 +25,8 @@ struct FullDuplexApp: App {
                 configurations: [modelConfiguration]
             )
         } catch {
+            // If schema migration fails, log and crash
+            // In production, you might want to handle this more gracefully
             fatalError("Could not create ModelContainer: \(error)")
         }
     }()
