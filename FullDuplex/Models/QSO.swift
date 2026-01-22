@@ -120,6 +120,11 @@ final class QSO {
         return score
     }
 
+    /// Count of services where this QSO is confirmed present
+    var syncedServicesCount: Int {
+        servicePresence.filter { $0.isPresent }.count
+    }
+
     /// Date only (for activity tracking)
     var dateOnly: Date {
         Calendar.current.startOfDay(for: timestamp)
