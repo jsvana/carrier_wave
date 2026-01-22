@@ -1,4 +1,5 @@
 import Foundation
+import SwiftData
 
 enum POTAError: Error, LocalizedError {
     case notAuthenticated
@@ -278,6 +279,168 @@ actor POTAClient {
         default:
             await debugLog.error("Upload failed: \(httpResponse.statusCode) - Server error", service: .pota)
             throw POTAError.uploadFailed("Server error: \(httpResponse.statusCode)")
+        }
+    }
+
+    /// Upload activation with attempt recording for debugging
+    func uploadActivationWithRecording(
+        parkReference: String,
+        qsos: [QSO],
+        modelContext: ModelContext
+    ) async throws -> POTAUploadResult {
+        let debugLog = await SyncDebugLog.shared
+        let startTime = Date()
+
+        // Validate park reference format
+        let parkPattern = #"^[A-Za-z]{1,4}-\d{1,6}$"#
+        guard parkReference.range(of: parkPattern, options: .regularExpression) != nil else {
+            await debugLog.error("Invalid park reference format: '\(parkReference)' (expected format like K-1234)", service: .pota)
+            throw POTAError.invalidParkReference
+        }
+
+        let normalizedParkRef = parkReference.uppercased()
+
+        // Get token (don't record attempt yet in case auth fails)
+        let token = try await authService.ensureValidToken()
+
+        // Filter QSOs for this park
+        let parkQSOs = qsos.filter { $0.parkReference?.uppercased() == normalizedParkRef }
+        guard !parkQSOs.isEmpty else {
+            await debugLog.info("No QSOs to upload for park \(normalizedParkRef)", service: .pota)
+            return POTAUploadResult(success: true, qsosAccepted: 0, message: "No QSOs for this park")
+        }
+
+        await debugLog.info("Uploading \(parkQSOs.count) QSOs to park \(normalizedParkRef)", service: .pota)
+
+        let callsign = parkQSOs.first?.myCallsign ?? "UNKNOWN"
+        let parkPrefix = normalizedParkRef.split(separator: "-").first.map(String.init) ?? "US"
+        let myGrid = parkQSOs.first?.myGrid
+        let derivedState = myGrid.flatMap { Self.gridToUSState($0) }
+        let location: String
+        if parkPrefix == "US" || parkPrefix == "K", let state = derivedState {
+            location = "US-\(state)"
+        } else {
+            location = parkPrefix
+        }
+
+        let adifContent = generateADIF(for: parkQSOs, parkReference: normalizedParkRef)
+
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyMMdd"
+        dateFormatter.timeZone = TimeZone(identifier: "UTC")
+        let dateStr = parkQSOs.first.map { dateFormatter.string(from: $0.timestamp) } ?? "000000"
+        let filename = "\(callsign)@\(normalizedParkRef)-\(dateStr).adi"
+
+        // Build request
+        let boundary = UUID().uuidString
+        var body = Data()
+        body.append("--\(boundary)\r\n".data(using: .utf8)!)
+        body.append("Content-Disposition: form-data; name=\"adif\"; filename=\"\(filename)\"\r\n".data(using: .utf8)!)
+        body.append("Content-Type: application/octet-stream\r\n\r\n".data(using: .utf8)!)
+        body.append(adifContent.data(using: .utf8)!)
+        body.append("\r\n".data(using: .utf8)!)
+
+        for (name, value) in [("reference", normalizedParkRef), ("location", location), ("callsign", callsign)] {
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"\(name)\"\r\n\r\n".data(using: .utf8)!)
+            body.append("\(value)\r\n".data(using: .utf8)!)
+        }
+        body.append("--\(boundary)--\r\n".data(using: .utf8)!)
+
+        guard let url = URL(string: "\(baseURL)/adif") else {
+            await debugLog.error("Invalid URL for POTA upload", service: .pota)
+            throw POTAError.uploadFailed("Invalid URL")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(token, forHTTPHeaderField: "Authorization")
+        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.httpBody = body
+
+        // Capture headers for recording (redact auth token)
+        let recordedHeaders = [
+            "Content-Type": "multipart/form-data; boundary=\(boundary)",
+            "Authorization": "[REDACTED]"
+        ]
+
+        // Create upload attempt record
+        let attempt = await MainActor.run {
+            let attempt = POTAUploadAttempt(
+                timestamp: startTime,
+                parkReference: normalizedParkRef,
+                qsoCount: parkQSOs.count,
+                callsign: callsign,
+                location: location,
+                adifContent: adifContent,
+                requestHeaders: recordedHeaders,
+                filename: filename
+            )
+            modelContext.insert(attempt)
+            return attempt
+        }
+
+        await debugLog.debug("POST /adif - callsign=\(callsign), location=\(location), reference=\(normalizedParkRef), filename=\(filename)", service: .pota)
+
+        do {
+            let (data, response) = try await URLSession.shared.data(for: request)
+            let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                await MainActor.run {
+                    attempt.markFailed(httpStatusCode: nil, responseBody: nil, errorMessage: "Invalid response (not HTTP)", durationMs: durationMs)
+                }
+                await debugLog.error("Invalid response (not HTTP)", service: .pota)
+                throw POTAError.uploadFailed("Invalid response")
+            }
+
+            let responseBody = String(data: data, encoding: .utf8) ?? "(binary data)"
+            await debugLog.debug("Response \(httpResponse.statusCode): \(responseBody.prefix(500))", service: .pota)
+
+            switch httpResponse.statusCode {
+            case 200...299:
+                await MainActor.run {
+                    attempt.markCompleted(httpStatusCode: httpResponse.statusCode, responseBody: responseBody, durationMs: durationMs)
+                }
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    let count = json["qsosAccepted"] as? Int ?? parkQSOs.count
+                    let message = json["message"] as? String
+                    await debugLog.info("Upload success: \(count) QSOs accepted for \(normalizedParkRef)", service: .pota)
+                    return POTAUploadResult(success: true, qsosAccepted: count, message: message)
+                }
+                await debugLog.info("Upload success: \(parkQSOs.count) QSOs for \(normalizedParkRef) (no count in response)", service: .pota)
+                return POTAUploadResult(success: true, qsosAccepted: parkQSOs.count, message: nil)
+
+            case 401:
+                await MainActor.run {
+                    attempt.markFailed(httpStatusCode: httpResponse.statusCode, responseBody: responseBody, errorMessage: "Unauthorized - token may be expired", durationMs: durationMs)
+                }
+                await debugLog.error("Upload failed: 401 Unauthorized - token may be expired", service: .pota)
+                throw POTAError.notAuthenticated
+
+            case 400...499:
+                let errorMessage = String(data: data, encoding: .utf8) ?? "Client error"
+                await MainActor.run {
+                    attempt.markFailed(httpStatusCode: httpResponse.statusCode, responseBody: responseBody, errorMessage: errorMessage, durationMs: durationMs)
+                }
+                await debugLog.error("Upload failed: \(httpResponse.statusCode) - \(errorMessage)", service: .pota)
+                throw POTAError.uploadFailed(errorMessage)
+
+            default:
+                await MainActor.run {
+                    attempt.markFailed(httpStatusCode: httpResponse.statusCode, responseBody: responseBody, errorMessage: "Server error: \(httpResponse.statusCode)", durationMs: durationMs)
+                }
+                await debugLog.error("Upload failed: \(httpResponse.statusCode) - Server error", service: .pota)
+                throw POTAError.uploadFailed("Server error: \(httpResponse.statusCode)")
+            }
+        } catch let error as POTAError {
+            throw error
+        } catch {
+            let durationMs = Int(Date().timeIntervalSince(startTime) * 1000)
+            await MainActor.run {
+                attempt.markFailed(httpStatusCode: nil, responseBody: nil, errorMessage: error.localizedDescription, durationMs: durationMs)
+            }
+            throw POTAError.networkError(error)
         }
     }
 
