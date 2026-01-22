@@ -450,53 +450,97 @@ actor POTAClient {
     }
 
     private func generateADIF(for qsos: [QSO], parkReference: String) -> String {
+        // Get activator callsign and date for header
+        let activator = qsos.first?.myCallsign ?? "UNKNOWN"
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = TimeZone(identifier: "UTC")
+        let dateStr = qsos.first.map { dateFormatter.string(from: $0.timestamp) } ?? "unknown"
+
         var lines: [String] = []
 
-        // Header
-        lines.append("ADIF Export for POTA")
-        lines.append("<adif_ver:5>3.1.4")
-        lines.append("<programid:10>FullDuplex")
-        lines.append("<eoh>")
+        // Header - matches logbook-sync format
+        lines.append("ADIF for \(activator): POTA \(parkReference) on \(dateStr)")
+        lines.append(formatField("ADIF_VER", "3.1.5"))
+        lines.append(formatField("PROGRAMID", "FullDuplex"))
+
+        // Get app version from bundle
+        let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+        lines.append(formatField("PROGRAMVERSION", version))
+
+        // Created timestamp in YYYYMMDD HHMMSS format
+        let timestampFormatter = DateFormatter()
+        timestampFormatter.dateFormat = "yyyyMMdd HHmmss"
+        timestampFormatter.timeZone = TimeZone(identifier: "UTC")
+        lines.append(formatField("CREATED_TIMESTAMP", timestampFormatter.string(from: Date())))
+
+        lines.append("<EOH>")
         lines.append("")
 
-        // Records
+        // QSO Records - field order follows Ham2K Portable Logger format for compatibility
         for qso in qsos {
             var fields: [String] = []
 
-            func addField(_ name: String, _ value: String?) {
-                guard let value = value, !value.isEmpty else { return }
-                fields.append("<\(name):\(value.count)>\(value)")
-            }
-
-            addField("call", qso.callsign)
-            addField("band", qso.band)
-            addField("mode", qso.mode)
+            // Core QSO fields
+            fields.append(formatField("CALL", qso.callsign))
+            fields.append(formatField("MODE", qso.mode))
+            fields.append(formatField("BAND", qso.band))
 
             if let freq = qso.frequency {
-                addField("freq", String(format: "%.4f", freq)) // MHz
+                fields.append(formatField("FREQ", String(format: "%.4f", freq)))
             }
 
-            let dateFormatter = DateFormatter()
-            dateFormatter.dateFormat = "yyyyMMdd"
-            dateFormatter.timeZone = TimeZone(identifier: "UTC")
-            addField("qso_date", dateFormatter.string(from: qso.timestamp))
+            let qsoDateFormatter = DateFormatter()
+            qsoDateFormatter.timeZone = TimeZone(identifier: "UTC")
+            qsoDateFormatter.dateFormat = "yyyyMMdd"
+            fields.append(formatField("QSO_DATE", qsoDateFormatter.string(from: qso.timestamp)))
 
-            dateFormatter.dateFormat = "HHmm"
-            addField("time_on", dateFormatter.string(from: qso.timestamp))
+            qsoDateFormatter.dateFormat = "HHmmss"
+            fields.append(formatField("TIME_ON", qsoDateFormatter.string(from: qso.timestamp)))
 
-            addField("rst_sent", qso.rstSent)
-            addField("rst_rcvd", qso.rstReceived)
-            addField("station_callsign", qso.myCallsign)
-            addField("my_gridsquare", qso.myGrid)
-            addField("gridsquare", qso.theirGrid)
-            addField("my_sig", "POTA")
-            addField("my_sig_info", parkReference)
-            addField("comment", qso.notes)
+            // Signal reports
+            if let rstRcvd = qso.rstReceived, !rstRcvd.isEmpty {
+                fields.append(formatField("RST_RCVD", rstRcvd))
+            }
+            if let rstSent = qso.rstSent, !rstSent.isEmpty {
+                fields.append(formatField("RST_SENT", rstSent))
+            }
 
-            lines.append(fields.joined(separator: " ") + " <eor>")
+            // Station info
+            if let stationCall = qso.myCallsign, !stationCall.isEmpty {
+                fields.append(formatField("STATION_CALLSIGN", stationCall))
+            }
+
+            // Grid squares
+            if let theirGrid = qso.theirGrid, !theirGrid.isEmpty {
+                fields.append(formatField("GRIDSQUARE", theirGrid))
+            }
+            if let myGrid = qso.myGrid, !myGrid.isEmpty {
+                fields.append(formatField("MY_GRIDSQUARE", myGrid))
+            }
+
+            // QSLMSG - POTA park reference
+            fields.append(formatField("QSLMSG", "POTA \(parkReference)"))
+
+            // Activator POTA info - always include for POTA exports
+            fields.append(formatField("MY_SIG", "POTA"))
+            fields.append(formatField("MY_SIG_INFO", parkReference))
+            fields.append(formatField("MY_POTA_REF", parkReference))
+
+            // Comment
+            if let notes = qso.notes, !notes.isEmpty {
+                fields.append(formatField("COMMENT", notes))
+            }
+
+            lines.append(fields.joined() + "<EOR>")
         }
 
         return lines.joined(separator: "\n")
+    }
+
+    /// Format a single ADIF field: <NAME:length>value
+    private func formatField(_ name: String, _ value: String) -> String {
+        "<\(name.uppercased()):\(value.count)>\(value)"
     }
 
     /// Get all unique park references from QSOs (excludes nil and empty)
