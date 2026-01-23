@@ -2,6 +2,41 @@ import Combine
 import Foundation
 import SwiftData
 
+// MARK: - Timeout Support
+
+enum SyncTimeoutError: Error, LocalizedError {
+    case timeout(service: ServiceType)
+
+    var errorDescription: String? {
+        switch self {
+        case .timeout(let service):
+            return "\(service.displayName) sync timed out"
+        }
+    }
+}
+
+/// Execute an async operation with a timeout
+private func withTimeout<T>(
+    seconds: TimeInterval,
+    service: ServiceType,
+    operation: @escaping () async throws -> T
+) async throws -> T {
+    try await withThrowingTaskGroup(of: T.self) { group in
+        group.addTask {
+            try await operation()
+        }
+
+        group.addTask {
+            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            throw SyncTimeoutError.timeout(service: service)
+        }
+
+        let result = try await group.next()!
+        group.cancelAll()
+        return result
+    }
+}
+
 // MARK: - Intermediate Format for Downloaded QSOs
 
 /// Common format for QSOs fetched from any service
@@ -141,6 +176,9 @@ class SyncService: ObservableObject {
     private let potaAuthService: POTAAuthService
     private let lofiClient: LoFiClient
 
+    /// Timeout for individual service sync operations (in seconds)
+    private let syncTimeoutSeconds: TimeInterval = 60
+
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
     @Published var syncPhase: SyncPhase?
@@ -208,6 +246,12 @@ class SyncService: ObservableObject {
         result.newQSOs = processResult.created
         result.mergedQSOs = processResult.merged
 
+        // PHASE 2.5: Reconcile QRZ presence against what QRZ actually returned
+        let qrzDownloadedKeys = Set(allFetched.filter { $0.source == .qrz }.map { $0.deduplicationKey })
+        if !qrzDownloadedKeys.isEmpty {
+            try reconcileQRZPresence(downloadedKeys: qrzDownloadedKeys)
+        }
+
         try modelContext.save()
 
         // PHASE 3: Upload to all destinations in parallel
@@ -230,7 +274,8 @@ class SyncService: ObservableObject {
     // MARK: - Download Phase
 
     private func downloadFromAllSources() async -> [ServiceType: Result<[FetchedQSO], Error>] {
-        await withTaskGroup(of: (ServiceType, Result<[FetchedQSO], Error>).self) { group in
+        let timeout = syncTimeoutSeconds
+        return await withTaskGroup(of: (ServiceType, Result<[FetchedQSO], Error>).self) { group in
             // QRZ download
             if await qrzClient.hasApiKey() {
                 group.addTask {
@@ -238,7 +283,9 @@ class SyncService: ObservableObject {
                     let debugLog = await SyncDebugLog.shared
                     await debugLog.info("Starting QRZ download", service: .qrz)
                     do {
-                        let qsos = try await self.qrzClient.fetchQSOs(since: nil)
+                        let qsos = try await withTimeout(seconds: timeout, service: .qrz) {
+                            try await self.qrzClient.fetchQSOs(since: nil)
+                        }
                         await debugLog.info("Downloaded \(qsos.count) QSOs from QRZ", service: .qrz)
                         let fetched = qsos.map { FetchedQSO.fromQRZ($0) }
                         // Log raw QSOs for debugging
@@ -264,7 +311,9 @@ class SyncService: ObservableObject {
                     let debugLog = await SyncDebugLog.shared
                     await debugLog.info("Starting POTA download", service: .pota)
                     do {
-                        let qsos = try await self.potaClient.fetchAllQSOs()
+                        let qsos = try await withTimeout(seconds: timeout, service: .pota) {
+                            try await self.potaClient.fetchAllQSOs()
+                        }
                         await debugLog.info("Downloaded \(qsos.count) QSOs from POTA", service: .pota)
                         let fetched = qsos.map { FetchedQSO.fromPOTA($0) }
                         // Log raw QSOs for debugging
@@ -290,9 +339,25 @@ class SyncService: ObservableObject {
                     let debugLog = await SyncDebugLog.shared
                     await debugLog.info("Starting LoFi download", service: .lofi)
                     do {
-                        let qsos = try await self.lofiClient.fetchAllQsosSinceLastSync()
-                        await debugLog.info("Downloaded \(qsos.count) QSOs from LoFi", service: .lofi)
-                        let fetched = qsos.compactMap { FetchedQSO.fromLoFi($0.0, operation: $0.1) }
+                        let qsos = try await withTimeout(seconds: timeout, service: .lofi) {
+                            try await self.lofiClient.fetchAllQsosSinceLastSync()
+                        }
+                        await debugLog.info("Downloaded \(qsos.count) raw QSOs from LoFi API", service: .lofi)
+
+                        // Track how many pass the filter
+                        var skippedCount = 0
+                        var fetchedList: [FetchedQSO] = []
+                        for (lofiQso, operation) in qsos {
+                            if let fetched = FetchedQSO.fromLoFi(lofiQso, operation: operation) {
+                                fetchedList.append(fetched)
+                            } else {
+                                skippedCount += 1
+                                // Log why it was skipped
+                                await debugLog.warning("Skipped QSO: call=\(lofiQso.theirCall ?? "nil"), band=\(lofiQso.band ?? "nil"), mode=\(lofiQso.mode ?? "nil")", service: .lofi)
+                            }
+                        }
+                        let fetched = fetchedList
+                        await debugLog.info("After filtering: \(fetched.count) valid, \(skippedCount) skipped", service: .lofi)
                         // Log raw QSOs for debugging
                         for (index, (lofiQso, op)) in qsos.prefix(5).enumerated() {
                             let rawJSON = """
@@ -338,16 +403,26 @@ class SyncService: ObservableObject {
     }
 
     private func processDownloadedQSOs(_ fetched: [FetchedQSO]) throws -> ProcessResult {
+        let debugLog = SyncDebugLog.shared
+
         // Group by deduplication key
         var byKey: [String: [FetchedQSO]] = [:]
         for qso in fetched {
             byKey[qso.deduplicationKey, default: []].append(qso)
         }
 
+        // Count by source for diagnostics
+        var sourceBreakdown: [ServiceType: Int] = [:]
+        for qso in fetched {
+            sourceBreakdown[qso.source, default: 0] += 1
+        }
+        debugLog.info("Processing \(fetched.count) QSOs: \(sourceBreakdown.map { "\($0.key.displayName)=\($0.value)" }.joined(separator: ", "))")
+
         // Fetch existing QSOs
         let descriptor = FetchDescriptor<QSO>()
         let existingQSOs = try modelContext.fetch(descriptor)
         let existingByKey = Dictionary(grouping: existingQSOs) { $0.deduplicationKey }
+        debugLog.info("Found \(existingQSOs.count) existing QSOs in database")
 
         var created = 0
         var merged = 0
@@ -384,7 +459,28 @@ class SyncService: ObservableObject {
             }
         }
 
+        debugLog.info("Process result: created=\(created), merged=\(merged)")
+
         return ProcessResult(created: created, merged: merged)
+    }
+
+    /// Reconcile QRZ presence records against what QRZ actually returned.
+    /// Clears isPresent and sets needsUpload for QSOs that we thought were in QRZ but aren't.
+    private func reconcileQRZPresence(downloadedKeys: Set<String>) throws {
+        let descriptor = FetchDescriptor<QSO>()
+        let allQSOs = try modelContext.fetch(descriptor)
+
+        for qso in allQSOs {
+            guard let presence = qso.presence(for: .qrz), presence.isPresent else {
+                continue
+            }
+
+            // If QRZ didn't return this QSO, it's not actually there
+            if !downloadedKeys.contains(qso.deduplicationKey) {
+                presence.isPresent = false
+                presence.needsUpload = true
+            }
+        }
     }
 
     /// Merge fetched QSO data into existing QSO (richest data wins)
@@ -469,6 +565,7 @@ class SyncService: ObservableObject {
     private func uploadToAllDestinations() async -> [ServiceType: Result<Int, Error>] {
         // Fetch QSOs needing upload
         let qsosNeedingUpload = try? fetchQSOsNeedingUpload()
+        let timeout = syncTimeoutSeconds
 
         return await withTaskGroup(of: (ServiceType, Result<Int, Error>).self) { group in
             // QRZ upload
@@ -478,7 +575,9 @@ class SyncService: ObservableObject {
                     group.addTask {
                         await MainActor.run { self.syncPhase = .uploading(service: .qrz) }
                         do {
-                            let count = try await self.uploadToQRZ(qsos: qrzQSOs)
+                            let count = try await withTimeout(seconds: timeout, service: .qrz) {
+                                try await self.uploadToQRZ(qsos: qrzQSOs)
+                            }
                             return (.qrz, .success(count))
                         } catch {
                             return (.qrz, .failure(error))
@@ -494,7 +593,9 @@ class SyncService: ObservableObject {
                     group.addTask {
                         await MainActor.run { self.syncPhase = .uploading(service: .pota) }
                         do {
-                            let count = try await self.uploadToPOTA(qsos: potaQSOs)
+                            let count = try await withTimeout(seconds: timeout, service: .pota) {
+                                try await self.uploadToPOTA(qsos: potaQSOs)
+                            }
                             return (.pota, .success(count))
                         } catch {
                             return (.pota, .failure(error))
@@ -530,10 +631,13 @@ class SyncService: ObservableObject {
             let result = try await qrzClient.uploadQSOs(batchQSOs)
             totalUploaded += result.uploaded
 
-            // Mark as present in QRZ
+            // Clear needsUpload flag - don't mark as present yet.
+            // Let the next download confirm actual presence in QRZ.
             await MainActor.run {
                 for qso in batchQSOs {
-                    qso.markPresent(in: .qrz, context: modelContext)
+                    if let presence = qso.presence(for: .qrz) {
+                        presence.needsUpload = false
+                    }
                 }
             }
         }
@@ -541,8 +645,13 @@ class SyncService: ObservableObject {
         return totalUploaded
     }
 
+    /// Modes that represent activation metadata, not actual QSOs (from Ham2K PoLo)
+    private static let metadataModes: Set<String> = ["WEATHER", "SOLAR"]
+
     private func uploadToPOTA(qsos: [QSO]) async throws -> Int {
-        let byPark = POTAClient.groupQSOsByPark(qsos)
+        // Filter out metadata pseudo-modes before grouping
+        let realQsos = qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
+        let byPark = POTAClient.groupQSOsByPark(realQsos)
         var totalUploaded = 0
 
         for (parkRef, parkQSOs) in byPark {
@@ -580,20 +689,29 @@ class SyncService: ObservableObject {
         var downloaded = 0
         var uploaded = 0
 
-        // Download
+        // Download with timeout
         syncPhase = .downloading(service: .qrz)
-        let qsos = try await qrzClient.fetchQSOs(since: nil)
+        let qsos = try await withTimeout(seconds: syncTimeoutSeconds, service: .qrz) {
+            try await self.qrzClient.fetchQSOs(since: nil)
+        }
         let fetched = qsos.map { FetchedQSO.fromQRZ($0) }
 
         syncPhase = .processing
         let processResult = try processDownloadedQSOs(fetched)
         downloaded = processResult.created
+
+        // Reconcile QRZ presence against what QRZ actually returned
+        let qrzDownloadedKeys = Set(fetched.map { $0.deduplicationKey })
+        try reconcileQRZPresence(downloadedKeys: qrzDownloadedKeys)
+
         try modelContext.save()
 
-        // Upload
+        // Upload with timeout
         syncPhase = .uploading(service: .qrz)
         let qsosToUpload = try fetchQSOsNeedingUpload().filter { $0.needsUpload(to: .qrz) }
-        uploaded = try await uploadToQRZ(qsos: qsosToUpload)
+        uploaded = try await withTimeout(seconds: syncTimeoutSeconds, service: .qrz) {
+            try await self.uploadToQRZ(qsos: qsosToUpload)
+        }
         try modelContext.save()
 
         return (downloaded, uploaded)
@@ -610,9 +728,11 @@ class SyncService: ObservableObject {
         var downloaded = 0
         var uploaded = 0
 
-        // Download
+        // Download with timeout
         syncPhase = .downloading(service: .pota)
-        let qsos = try await potaClient.fetchAllQSOs()
+        let qsos = try await withTimeout(seconds: syncTimeoutSeconds, service: .pota) {
+            try await self.potaClient.fetchAllQSOs()
+        }
         let fetched = qsos.map { FetchedQSO.fromPOTA($0) }
 
         syncPhase = .processing
@@ -620,10 +740,12 @@ class SyncService: ObservableObject {
         downloaded = processResult.created
         try modelContext.save()
 
-        // Upload
+        // Upload with timeout
         syncPhase = .uploading(service: .pota)
         let qsosToUpload = try fetchQSOsNeedingUpload().filter { $0.needsUpload(to: .pota) && $0.parkReference?.isEmpty == false }
-        uploaded = try await uploadToPOTA(qsos: qsosToUpload)
+        uploaded = try await withTimeout(seconds: syncTimeoutSeconds, service: .pota) {
+            try await self.uploadToPOTA(qsos: qsosToUpload)
+        }
         try modelContext.save()
 
         return (downloaded, uploaded)
@@ -637,8 +759,11 @@ class SyncService: ObservableObject {
             syncPhase = nil
         }
 
+        // Download with timeout
         syncPhase = .downloading(service: .lofi)
-        let qsos = try await lofiClient.fetchAllQsosSinceLastSync()
+        let qsos = try await withTimeout(seconds: syncTimeoutSeconds, service: .lofi) {
+            try await self.lofiClient.fetchAllQsosSinceLastSync()
+        }
         let fetched = qsos.compactMap { FetchedQSO.fromLoFi($0.0, operation: $0.1) }
 
         syncPhase = .processing

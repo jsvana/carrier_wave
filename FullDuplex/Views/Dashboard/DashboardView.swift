@@ -27,9 +27,21 @@ struct DashboardView: View {
 
     // Derived counts from ServicePresence
     private func uploadedCount(for service: ServiceType) -> Int {
-        qsos.filter { qso in
+        let count = qsos.filter { qso in
             qso.servicePresence.contains { $0.serviceType == service && $0.isPresent }
         }.count
+        // Debug: print breakdown
+        if service == .lofi && debugMode {
+            let total = qsos.count
+            let withLofiPresence = qsos.filter { qso in
+                qso.servicePresence.contains { $0.serviceType == .lofi }
+            }.count
+            let withLofiPresent = qsos.filter { qso in
+                qso.servicePresence.contains { $0.serviceType == .lofi && $0.isPresent }
+            }.count
+            print("[Dashboard] LoFi count: total QSOs=\(total), with LoFi presence=\(withLofiPresence), with LoFi isPresent=true: \(withLofiPresent)")
+        }
+        return count
     }
 
     private func pendingCount(for service: ServiceType) -> Int {
@@ -193,10 +205,7 @@ struct DashboardView: View {
                 NavigationLink {
                     StatDetailView(category: .parks, items: stats.items(for: .parks))
                 } label: {
-                    ActivationsStatBox(
-                        successful: stats.successfulActivations,
-                        attempts: stats.attemptedActivations
-                    )
+                    ActivationsStatBox(successful: stats.successfulActivations)
                 }
                 .buttonStyle(.plain)
             }
@@ -885,25 +894,15 @@ struct StatBox: View {
 
 struct ActivationsStatBox: View {
     let successful: Int
-    let attempts: Int
 
     var body: some View {
         VStack(spacing: 4) {
             Image(systemName: "leaf")
                 .font(.title3)
                 .foregroundStyle(.blue)
-            HStack(spacing: 2) {
-                Text("\(successful)")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundStyle(.primary)
-                Text("/")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                Text("\(successful + attempts)")
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-            }
+            Text("\(successful)")
+                .font(.title2)
+                .fontWeight(.bold)
             Text("Activations")
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -920,6 +919,8 @@ struct ActivationsStatBox: View {
 struct ActivityGrid: View {
     let activityData: [Date: Int]
 
+    @State private var selectedDate: Date?
+
     private let columns = 26
     private let rows = 7
 
@@ -931,6 +932,12 @@ struct ActivityGrid: View {
     private let monthFormatter: DateFormatter = {
         let f = DateFormatter()
         f.dateFormat = "MMM"
+        return f
+    }()
+
+    private let tooltipDateFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "MMM d, yyyy"
         return f
     }()
 
@@ -985,6 +992,28 @@ struct ActivityGrid: View {
                                 RoundedRectangle(cornerRadius: 2)
                                     .fill(colorFor(count: count))
                                     .frame(width: cellSize, height: cellSize)
+                                    .onTapGesture {
+                                        if selectedDate == date {
+                                            selectedDate = nil
+                                        } else {
+                                            selectedDate = date
+                                        }
+                                    }
+                                    .popover(isPresented: Binding(
+                                        get: { selectedDate == date },
+                                        set: { if !$0 { selectedDate = nil } }
+                                    ), arrowEdge: .top) {
+                                        VStack(spacing: 4) {
+                                            Text(tooltipDateFormatter.string(from: date))
+                                                .font(.caption)
+                                                .foregroundStyle(.secondary)
+                                            Text("\(count) QSO\(count == 1 ? "" : "s")")
+                                                .font(.headline)
+                                        }
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 8)
+                                        .presentationCompactAdaptation(.popover)
+                                    }
                             }
                         }
                     }

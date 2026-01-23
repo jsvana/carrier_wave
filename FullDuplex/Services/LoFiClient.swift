@@ -170,16 +170,19 @@ actor LoFiClient {
     // MARK: - Fetch Operations
 
     /// Fetch operations with pagination
+    /// - Parameter otherClientsOnly: When true, excludes operations uploaded by this client.
+    ///   Should be false for fresh sync to get ALL operations.
     func fetchOperations(
         syncedSinceMillis: Int64 = 0,
-        limit: Int = 50
+        limit: Int = 50,
+        otherClientsOnly: Bool = true
     ) async throws -> LoFiOperationsResponse {
         let token = try getToken()
 
         var components = URLComponents(string: "\(baseURL)/v1/operations")!
         components.queryItems = [
             URLQueryItem(name: "synced_since_millis", value: String(syncedSinceMillis)),
-            URLQueryItem(name: "other_clients_only", value: "true"),
+            URLQueryItem(name: "other_clients_only", value: String(otherClientsOnly)),
             URLQueryItem(name: "limit", value: String(limit))
         ]
 
@@ -190,17 +193,20 @@ actor LoFiClient {
     }
 
     /// Fetch QSOs for a specific operation
+    /// - Parameter otherClientsOnly: When true, excludes QSOs uploaded by this client.
+    ///   Should be false for fresh sync to get ALL QSOs.
     func fetchOperationQsos(
         operationUUID: String,
         syncedSinceMillis: Int64 = 0,
-        limit: Int = 50
+        limit: Int = 50,
+        otherClientsOnly: Bool = true
     ) async throws -> LoFiQsosResponse {
         let token = try getToken()
 
         var components = URLComponents(string: "\(baseURL)/v1/operations/\(operationUUID)/qsos")!
         components.queryItems = [
             URLQueryItem(name: "synced_since_millis", value: String(syncedSinceMillis)),
-            URLQueryItem(name: "other_clients_only", value: "true"),
+            URLQueryItem(name: "other_clients_only", value: String(otherClientsOnly)),
             URLQueryItem(name: "limit", value: String(limit))
         ]
 
@@ -216,12 +222,22 @@ actor LoFiClient {
         let lastSyncMillis = getLastSyncMillis()
         var maxSyncMillis: Int64 = lastSyncMillis
 
+        // For fresh sync (lastSyncMillis == 0), fetch ALL QSOs including our own.
+        // For incremental sync, only fetch QSOs from other clients to avoid duplicates.
+        let isFreshSync = lastSyncMillis == 0
+        print("[LoFi] fetchAllQsosSinceLastSync: lastSyncMillis=\(lastSyncMillis), isFreshSync=\(isFreshSync)")
+
         // First, fetch all operations
         var operations: [LoFiOperation] = []
         var syncedSince: Int64 = 0
 
         while true {
-            let response = try await fetchOperations(syncedSinceMillis: syncedSince, limit: 50)
+            let response = try await fetchOperations(
+                syncedSinceMillis: syncedSince,
+                limit: 50,
+                otherClientsOnly: !isFreshSync
+            )
+            print("[LoFi] Fetched \(response.operations.count) operations (total so far: \(operations.count + response.operations.count)), recordsLeft=\(response.meta.operations.recordsLeft)")
             operations.append(contentsOf: response.operations)
 
             if response.meta.operations.recordsLeft == 0 {
@@ -236,6 +252,11 @@ actor LoFiClient {
             }
         }
 
+        print("[LoFi] Total operations fetched: \(operations.count)")
+        for (idx, op) in operations.enumerated() {
+            print("[LoFi]   [\(idx)] \(op.stationCall) - \(op.title ?? "untitled") - qsoCount=\(op.qsoCount)")
+        }
+
         // Now fetch QSOs for each operation
         for operation in operations {
             var qsoSyncedSince: Int64 = lastSyncMillis
@@ -244,8 +265,10 @@ actor LoFiClient {
                 let qsosResponse = try await fetchOperationQsos(
                     operationUUID: operation.uuid,
                     syncedSinceMillis: qsoSyncedSince,
-                    limit: 50
+                    limit: 50,
+                    otherClientsOnly: !isFreshSync
                 )
+                print("[LoFi] Operation \(operation.uuid): fetched \(qsosResponse.qsos.count) QSOs, recordsLeft=\(qsosResponse.meta.qsos.recordsLeft)")
 
                 for qso in qsosResponse.qsos {
                     allQsos.append((qso, operation))
@@ -265,6 +288,8 @@ actor LoFiClient {
                 }
             }
         }
+
+        print("[LoFi] Total QSOs fetched: \(allQsos.count)")
 
         // Update last sync timestamp
         if maxSyncMillis > lastSyncMillis {
