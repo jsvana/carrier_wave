@@ -136,15 +136,15 @@ actor HAMRSClient {
             else {
                 // QSO without matching logbook - use empty logbook
                 let emptyLogbook = HAMRSLogbook(
-                    _id: "LOGBOOK:unknown",
-                    _rev: nil,
+                    id: "LOGBOOK:unknown",
+                    rev: nil,
                     title: nil,
                     createdAt: nil,
                     updatedAt: nil,
                     template: nil,
                     myPark: nil,
                     myGridsquare: nil,
-                    operator: nil
+                    operatorCall: nil
                 )
                 results.append((qso, emptyLogbook))
                 continue
@@ -153,6 +153,26 @@ actor HAMRSClient {
         }
 
         return results
+    }
+
+    /// Extract Basic Auth header from URL with embedded credentials
+    private func basicAuthHeader(from url: URL) -> String? {
+        guard let user = url.user, let password = url.password else {
+            return nil
+        }
+        let credentials = "\(user):\(password)"
+        guard let data = credentials.data(using: .utf8) else {
+            return nil
+        }
+        return "Basic \(data.base64EncodedString())"
+    }
+
+    /// Remove credentials from URL (for use in requests after extracting auth)
+    private func urlWithoutCredentials(_ url: URL) -> URL {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        components?.user = nil
+        components?.password = nil
+        return components?.url ?? url
     }
 
     /// Fetch all logbooks from CouchDB
@@ -166,8 +186,11 @@ actor HAMRSClient {
                 URLQueryItem(name: "endkey", value: "\"LOGBOOK:\u{ffff}\""),
             ])
 
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: urlWithoutCredentials(url))
         request.httpMethod = "GET"
+        if let authHeader = basicAuthHeader(from: couchURL) {
+            request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        }
 
         let (data, response) = try await session.data(for: request)
 
@@ -201,8 +224,11 @@ actor HAMRSClient {
                 URLQueryItem(name: "endkey", value: "\"QSO:\u{ffff}\""),
             ])
 
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: urlWithoutCredentials(url))
         request.httpMethod = "GET"
+        if let authHeader = basicAuthHeader(from: couchURL) {
+            request.setValue(authHeader, forHTTPHeaderField: "Authorization")
+        }
 
         let (data, response) = try await session.data(for: request)
 
