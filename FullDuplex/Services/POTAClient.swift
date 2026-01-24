@@ -507,8 +507,8 @@ actor POTAClient {
             }
 
             // Station info
-            if let stationCall = qso.myCallsign, !stationCall.isEmpty {
-                fields.append(formatField("STATION_CALLSIGN", stationCall))
+            if !qso.myCallsign.isEmpty {
+                fields.append(formatField("STATION_CALLSIGN", qso.myCallsign))
             }
 
             // Grid squares

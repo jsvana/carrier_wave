@@ -17,8 +17,8 @@ class POTAUploadAttempt {
 
     // Request details
     var adifContent: String = ""
-    @Attribute(.transformable(by: DictionaryTransformer.self))
-    var requestHeaders: [String: String] = [:]
+    // Store headers as JSON string to avoid ValueTransformer issues
+    var requestHeadersJSON: String = "{}"
     var filename: String = ""
 
     // Response details
@@ -32,6 +32,25 @@ class POTAUploadAttempt {
 
     // Correlation
     var correlatedJobId: Int?
+
+    /// Computed property for accessing headers as dictionary
+    var requestHeaders: [String: String] {
+        get {
+            guard let data = requestHeadersJSON.data(using: .utf8),
+                  let dict = try? JSONDecoder().decode([String: String].self, from: data) else {
+                return [:]
+            }
+            return dict
+        }
+        set {
+            if let data = try? JSONEncoder().encode(newValue),
+               let json = String(data: data, encoding: .utf8) {
+                requestHeadersJSON = json
+            } else {
+                requestHeadersJSON = "{}"
+            }
+        }
+    }
 
     init(
         timestamp: Date = Date(),
@@ -50,8 +69,12 @@ class POTAUploadAttempt {
         self.callsign = callsign
         self.location = location
         self.adifContent = adifContent
-        self.requestHeaders = requestHeaders
         self.filename = filename
+        // Set headers via JSON encoding
+        if let data = try? JSONEncoder().encode(requestHeaders),
+           let json = String(data: data, encoding: .utf8) {
+            self.requestHeadersJSON = json
+        }
     }
 
     func markCompleted(httpStatusCode: Int, responseBody: String?, durationMs: Int) {
@@ -68,33 +91,5 @@ class POTAUploadAttempt {
         self.errorMessage = errorMessage
         self.requestDurationMs = durationMs
         self.success = false
-    }
-}
-
-// Custom transformer for [String: String] dictionary
-final class DictionaryTransformer: ValueTransformer {
-    override class func transformedValueClass() -> AnyClass {
-        NSData.self
-    }
-
-    override class func allowsReverseTransformation() -> Bool {
-        true
-    }
-
-    override func transformedValue(_ value: Any?) -> Any? {
-        guard let dict = value as? [String: String] else { return nil }
-        return try? JSONEncoder().encode(dict)
-    }
-
-    override func reverseTransformedValue(_ value: Any?) -> Any? {
-        guard let data = value as? Data else { return nil }
-        return try? JSONDecoder().decode([String: String].self, from: data)
-    }
-
-    static func register() {
-        ValueTransformer.setValueTransformer(
-            DictionaryTransformer(),
-            forName: NSValueTransformerName("DictionaryTransformer")
-        )
     }
 }

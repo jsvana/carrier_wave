@@ -9,7 +9,18 @@
       "Skill(ios-simulator-skill)",
       "Bash(python /Users/jsvana/.claude/skills/ios-simulator-skill/scripts/build_and_test.py:*)",
       "Bash(python3:*)",
-      "Bash(bd list:*)"
+      "Bash(bd list:*)",
+      "Bash(xcrun simctl boot:*)",
+      "Bash(xcrun simctl:*)",
+      "Bash(open:*)",
+      "Skill(canvas-design)",
+      "Bash(pip3 install:*)",
+      "Bash(pip install:*)",
+      "Bash(xcrun devicectl device:*)",
+      "Bash(log show:*)",
+      "Bash(plutil:*)",
+      "Bash(curl:*)",
+      "Bash(sips:*)"
     ]
   }
 }

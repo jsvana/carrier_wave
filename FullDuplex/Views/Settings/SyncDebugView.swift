@@ -1,22 +1,28 @@
+import SwiftData
 import SwiftUI
 
 struct SyncDebugView: View {
+    @Environment(\.modelContext) private var modelContext
     @ObservedObject var debugLog = SyncDebugLog.shared
     @State private var selectedTab = 0
+    @State private var serviceCounts: [ServiceType: Int] = [:]
 
     var body: some View {
         VStack(spacing: 0) {
             Picker("View", selection: $selectedTab) {
                 Text("Raw QSOs").tag(0)
                 Text("Sync Log").tag(1)
+                Text("Stats").tag(2)
             }
             .pickerStyle(.segmented)
             .padding()
 
             if selectedTab == 0 {
                 rawQSOsView
-            } else {
+            } else if selectedTab == 1 {
                 syncLogView
+            } else {
+                serviceStatsView
             }
         }
         .navigationTitle("Sync Debug")
@@ -76,6 +82,44 @@ struct SyncDebugView: View {
                 }
             }
         }
+    }
+
+    private var serviceStatsView: some View {
+        List {
+            Section("QSOs Present per Service") {
+                ForEach(ServiceType.allCases, id: \.self) { service in
+                    HStack {
+                        Text(service.displayName)
+                        Spacer()
+                        Text("\(serviceCounts[service] ?? 0)")
+                            .foregroundStyle(.secondary)
+                            .fontDesign(.monospaced)
+                    }
+                }
+            }
+        }
+        .onAppear {
+            loadServiceCounts()
+        }
+        .refreshable {
+            loadServiceCounts()
+        }
+    }
+
+    private func loadServiceCounts() {
+        var counts: [ServiceType: Int] = [:]
+        do {
+            let descriptor = FetchDescriptor<ServicePresence>()
+            let allPresence = try modelContext.fetch(descriptor)
+            for service in ServiceType.allCases {
+                counts[service] = allPresence.filter { $0.serviceType == service && $0.isPresent }.count
+            }
+        } catch {
+            for service in ServiceType.allCases {
+                counts[service] = 0
+            }
+        }
+        serviceCounts = counts
     }
 }
 

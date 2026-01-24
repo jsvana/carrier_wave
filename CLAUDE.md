@@ -6,7 +6,21 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Prefer using the `ios-simulator-skill` over running xcodebuild commands directly.** The skill provides optimized scripts for building, testing, and simulator management with minimal token output.
 
-The commands below are provided as reference when the skill is not available:
+### Running on Simulator (IMPORTANT)
+
+**Always rebuild and reinstall to test code changes.** Simply launching the app will run the old version.
+
+```bash
+# Full workflow: build, install, launch (use this after code changes)
+python3 ~/.claude/skills/ios-simulator-skill/scripts/build_and_test.py --project FullDuplex.xcodeproj --scheme FullDuplex
+xcrun simctl install booted ~/Library/Developer/Xcode/DerivedData/FullDuplex-*/Build/Products/Debug-iphonesimulator/FullDuplex.app
+python3 ~/.claude/skills/ios-simulator-skill/scripts/app_launcher.py --launch com.jsvana.FullDuplex
+
+# If app is already running, terminate first
+python3 ~/.claude/skills/ios-simulator-skill/scripts/app_launcher.py --terminate com.jsvana.FullDuplex
+```
+
+### Reference Commands (when skill is not available)
 
 ```bash
 # Build for simulator

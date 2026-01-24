@@ -5,14 +5,12 @@ import UniformTypeIdentifiers
 @main
 struct FullDuplexApp: App {
     var sharedModelContainer: ModelContainer = {
-        // Register value transformer before creating container
-        DictionaryTransformer.register()
-
         let schema = Schema([
             QSO.self,
             ServicePresence.self,
             UploadDestination.self,
             POTAUploadAttempt.self,
+            ActivationMetadata.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,

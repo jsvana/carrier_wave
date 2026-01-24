@@ -19,7 +19,8 @@ struct ADIFRecord {
     var myCallsign: String?
     var myGridsquare: String?
     var gridsquare: String?    // Their grid
-    var sigInfo: String?       // Park reference for POTA
+    var sigInfo: String?       // Their park reference (hunter contacts)
+    var mySigInfo: String?     // My park reference (activations)
     var comment: String?
     var rawADIF: String
 
@@ -77,7 +78,8 @@ struct ADIFParser {
                 myCallsign: fields["station_callsign"] ?? fields["operator"],
                 myGridsquare: fields["my_gridsquare"],
                 gridsquare: fields["gridsquare"],
-                sigInfo: fields["sig_info"] ?? fields["pota_ref"],
+                sigInfo: fields["sig_info"],
+                mySigInfo: fields["my_sig_info"] ?? fields["pota_ref"],
                 comment: fields["comment"] ?? fields["notes"],
                 rawADIF: "<" + trimmed + "<eor>"
             )

@@ -102,7 +102,7 @@ class ImportService: ObservableObject {
             myCallsign: record.myCallsign ?? myCallsign,
             myGrid: record.myGridsquare,
             theirGrid: record.gridsquare,
-            parkReference: record.sigInfo,
+            parkReference: record.mySigInfo,
             notes: record.comment,
             importSource: source,
             rawADIF: record.rawADIF
@@ -132,9 +132,26 @@ class ImportService: ObservableObject {
 
     // MARK: - LoFi Import
 
+    /// Modes that represent activation metadata, not actual QSOs
+    private static let metadataModes: Set<String> = ["WEATHER", "SOLAR"]
+
     func importFromLoFi(qsos: [(LoFiQso, LoFiOperation)]) async throws -> ImportResult {
         isImporting = true
         defer { isImporting = false }
+
+        // Filter out metadata pseudo-modes (WEATHER, SOLAR from Ham2K PoLo)
+        // These are activation conditions, not actual QSOs
+        let realQsos = qsos.filter { lofiQso, _ in
+            !Self.metadataModes.contains(lofiQso.mode?.uppercased() ?? "")
+        }
+
+        // Store metadata entries (WEATHER, SOLAR) in ActivationMetadata
+        let metadataEntries = qsos.filter { lofiQso, _ in
+            Self.metadataModes.contains(lofiQso.mode?.uppercased() ?? "")
+        }
+        for (lofiQso, operation) in metadataEntries {
+            storeActivationMetadata(from: lofiQso, operation: operation)
+        }
 
         var imported = 0
         var duplicates = 0
@@ -142,7 +159,7 @@ class ImportService: ObservableObject {
 
         let existingKeys = try fetchExistingDeduplicationKeys()
 
-        for (lofiQso, operation) in qsos {
+        for (lofiQso, operation) in realQsos {
             do {
                 let qso = try createQSO(from: lofiQso, operation: operation)
 
@@ -165,7 +182,7 @@ class ImportService: ObservableObject {
         try modelContext.save()
 
         let result = ImportResult(
-            totalRecords: qsos.count,
+            totalRecords: realQsos.count,
             imported: imported,
             duplicates: duplicates,
             errors: errors,
@@ -174,6 +191,51 @@ class ImportService: ObservableObject {
 
         lastImportResult = result
         return result
+    }
+
+    /// Store weather/solar metadata for an activation
+    private func storeActivationMetadata(from lofiQso: LoFiQso, operation: LoFiOperation) {
+        guard let mode = lofiQso.mode?.uppercased() else { return }
+
+        // Get park reference from operation
+        guard let parkRef = operation.refs.first(where: { $0.refType == "potaActivation" })?.reference else {
+            return
+        }
+
+        // Get activation date from operation or QSO
+        let timestamp: Date
+        if let startMillis = operation.startAtMillisMin {
+            timestamp = Date(timeIntervalSince1970: Double(startMillis) / 1000.0)
+        } else {
+            timestamp = lofiQso.timestamp
+        }
+
+        // Normalize to UTC start of day
+        var calendar = Calendar.current
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        let date = calendar.startOfDay(for: timestamp)
+
+        // Fetch or create metadata for this activation
+        let descriptor = FetchDescriptor<ActivationMetadata>()
+        let allMetadata = (try? modelContext.fetch(descriptor)) ?? []
+        let existing = allMetadata.first { $0.parkReference == parkRef && $0.date == date }
+
+        let metadata: ActivationMetadata
+        if let existing = existing {
+            metadata = existing
+        } else {
+            metadata = ActivationMetadata(parkReference: parkRef, date: date)
+            modelContext.insert(metadata)
+        }
+
+        // Store the value - notes field contains the actual condition
+        let value = lofiQso.notes
+
+        if mode == "WEATHER" {
+            metadata.weather = value
+        } else if mode == "SOLAR" {
+            metadata.solarConditions = value
+        }
     }
 
     private func createQSO(from lofiQso: LoFiQso, operation: LoFiOperation) throws -> QSO {
