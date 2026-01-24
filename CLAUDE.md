@@ -3,6 +3,12 @@
 > **IMPORTANT:** For general project context, read this file and linked docs.
 > Only explore source files when actively implementing, planning, or debugging.
 
+## Building and Testing
+
+**NEVER build, run tests, or use the iOS simulator yourself. Always prompt the user to do so.**
+
+When you need to verify changes compile or tests pass, ask the user to run the appropriate command (e.g., `make build`, `make test`) and report back the results.
+
 ## Overview
 
 FullDuplex is a SwiftUI/SwiftData iOS app for amateur radio QSO (contact) logging with cloud sync to QRZ, POTA, and Ham2K LoFi.

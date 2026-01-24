@@ -20,7 +20,7 @@ struct KeychainHelper {
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
-            kSecValueData as String: data
+            kSecValueData as String: data,
         ]
 
         // Delete existing item first
@@ -46,7 +46,7 @@ struct KeychainHelper {
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
             kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
+            kSecMatchLimit as String: kSecMatchLimitOne,
         ]
 
         var result: AnyObject?
@@ -78,7 +78,7 @@ struct KeychainHelper {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: key
+            kSecAttrAccount as String: key,
         ]
 
         let status = SecItemDelete(query as CFDictionary)
@@ -116,5 +116,8 @@ extension KeychainHelper {
         static let lofiEmail = "lofi.email"
         static let lofiDeviceLinked = "lofi.device.linked"
         static let lofiLastSyncMillis = "lofi.last.sync.millis"
+
+        // HAMRS
+        static let hamrsApiKey = "hamrs.api.key"
     }
 }

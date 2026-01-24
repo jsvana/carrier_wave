@@ -5,7 +5,6 @@ struct SettingsMainView: View {
     @Environment(\.modelContext) private var modelContext
     @ObservedObject var potaAuth: POTAAuthService
 
-    @State private var showingPOTALogin = false
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var showingClearAllConfirmation = false
@@ -18,6 +17,11 @@ struct SettingsMainView: View {
     @AppStorage("readOnlyMode") private var readOnlyMode = false
 
     private let lofiClient = LoFiClient()
+    private let qrzClient = QRZClient()
+    private let hamrsClient = HAMRSClient()
+
+    @State private var qrzIsConfigured = false
+    @State private var qrzCallsign: String?
 
     var body: some View {
         NavigationStack {
@@ -27,45 +31,34 @@ struct SettingsMainView: View {
                     NavigationLink {
                         QRZSettingsView()
                     } label: {
-                        Label("QRZ Logbook", systemImage: "globe")
+                        HStack {
+                            Label("QRZ Logbook", systemImage: "globe")
+                            Spacer()
+                            if qrzIsConfigured {
+                                if let callsign = qrzCallsign {
+                                    Text(callsign)
+                                        .foregroundStyle(.secondary)
+                                }
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                        }
                     }
 
                     // POTA
-                    if let token = potaAuth.currentToken, !token.isExpired {
+                    NavigationLink {
+                        POTASettingsView(potaAuth: potaAuth)
+                    } label: {
                         HStack {
                             Label("POTA", systemImage: "leaf")
                             Spacer()
-                            if let callsign = token.callsign {
-                                Text(callsign)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button("Logout", role: .destructive) {
-                                potaAuth.logout()
-                            }
-                        }
-                    } else {
-                        Button {
-                            showingPOTALogin = true
-                            Task {
-                                do {
-                                    _ = try await potaAuth.authenticate()
-                                    showingPOTALogin = false
-                                } catch {
-                                    showingPOTALogin = false
-                                    errorMessage = error.localizedDescription
-                                    showingError = true
+                            if let token = potaAuth.currentToken, !token.isExpired {
+                                if let callsign = token.callsign {
+                                    Text(callsign)
+                                        .foregroundStyle(.secondary)
                                 }
-                            }
-                        } label: {
-                            HStack {
-                                Label("POTA", systemImage: "leaf")
-                                Spacer()
-                                Text("Connect")
-                                    .foregroundStyle(.secondary)
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
                             }
                         }
                     }
@@ -74,7 +67,37 @@ struct SettingsMainView: View {
                     NavigationLink {
                         LoFiSettingsView()
                     } label: {
-                        Label("Ham2K LoFi", systemImage: "antenna.radiowaves.left.and.right")
+                        HStack {
+                            Label("Ham2K LoFi", systemImage: "antenna.radiowaves.left.and.right")
+                            Spacer()
+                            if lofiClient.isConfigured {
+                                if let callsign = lofiClient.getCallsign() {
+                                    Text(callsign)
+                                        .foregroundStyle(.secondary)
+                                }
+                                if lofiClient.isLinked {
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .foregroundStyle(.green)
+                                } else {
+                                    Image(systemName: "clock")
+                                        .foregroundStyle(.orange)
+                                }
+                            }
+                        }
+                    }
+
+                    // HAMRS
+                    NavigationLink {
+                        HAMRSSettingsView()
+                    } label: {
+                        HStack {
+                            Label("HAMRS Pro", systemImage: "rectangle.stack")
+                            Spacer()
+                            if hamrsClient.isConfigured {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                        }
                     }
 
                     // iCloud
@@ -160,8 +183,8 @@ struct SettingsMainView: View {
                 }
             }
             .navigationTitle("Settings")
-            .sheet(isPresented: $showingPOTALogin) {
-                POTALoginSheet(authService: potaAuth)
+            .task {
+                await loadServiceStatus()
             }
             .alert("Error", isPresented: $showingError) {
                 Button("OK") {}
@@ -232,6 +255,11 @@ struct SettingsMainView: View {
             errorMessage = "Deduplication failed: \(error.localizedDescription)"
             showingError = true
         }
+    }
+
+    private func loadServiceStatus() async {
+        qrzIsConfigured = await qrzClient.hasApiKey()
+        qrzCallsign = await qrzClient.getCallsign()
     }
 }
 
@@ -400,6 +428,80 @@ struct QRZSettingsView: View {
         Task {
             await qrzClient.logout()
             await checkStatus()
+        }
+    }
+}
+
+struct POTASettingsView: View {
+    @ObservedObject var potaAuth: POTAAuthService
+
+    @State private var showingLogin = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
+
+    var body: some View {
+        List {
+            if let token = potaAuth.currentToken, !token.isExpired {
+                Section {
+                    HStack {
+                        Label(
+                            "Connected",
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .foregroundStyle(.green)
+                        Spacer()
+                        if let callsign = token.callsign {
+                            Text(callsign)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Status")
+                }
+
+                Section {
+                    Button("Logout", role: .destructive) {
+                        potaAuth.logout()
+                    }
+                }
+            } else {
+                Section {
+                    Text("Connect your POTA account to sync activations and hunter QSOs.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Button("Connect to POTA") {
+                        showingLogin = true
+                        Task {
+                            do {
+                                _ = try await potaAuth.authenticate()
+                                showingLogin = false
+                            } catch {
+                                showingLogin = false
+                                errorMessage = error.localizedDescription
+                                showingError = true
+                            }
+                        }
+                    }
+                } header: {
+                    Text("Setup")
+                }
+
+                Section {
+                    Link(destination: URL(string: "https://pota.app")!) {
+                        Label("Visit POTA Website", systemImage: "arrow.up.right.square")
+                    }
+                }
+            }
+        }
+        .navigationTitle("POTA")
+        .sheet(isPresented: $showingLogin) {
+            POTALoginSheet(authService: potaAuth)
+        }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK") {}
+        } message: {
+            Text(errorMessage)
         }
     }
 }

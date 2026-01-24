@@ -15,10 +15,19 @@ final class QSO {
     var myGrid: String?
     var theirGrid: String?
     var parkReference: String?
+    var theirParkReference: String?
     var notes: String?
     var importSource: ImportSource
     var importedAt: Date
     var rawADIF: String?
+
+    // Contact info (from HAMRS and other sources)
+    var name: String?
+    var qth: String?
+    var state: String?
+    var country: String?
+    var power: Int?
+    var sotaRef: String?
 
     // QRZ sync tracking
     var qrzLogId: String?
@@ -41,10 +50,17 @@ final class QSO {
         myGrid: String? = nil,
         theirGrid: String? = nil,
         parkReference: String? = nil,
+        theirParkReference: String? = nil,
         notes: String? = nil,
         importSource: ImportSource,
         importedAt: Date = Date(),
         rawADIF: String? = nil,
+        name: String? = nil,
+        qth: String? = nil,
+        state: String? = nil,
+        country: String? = nil,
+        power: Int? = nil,
+        sotaRef: String? = nil,
         qrzLogId: String? = nil,
         qrzConfirmed: Bool = false,
         lotwConfirmedDate: Date? = nil
@@ -61,10 +77,17 @@ final class QSO {
         self.myGrid = myGrid
         self.theirGrid = theirGrid
         self.parkReference = parkReference
+        self.theirParkReference = theirParkReference
         self.notes = notes
         self.importSource = importSource
         self.importedAt = importedAt
         self.rawADIF = rawADIF
+        self.name = name
+        self.qth = qth
+        self.state = state
+        self.country = country
+        self.power = power
+        self.sotaRef = sotaRef
         self.qrzLogId = qrzLogId
         self.qrzConfirmed = qrzConfirmed
         self.lotwConfirmedDate = lotwConfirmedDate
@@ -73,7 +96,7 @@ final class QSO {
     /// Deduplication key: callsign + band + mode + timestamp (rounded to 2 min)
     var deduplicationKey: String {
         let roundedTimestamp = timestamp.timeIntervalSince1970
-        let rounded = Int(roundedTimestamp / 120) * 120 // 2 minute buckets
+        let rounded = Int(roundedTimestamp / 120) * 120  // 2 minute buckets
         return "\(callsign.uppercased())|\(band.uppercased())|\(mode.uppercased())|\(rounded)"
     }
 
@@ -117,10 +140,17 @@ final class QSO {
         if myGrid != nil { score += 1 }
         if theirGrid != nil { score += 1 }
         if parkReference != nil { score += 1 }
+        if theirParkReference != nil { score += 1 }
         if notes != nil { score += 1 }
         if qrzLogId != nil { score += 1 }
         if rawADIF != nil { score += 1 }
         if frequency != nil { score += 1 }
+        if name != nil { score += 1 }
+        if qth != nil { score += 1 }
+        if state != nil { score += 1 }
+        if country != nil { score += 1 }
+        if power != nil { score += 1 }
+        if sotaRef != nil { score += 1 }
         return score
     }
 

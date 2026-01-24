@@ -6,25 +6,28 @@ enum ImportSource: String, Codable {
     case icloud
     case qrz
     case pota
+    case hamrs
 }
 
 enum ServiceType: String, Codable, CaseIterable {
     case qrz
     case pota
     case lofi
+    case hamrs
 
     var displayName: String {
         switch self {
         case .qrz: return "QRZ"
         case .pota: return "POTA"
         case .lofi: return "LoFi"
+        case .hamrs: return "HAMRS"
         }
     }
 
     var supportsUpload: Bool {
         switch self {
         case .qrz, .pota: return true
-        case .lofi: return false
+        case .lofi, .hamrs: return false
         }
     }
 
@@ -34,6 +37,7 @@ enum ServiceType: String, Codable, CaseIterable {
         case .qrz: return .qrz
         case .pota: return .pota
         case .lofi: return .lofi
+        case .hamrs: return .hamrs
         }
     }
 }

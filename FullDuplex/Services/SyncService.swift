@@ -52,8 +52,17 @@ struct FetchedQSO {
     let myGrid: String?
     let theirGrid: String?
     let parkReference: String?
+    let theirParkReference: String?
     let notes: String?
     let rawADIF: String?
+
+    // Contact info
+    let name: String?
+    let qth: String?
+    let state: String?
+    let country: String?
+    let power: Int?
+    let sotaRef: String?
 
     // QRZ-specific
     let qrzLogId: String?
@@ -82,9 +91,16 @@ struct FetchedQSO {
         if let g = myGrid { fields["myGrid"] = g }
         if let g = theirGrid { fields["theirGrid"] = g }
         if let p = parkReference { fields["parkReference"] = p }
+        if let p = theirParkReference { fields["theirParkReference"] = p }
         if let r = rstSent { fields["rstSent"] = r }
         if let r = rstReceived { fields["rstReceived"] = r }
         if let id = qrzLogId { fields["qrzLogId"] = id }
+        if let n = name { fields["name"] = n }
+        if let q = qth { fields["qth"] = q }
+        if let s = state { fields["state"] = s }
+        if let c = country { fields["country"] = c }
+        if let p = power { fields["power"] = String(p) }
+        if let s = sotaRef { fields["sotaRef"] = s }
         return fields
     }
 
@@ -102,8 +118,15 @@ struct FetchedQSO {
             myGrid: qrz.myGrid,
             theirGrid: qrz.theirGrid,
             parkReference: qrz.parkReference,
+            theirParkReference: nil,
             notes: qrz.notes,
             rawADIF: qrz.rawADIF,
+            name: nil,
+            qth: nil,
+            state: nil,
+            country: nil,
+            power: nil,
+            sotaRef: nil,
             qrzLogId: qrz.qrzLogId,
             qrzConfirmed: qrz.qrzConfirmed,
             lotwConfirmedDate: qrz.lotwConfirmedDate,
@@ -125,8 +148,15 @@ struct FetchedQSO {
             myGrid: nil,
             theirGrid: nil,
             parkReference: pota.parkReference,
+            theirParkReference: nil,
             notes: nil,
             rawADIF: nil,
+            name: nil,
+            qth: nil,
+            state: nil,
+            country: nil,
+            power: nil,
+            sotaRef: nil,
             qrzLogId: nil,
             qrzConfirmed: false,
             lotwConfirmedDate: nil,
@@ -157,12 +187,57 @@ struct FetchedQSO {
             myGrid: operation.grid,
             theirGrid: lofi.theirGrid,
             parkReference: parkRef,
+            theirParkReference: lofi.theirPotaRef,
             notes: lofi.notes,
             rawADIF: nil,
+            name: lofi.their?.guess?.name,
+            qth: nil,
+            state: lofi.their?.guess?.state,
+            country: lofi.their?.guess?.country,
+            power: nil,
+            sotaRef: nil,
             qrzLogId: nil,
             qrzConfirmed: false,
             lotwConfirmedDate: nil,
             source: .lofi
+        )
+    }
+
+    /// Create from HAMRS fetched QSO with logbook info
+    static func fromHAMRS(_ qso: HAMRSQSO, logbook: HAMRSLogbook) -> FetchedQSO? {
+        guard let callsign = qso.call,
+            let band = qso.band,
+            let mode = qso.mode,
+            let timestamp = qso.timestamp
+        else {
+            return nil
+        }
+
+        return FetchedQSO(
+            callsign: callsign,
+            band: band,
+            mode: mode,
+            frequency: qso.freq,
+            timestamp: timestamp,
+            rstSent: qso.rstSent,
+            rstReceived: qso.rstRcvd,
+            myCallsign: logbook.operator ?? "",
+            myGrid: logbook.myGridsquare,
+            theirGrid: qso.gridsquare,
+            parkReference: logbook.myPark,
+            theirParkReference: qso.potaRef,
+            notes: qso.notes,
+            rawADIF: nil,
+            name: qso.name,
+            qth: qso.qth,
+            state: qso.state,
+            country: qso.country,
+            power: qso.txPwr,
+            sotaRef: qso.sotaRef,
+            qrzLogId: nil,
+            qrzConfirmed: false,
+            lotwConfirmedDate: nil,
+            source: .hamrs
         )
     }
 }
@@ -176,6 +251,7 @@ class SyncService: ObservableObject {
     private let potaClient: POTAClient
     private let potaAuthService: POTAAuthService
     private let lofiClient: LoFiClient
+    private let hamrsClient: HAMRSClient
 
     /// Timeout for individual service sync operations (in seconds)
     private let syncTimeoutSeconds: TimeInterval = 60
@@ -205,13 +281,15 @@ class SyncService: ObservableObject {
 
     init(
         modelContext: ModelContext, potaAuthService: POTAAuthService,
-        lofiClient: LoFiClient = LoFiClient()
+        lofiClient: LoFiClient = LoFiClient(),
+        hamrsClient: HAMRSClient = HAMRSClient()
     ) {
         self.modelContext = modelContext
         self.qrzClient = QRZClient()
         self.potaAuthService = potaAuthService
         self.potaClient = POTAClient(authService: potaAuthService)
         self.lofiClient = lofiClient
+        self.hamrsClient = hamrsClient
     }
 
     /// Full sync: download from all sources, deduplicate, upload to all destinations
@@ -413,6 +491,57 @@ class SyncService: ObservableObject {
                 }
             }
 
+            // HAMRS download (if configured)
+            if hamrsClient.isConfigured {
+                group.addTask {
+                    await MainActor.run { self.syncPhase = .downloading(service: .hamrs) }
+                    let debugLog = await SyncDebugLog.shared
+                    await debugLog.info("Starting HAMRS download", service: .hamrs)
+                    do {
+                        let qsos = try await withTimeout(seconds: timeout, service: .hamrs) {
+                            try await self.hamrsClient.fetchAllQSOs()
+                        }
+                        await debugLog.info(
+                            "Downloaded \(qsos.count) raw QSOs from HAMRS", service: .hamrs)
+
+                        // Convert to FetchedQSO format
+                        var skippedCount = 0
+                        var fetchedList: [FetchedQSO] = []
+                        for (hamrsQso, logbook) in qsos {
+                            if let fetched = FetchedQSO.fromHAMRS(hamrsQso, logbook: logbook) {
+                                fetchedList.append(fetched)
+                            } else {
+                                skippedCount += 1
+                                await debugLog.warning(
+                                    "Skipped QSO: call=\(hamrsQso.call ?? "nil"), band=\(hamrsQso.band ?? "nil"), mode=\(hamrsQso.mode ?? "nil")",
+                                    service: .hamrs)
+                            }
+                        }
+                        await debugLog.info(
+                            "After filtering: \(fetchedList.count) valid, \(skippedCount) skipped",
+                            service: .hamrs)
+
+                        // Log sample QSOs for debugging
+                        for fetched in fetchedList.prefix(5) {
+                            await debugLog.logRawQSO(
+                                service: .hamrs,
+                                rawJSON: "HAMRS QSO: \(fetched.callsign) @ \(fetched.timestamp)",
+                                parsedFields: fetched.debugFields
+                            )
+                        }
+                        return (.hamrs, .success(fetchedList))
+                    } catch HAMRSError.subscriptionInactive {
+                        await debugLog.warning(
+                            "HAMRS subscription inactive - skipping download", service: .hamrs)
+                        return (.hamrs, .success([]))
+                    } catch {
+                        await debugLog.error(
+                            "HAMRS download failed: \(error.localizedDescription)", service: .hamrs)
+                        return (.hamrs, .failure(error))
+                    }
+                }
+            }
+
             var results: [ServiceType: Result<[FetchedQSO], Error>] = [:]
             for await (service, result) in group {
                 results[service] = result
@@ -521,8 +650,16 @@ class SyncService: ObservableObject {
         existing.myGrid = existing.myGrid.nonEmpty ?? fetched.myGrid
         existing.theirGrid = existing.theirGrid.nonEmpty ?? fetched.theirGrid
         existing.parkReference = existing.parkReference.nonEmpty ?? fetched.parkReference
+        existing.theirParkReference =
+            existing.theirParkReference.nonEmpty ?? fetched.theirParkReference
         existing.notes = existing.notes.nonEmpty ?? fetched.notes
         existing.rawADIF = existing.rawADIF.nonEmpty ?? fetched.rawADIF
+        existing.name = existing.name.nonEmpty ?? fetched.name
+        existing.qth = existing.qth.nonEmpty ?? fetched.qth
+        existing.state = existing.state.nonEmpty ?? fetched.state
+        existing.country = existing.country.nonEmpty ?? fetched.country
+        existing.power = existing.power ?? fetched.power
+        existing.sotaRef = existing.sotaRef.nonEmpty ?? fetched.sotaRef
 
         // QRZ-specific: only update from QRZ source
         if fetched.source == .qrz {
@@ -554,8 +691,15 @@ class SyncService: ObservableObject {
                 myGrid: merged.myGrid.nonEmpty ?? other.myGrid,
                 theirGrid: merged.theirGrid.nonEmpty ?? other.theirGrid,
                 parkReference: merged.parkReference.nonEmpty ?? other.parkReference,
+                theirParkReference: merged.theirParkReference.nonEmpty ?? other.theirParkReference,
                 notes: merged.notes.nonEmpty ?? other.notes,
                 rawADIF: merged.rawADIF.nonEmpty ?? other.rawADIF,
+                name: merged.name.nonEmpty ?? other.name,
+                qth: merged.qth.nonEmpty ?? other.qth,
+                state: merged.state.nonEmpty ?? other.state,
+                country: merged.country.nonEmpty ?? other.country,
+                power: merged.power ?? other.power,
+                sotaRef: merged.sotaRef.nonEmpty ?? other.sotaRef,
                 qrzLogId: merged.qrzLogId ?? other.qrzLogId,
                 qrzConfirmed: merged.qrzConfirmed || other.qrzConfirmed,
                 lotwConfirmedDate: merged.lotwConfirmedDate ?? other.lotwConfirmedDate,
@@ -580,9 +724,16 @@ class SyncService: ObservableObject {
             myGrid: fetched.myGrid,
             theirGrid: fetched.theirGrid,
             parkReference: fetched.parkReference,
+            theirParkReference: fetched.theirParkReference,
             notes: fetched.notes,
             importSource: fetched.source.toImportSource,
             rawADIF: fetched.rawADIF,
+            name: fetched.name,
+            qth: fetched.qth,
+            state: fetched.state,
+            country: fetched.country,
+            power: fetched.power,
+            sotaRef: fetched.sotaRef,
             qrzLogId: fetched.qrzLogId,
             qrzConfirmed: fetched.qrzConfirmed,
             lotwConfirmedDate: fetched.lotwConfirmedDate
@@ -803,6 +954,28 @@ class SyncService: ObservableObject {
             try await self.lofiClient.fetchAllQsosSinceLastSync()
         }
         let fetched = qsos.compactMap { FetchedQSO.fromLoFi($0.0, operation: $0.1) }
+
+        syncPhase = .processing
+        let processResult = try processDownloadedQSOs(fetched)
+        try modelContext.save()
+
+        return processResult.created
+    }
+
+    /// Sync only with HAMRS (download only)
+    func syncHAMRS() async throws -> Int {
+        isSyncing = true
+        defer {
+            isSyncing = false
+            syncPhase = nil
+        }
+
+        // Download with timeout
+        syncPhase = .downloading(service: .hamrs)
+        let qsos = try await withTimeout(seconds: syncTimeoutSeconds, service: .hamrs) {
+            try await self.hamrsClient.fetchAllQSOs()
+        }
+        let fetched = qsos.compactMap { FetchedQSO.fromHAMRS($0.0, logbook: $0.1) }
 
         syncPhase = .processing
         let processResult = try processDownloadedQSOs(fetched)

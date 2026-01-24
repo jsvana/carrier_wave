@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct DashboardView: View {
     @Environment(\.modelContext) private var modelContext
@@ -19,6 +19,7 @@ struct DashboardView: View {
 
     private let lofiClient = LoFiClient()
     private let qrzClient = QRZClient()
+    private let hamrsClient = HAMRSClient()
 
     // Statistics
     private var stats: QSOStatistics {
@@ -39,7 +40,9 @@ struct DashboardView: View {
             let withLofiPresent = qsos.filter { qso in
                 qso.servicePresence.contains { $0.serviceType == .lofi && $0.isPresent }
             }.count
-            print("[Dashboard] LoFi count: total QSOs=\(total), with LoFi presence=\(withLofiPresence), with LoFi isPresent=true: \(withLofiPresent)")
+            print(
+                "[Dashboard] LoFi count: total QSOs=\(total), with LoFi presence=\(withLofiPresence), with LoFi isPresent=true: \(withLofiPresent)"
+            )
         }
         return count
     }
@@ -68,6 +71,9 @@ struct DashboardView: View {
     @State private var showingPOTALogin: Bool = false
     @State private var potaSyncResult: String?
 
+    // HAMRS state
+    @State private var hamrsSyncResult: String?
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -78,14 +84,18 @@ struct DashboardView: View {
                     // Summary Stats
                     summaryCard
 
-                    // Service Cards (2x2 grid)
+                    // Service Cards (2x3 grid)
                     HStack(spacing: 12) {
                         lofiCard
                         qrzCard
                     }
                     HStack(spacing: 12) {
                         potaCard
+                        hamrsCard
+                    }
+                    HStack(spacing: 12) {
                         icloudCard
+                        Spacer()
                     }
                 }
                 .padding()
@@ -162,15 +172,19 @@ struct DashboardView: View {
                 }
             }
 
-            LazyVGrid(columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible()),
-                GridItem(.flexible())
-            ], spacing: 12) {
+            LazyVGrid(
+                columns: [
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                    GridItem(.flexible()),
+                ], spacing: 12
+            ) {
                 Button {
                     selectedTab = .logs
                 } label: {
-                    StatBox(title: "QSOs", value: "\(stats.totalQSOs)", icon: "antenna.radiowaves.left.and.right")
+                    StatBox(
+                        title: "QSOs", value: "\(stats.totalQSOs)",
+                        icon: "antenna.radiowaves.left.and.right")
                 }
                 .buttonStyle(.plain)
 
@@ -198,7 +212,8 @@ struct DashboardView: View {
                 NavigationLink {
                     StatDetailView(category: .modes, items: stats.items(for: .modes))
                 } label: {
-                    StatBox(title: "Modes", value: "\(stats.uniqueModes)", icon: "dot.radiowaves.right")
+                    StatBox(
+                        title: "Modes", value: "\(stats.uniqueModes)", icon: "dot.radiowaves.right")
                 }
                 .buttonStyle(.plain)
 
@@ -406,7 +421,7 @@ struct DashboardView: View {
             )
         }
         .alert("Error", isPresented: $showingQRZError) {
-            Button("OK") { }
+            Button("OK") {}
         } message: {
             Text(qrzErrorMessage)
         }
@@ -517,6 +532,88 @@ struct DashboardView: View {
         }
     }
 
+    // MARK: - HAMRS Card
+
+    private var hamrsCard: some View {
+        let synced = uploadedCount(for: .hamrs)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("HAMRS")
+                    .font(.headline)
+                Spacer()
+                if hamrsClient.isConfigured {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                    Text("Connected")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Not configured")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            if hamrsClient.isConfigured {
+                // Show sync status overlay during global sync
+                if syncService.isSyncing {
+                    SyncStatusOverlay(phase: syncService.syncPhase, service: .hamrs)
+                } else {
+                    // Synced QSOs
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.circle")
+                            .foregroundStyle(.blue)
+                        Text("\(synced) QSOs synced")
+                            .font(.subheadline)
+                    }
+
+                    if let result = hamrsSyncResult {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                    }
+                }
+
+                // Debug mode: show individual sync button
+                if debugMode && !syncService.isSyncing {
+                    HStack {
+                        AnimatedSyncButton(
+                            title: "Sync",
+                            isAnimating: syncingService == .hamrs,
+                            isDisabled: isSyncing
+                        ) {
+                            Task { await syncFromHAMRS() }
+                        }
+
+                        Menu {
+                            Button(role: .destructive) {
+                                Task { await clearHAMRSCredentials() }
+                            } label: {
+                                Label(
+                                    "Disconnect", systemImage: "rectangle.portrait.and.arrow.right")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                        }
+                        .disabled(isSyncing)
+                    }
+                }
+            } else {
+                NavigationLink {
+                    HAMRSSettingsView()
+                } label: {
+                    Label("Configure HAMRS", systemImage: "gear")
+                }
+                .buttonStyle(.bordered)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
     // MARK: - iCloud Card
 
     private var icloudCard: some View {
@@ -586,7 +683,9 @@ struct DashboardView: View {
 
         do {
             let result = try await syncService.syncAll()
-            print("Sync complete: downloaded \(result.downloaded), uploaded \(result.uploaded), new \(result.newQSOs), merged \(result.mergedQSOs)")
+            print(
+                "Sync complete: downloaded \(result.downloaded), uploaded \(result.uploaded), new \(result.newQSOs), merged \(result.mergedQSOs)"
+            )
             if !result.errors.isEmpty {
                 print("Sync errors: \(result.errors)")
             }
@@ -604,7 +703,9 @@ struct DashboardView: View {
 
         do {
             let result = try await syncService.downloadOnly()
-            print("Download-only sync complete: downloaded \(result.downloaded), new \(result.newQSOs), merged \(result.mergedQSOs)")
+            print(
+                "Download-only sync complete: downloaded \(result.downloaded), new \(result.newQSOs), merged \(result.mergedQSOs)"
+            )
             if !result.errors.isEmpty {
                 print("Download-only sync errors: \(result.errors)")
             }
@@ -718,6 +819,28 @@ struct DashboardView: View {
         } catch {
             lofiSyncResult = "Error: \(error.localizedDescription)"
         }
+    }
+
+    private func syncFromHAMRS() async {
+        isSyncing = true
+        syncingService = .hamrs
+        hamrsSyncResult = "Syncing..."
+        defer {
+            isSyncing = false
+            syncingService = nil
+        }
+
+        do {
+            let count = try await syncService.syncHAMRS()
+            hamrsSyncResult = count > 0 ? "+\(count) QSOs" : "Already in sync"
+        } catch {
+            hamrsSyncResult = "Error: \(error.localizedDescription)"
+        }
+    }
+
+    private func clearHAMRSCredentials() async {
+        await hamrsClient.clearCredentials()
+        hamrsSyncResult = nil
     }
 }
 
@@ -999,10 +1122,12 @@ struct ActivityGrid: View {
                                             selectedDate = date
                                         }
                                     }
-                                    .popover(isPresented: Binding(
-                                        get: { selectedDate == date },
-                                        set: { if !$0 { selectedDate = nil } }
-                                    ), arrowEdge: .top) {
+                                    .popover(
+                                        isPresented: Binding(
+                                            get: { selectedDate == date },
+                                            set: { if !$0 { selectedDate = nil } }
+                                        ), arrowEdge: .top
+                                    ) {
                                         VStack(spacing: 4) {
                                             Text(tooltipDateFormatter.string(from: date))
                                                 .font(.caption)
