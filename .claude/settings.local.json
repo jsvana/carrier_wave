@@ -20,7 +20,10 @@
       "Bash(log show:*)",
       "Bash(plutil:*)",
       "Bash(curl:*)",
-      "Bash(sips:*)"
+      "Bash(sips:*)",
+      "Skill(documentation-driven-development)",
+      "Skill(documentation-driven-development:*)",
+      "mcp__acp__Write"
     ]
   }
 }

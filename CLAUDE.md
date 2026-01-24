@@ -1,81 +1,60 @@
-# CLAUDE.md
+# FullDuplex
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+> **IMPORTANT:** For general project context, read this file and linked docs.
+> Only explore source files when actively implementing, planning, or debugging.
 
-## Build and Test Commands
-
-**Prefer using the `ios-simulator-skill` over running xcodebuild commands directly.** The skill provides optimized scripts for building, testing, and simulator management with minimal token output.
-
-### Running on Simulator (IMPORTANT)
-
-**Always rebuild and reinstall to test code changes.** Simply launching the app will run the old version.
-
-```bash
-# Full workflow: build, install, launch (use this after code changes)
-python3 ~/.claude/skills/ios-simulator-skill/scripts/build_and_test.py --project FullDuplex.xcodeproj --scheme FullDuplex
-xcrun simctl install booted ~/Library/Developer/Xcode/DerivedData/FullDuplex-*/Build/Products/Debug-iphonesimulator/FullDuplex.app
-python3 ~/.claude/skills/ios-simulator-skill/scripts/app_launcher.py --launch com.jsvana.FullDuplex
-
-# If app is already running, terminate first
-python3 ~/.claude/skills/ios-simulator-skill/scripts/app_launcher.py --terminate com.jsvana.FullDuplex
-```
-
-### Reference Commands (when skill is not available)
-
-```bash
-# Build for simulator
-xcodebuild -project FullDuplex.xcodeproj -scheme FullDuplex \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
-
-# Run all tests
-xcodebuild -project FullDuplex.xcodeproj -scheme FullDuplex \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
-
-# Build and install on device (device name: theseus)
-xcodebuild -project FullDuplex.xcodeproj -scheme FullDuplex \
-  -destination 'platform=iOS,name=theseus' build
-xcrun devicectl device install app --device theseus \
-  ~/Library/Developer/Xcode/DerivedData/FullDuplex-*/Build/Products/Debug-iphoneos/FullDuplex.app
-xcrun devicectl device process launch --device theseus com.jsvana.FullDuplex
-```
-
-## Architecture Overview
+## Overview
 
 FullDuplex is a SwiftUI/SwiftData iOS app for amateur radio QSO (contact) logging with cloud sync to QRZ, POTA, and Ham2K LoFi.
 
-### Data Models
+## Quick Reference
 
-- **QSO** - Core model: callsign, band, mode, timestamp, grid squares, park reference, RST reports. Has `deduplicationKey` (2-minute buckets + band + mode + callsign) and `callsignPrefix` for DXCC entity extraction.
-- **SyncRecord** - Join table tracking upload status (pending/uploaded/failed) per QSO per destination (QRZ/POTA). Cascade deletes with QSO.
-- **UploadDestination** - Configuration for sync targets with enabled flag and last sync timestamp.
+| Area | Description | Details |
+|------|-------------|---------|
+| Architecture | Data models, services, view hierarchy | [docs/architecture.md](docs/architecture.md) |
+| Setup | Development environment, build commands | [docs/SETUP.md](docs/SETUP.md) |
+| Sync System | QRZ, POTA, LoFi integration | [docs/features/sync.md](docs/features/sync.md) |
+| Statistics | Dashboard stats and drilldown views | [docs/features/statistics.md](docs/features/statistics.md) |
 
-### Services (all use `actor` for thread safety)
+## Code Standards
 
-- **QRZClient** - QRZ.com Logbook API. Session-based auth, ADIF upload via query params.
-- **POTAClient** - Parks on the Air API. Bearer token auth, multipart ADIF upload, groups QSOs by park reference.
-- **LoFiClient** - Ham2K LoFi sync. Email-based device linking, paginated operation/QSO fetching with `synced_since_millis`.
-- **ImportService** - ADIF parsing via ADIFParser, deduplication, creates QSO + SyncRecords.
-- **SyncService** - Orchestrates uploads to all destinations, batches QSOs (50 per batch for QRZ).
-- **KeychainHelper** - Secure credential storage. All auth tokens stored here, never in SwiftData.
-
-### View Structure
-
-```
-ContentView (TabView with AppTab enum for programmatic switching)
-├── DashboardView - Activity grid, stats (tappable → StatDetailView), sync status
-├── LogsListView - Searchable/filterable QSO list with delete
-└── SettingsMainView - Auth flows (QRZ form, POTA WebView, LoFi email)
-```
-
-Dashboard stats use `QSOStatistics` struct with `items(for:)` method to group QSOs by category. `StatDetailView` shows expandable `StatItemRow` components with progressive QSO loading.
-
-### Key Patterns
-
-- Credentials in Keychain (service-namespaced keys: `qrz_*`, `pota_*`, `lofi_*`)
-- ADIF stored in `rawADIF` field for reproducibility
-- `@MainActor` classes for view-bound services, `actor` for API clients
+- **Maximum file size: 1000 lines.** Refactor when approaching this limit.
+- Use `actor` for API clients (thread safety)
+- Use `@MainActor` for view-bound services
+- Store credentials in Keychain, never in SwiftData
 - Tests use in-memory SwiftData containers
+
+## Getting Started
+
+
+NEVER run or build the app yourself. Prompt the user to do so.
+
+```bash
+# Build for simulator
+make build
+
+# Build for device
+make build-device
+
+# Run tests
+make test
+
+# List available devices
+make devices
+
+# Install app on device (requires build-device first)
+make install
+
+# Launch app on device
+make launch
+
+# Build, install, and launch on device
+make deploy
+
+```
+
+See [docs/SETUP.md](docs/SETUP.md) for device builds and additional commands.
 
 ## Issue Tracking
 
-This project uses **bd** (beads). See AGENTS.md for workflow. Work is NOT complete until `git push` succeeds.
+This project uses **bd** (beads). Work is NOT complete until `git push` succeeds.
