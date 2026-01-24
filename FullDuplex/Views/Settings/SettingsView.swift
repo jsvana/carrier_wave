@@ -5,10 +5,6 @@ struct SettingsMainView: View {
     @Environment(\.modelContext) private var modelContext
     @ObservedObject var potaAuth: POTAAuthService
 
-    @State private var qrzApiKey = ""
-    @State private var qrzCallsign: String?
-    @State private var qrzIsAuthenticated = false
-    @State private var showingQRZLogin = false
     @State private var showingPOTALogin = false
     @State private var showingError = false
     @State private var errorMessage = ""
@@ -28,33 +24,10 @@ struct SettingsMainView: View {
             List {
                 Section {
                     // QRZ
-                    if qrzIsAuthenticated {
-                        HStack {
-                            Label("QRZ Logbook", systemImage: "globe")
-                            Spacer()
-                            if let callsign = qrzCallsign {
-                                Text(callsign)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundStyle(.green)
-                        }
-                        .swipeActions(edge: .trailing) {
-                            Button("Logout", role: .destructive) {
-                                logoutQRZ()
-                            }
-                        }
-                    } else {
-                        Button {
-                            showingQRZLogin = true
-                        } label: {
-                            HStack {
-                                Label("QRZ Logbook", systemImage: "globe")
-                                Spacer()
-                                Text("Connect")
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
+                    NavigationLink {
+                        QRZSettingsView()
+                    } label: {
+                        Label("QRZ Logbook", systemImage: "globe")
                     }
 
                     // POTA
@@ -187,15 +160,6 @@ struct SettingsMainView: View {
                 }
             }
             .navigationTitle("Settings")
-            .sheet(isPresented: $showingQRZLogin) {
-                QRZApiKeySheet(
-                    apiKey: $qrzApiKey,
-                    callsign: $qrzCallsign,
-                    isAuthenticated: $qrzIsAuthenticated,
-                    errorMessage: $errorMessage,
-                    showingError: $showingError
-                )
-            }
             .sheet(isPresented: $showingPOTALogin) {
                 POTALoginSheet(authService: potaAuth)
             }
@@ -219,30 +183,6 @@ struct SettingsMainView: View {
             } message: {
                 Text(dedupeResultMessage)
             }
-            .onAppear {
-                checkQRZAuth()
-            }
-        }
-    }
-
-    private func checkQRZAuth() {
-        do {
-            _ = try KeychainHelper.shared.readString(for: KeychainHelper.Keys.qrzApiKey)
-            qrzIsAuthenticated = true
-            qrzCallsign = try? KeychainHelper.shared.readString(
-                for: KeychainHelper.Keys.qrzCallsign)
-        } catch {
-            qrzIsAuthenticated = false
-            qrzCallsign = nil
-        }
-    }
-
-    private func logoutQRZ() {
-        Task {
-            let client = QRZClient()
-            await client.logout()
-            qrzIsAuthenticated = false
-            qrzCallsign = nil
         }
     }
 
@@ -365,6 +305,101 @@ struct QRZApiKeySheet: View {
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
+        }
+    }
+}
+
+struct QRZSettingsView: View {
+    @State private var isAuthenticated = false
+    @State private var callsign: String?
+    @State private var showingLogin = false
+    @State private var apiKey = ""
+    @State private var errorMessage = ""
+    @State private var showingError = false
+
+    private let qrzClient = QRZClient()
+
+    var body: some View {
+        List {
+            if isAuthenticated {
+                Section {
+                    HStack {
+                        Label(
+                            "Connected",
+                            systemImage: "checkmark.circle.fill"
+                        )
+                        .foregroundStyle(.green)
+                        Spacer()
+                        if let callsign = callsign {
+                            Text(callsign)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                } header: {
+                    Text("Status")
+                }
+
+                Section {
+                    Button("Logout", role: .destructive) {
+                        logout()
+                    }
+                }
+            } else {
+                Section {
+                    Text("Connect your QRZ Logbook to sync QSOs.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Button("Connect to QRZ") {
+                        showingLogin = true
+                    }
+                } header: {
+                    Text("Setup")
+                } footer: {
+                    Text("Requires QRZ XML Logbook Data subscription.")
+                }
+
+                Section {
+                    Link(
+                        destination: URL(
+                            string:
+                                "https://shop.qrz.com/collections/subscriptions/products/xml-logbook-data-subscription-1-year"
+                        )!
+                    ) {
+                        Label("Get QRZ Subscription", systemImage: "arrow.up.right.square")
+                    }
+                }
+            }
+        }
+        .navigationTitle("QRZ Logbook")
+        .sheet(isPresented: $showingLogin) {
+            QRZApiKeySheet(
+                apiKey: $apiKey,
+                callsign: $callsign,
+                isAuthenticated: $isAuthenticated,
+                errorMessage: $errorMessage,
+                showingError: $showingError
+            )
+        }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK") {}
+        } message: {
+            Text(errorMessage)
+        }
+        .task {
+            await checkStatus()
+        }
+    }
+
+    private func checkStatus() async {
+        isAuthenticated = await qrzClient.hasApiKey()
+        callsign = await qrzClient.getCallsign()
+    }
+
+    private func logout() {
+        Task {
+            await qrzClient.logout()
+            await checkStatus()
         }
     }
 }

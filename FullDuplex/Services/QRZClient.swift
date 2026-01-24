@@ -1,7 +1,8 @@
 import Foundation
 
 enum QRZError: Error, LocalizedError {
-    case invalidApiKey
+    case invalidApiKey(String)
+    case subscriptionRequired
     case sessionExpired
     case uploadFailed(String)
     case fetchFailed(String)
@@ -11,8 +12,10 @@ enum QRZError: Error, LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .invalidApiKey:
-            return "Invalid QRZ API key"
+        case .invalidApiKey(let reason):
+            return "Invalid QRZ API key: \(reason)"
+        case .subscriptionRequired:
+            return "QRZ XML Logbook Data subscription required. Visit shop.qrz.com to subscribe."
         case .sessionExpired:
             return "QRZ session expired, please re-authenticate"
         case .uploadFailed(let reason):
@@ -143,7 +146,7 @@ actor QRZClient {
         // Form-encode the body
         let formData = [
             "KEY": key,
-            "ACTION": "STATUS"
+            "ACTION": "STATUS",
         ]
         request.httpBody = formEncode(formData).data(using: .utf8)
 
@@ -156,7 +159,14 @@ actor QRZClient {
         let parsed = Self.parseResponse(responseString)
 
         guard parsed["RESULT"] == "OK" else {
-            throw QRZError.invalidApiKey
+            // AUTH means insufficient privileges (subscription required)
+            if parsed["RESULT"] == "AUTH" {
+                throw QRZError.subscriptionRequired
+            }
+            let reason =
+                parsed["REASON"]
+                ?? "RESULT=\(parsed["RESULT"] ?? "nil"), response: \(responseString.prefix(200))"
+            throw QRZError.invalidApiKey(reason)
         }
 
         guard let callsign = parsed["CALLSIGN"] else {
@@ -182,7 +192,8 @@ actor QRZClient {
 
         return params.map { key, value in
             let escapedKey = key.addingPercentEncoding(withAllowedCharacters: allowed) ?? key
-            let escapedValue = value
+            let escapedValue =
+                value
                 .replacingOccurrences(of: " ", with: "+")
                 .addingPercentEncoding(withAllowedCharacters: allowed) ?? value
             return "\(escapedKey)=\(escapedValue)"
@@ -217,7 +228,7 @@ actor QRZClient {
             "KEY": apiKey,
             "ACTION": "INSERT",
             "OPTION": "REPLACE",
-            "ADIF": adifContent
+            "ADIF": adifContent,
         ]
         request.httpBody = formEncode(formData).data(using: .utf8)
 
@@ -278,13 +289,14 @@ actor QRZClient {
             var request = URLRequest(url: url)
             request.httpMethod = "POST"
             request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            request.setValue(
+                "application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
             // Form-encode the body
             let formData = [
                 "KEY": apiKey,
                 "ACTION": "FETCH",
-                "OPTION": optionParts.joined(separator: ",")
+                "OPTION": optionParts.joined(separator: ","),
             ]
             let body = formEncode(formData)
             request.httpBody = body.data(using: .utf8)
@@ -293,7 +305,9 @@ actor QRZClient {
 
             // Check HTTP status code
             if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-                throw QRZError.invalidResponse("HTTP \(httpResponse.statusCode), body: \(String(data: data, encoding: .utf8)?.prefix(200) ?? "nil")")
+                throw QRZError.invalidResponse(
+                    "HTTP \(httpResponse.statusCode), body: \(String(data: data, encoding: .utf8)?.prefix(200) ?? "nil")"
+                )
             }
 
             // Try UTF-8 first, then fall back to ISO Latin 1 (common for ADIF data)
@@ -304,8 +318,10 @@ actor QRZClient {
                 responseString = latin1String
             } else {
                 // Show first bytes for debugging
-                let firstBytes = data.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " ")
-                throw QRZError.invalidResponse("Cannot decode \(data.count) bytes, first bytes: \(firstBytes)")
+                let firstBytes = data.prefix(20).map { String(format: "%02x", $0) }.joined(
+                    separator: " ")
+                throw QRZError.invalidResponse(
+                    "Cannot decode \(data.count) bytes, first bytes: \(firstBytes)")
             }
 
             let parsed = Self.parseResponse(responseString)
@@ -326,7 +342,8 @@ actor QRZClient {
 
             guard result == "OK" else {
                 // Show full response for debugging when no REASON provided
-                let errorReason = parsed["REASON"] ?? "RESULT=\(result), Response: \(responseString.prefix(300))"
+                let errorReason =
+                    parsed["REASON"] ?? "RESULT=\(result), Response: \(responseString.prefix(300))"
                 throw QRZError.fetchFailed(errorReason)
             }
 
@@ -348,7 +365,7 @@ actor QRZClient {
             offset += pageSize
 
             // Small delay between pages to be nice to the API
-            try await Task.sleep(nanoseconds: 200_000_000) // 200ms
+            try await Task.sleep(nanoseconds: 200_000_000)  // 200ms
         }
 
         return allQSOs
@@ -369,7 +386,7 @@ actor QRZClient {
             ("&quot;", "\""),
             ("&apos;", "'"),
             ("&#39;", "'"),
-            ("&#x27;", "'")
+            ("&#x27;", "'"),
         ]
 
         for (entity, char) in htmlEntities {
@@ -384,7 +401,8 @@ actor QRZClient {
         var qsos: [QRZFetchedQSO] = []
 
         // Split by end of record marker
-        let records = adif.lowercased().contains("<eor>")
+        let records =
+            adif.lowercased().contains("<eor>")
             ? adif.components(separatedBy: "<eor>").compactMap { $0.isEmpty ? nil : $0 }
             : adif.components(separatedBy: "<EOR>").compactMap { $0.isEmpty ? nil : $0 }
 
@@ -397,20 +415,22 @@ actor QRZClient {
             let fields = parseADIFFields(record)
 
             guard let callsign = fields["CALL"] ?? fields["call"],
-                  let band = fields["BAND"] ?? fields["band"],
-                  let mode = fields["MODE"] ?? fields["mode"] else {
+                let band = fields["BAND"] ?? fields["band"],
+                let mode = fields["MODE"] ?? fields["mode"]
+            else {
                 continue
             }
 
-            let timestamp = parseTimestamp(
-                date: fields["QSO_DATE"] ?? fields["qso_date"],
-                time: fields["TIME_ON"] ?? fields["time_on"]
-            ) ?? Date()
+            let timestamp =
+                parseTimestamp(
+                    date: fields["QSO_DATE"] ?? fields["qso_date"],
+                    time: fields["TIME_ON"] ?? fields["time_on"]
+                ) ?? Date()
 
             // Parse frequency (ADIF FREQ field is in MHz)
             var frequency: Double?
             if let freqStr = fields["FREQ"] ?? fields["freq"], let freq = Double(freqStr) {
-                frequency = freq // MHz - keep as-is
+                frequency = freq  // MHz - keep as-is
             }
 
             // Check QRZ confirmation status
@@ -455,7 +475,8 @@ actor QRZClient {
         }
 
         let nsRecord = record as NSString
-        let matches = regex.matches(in: record, options: [], range: NSRange(location: 0, length: nsRecord.length))
+        let matches = regex.matches(
+            in: record, options: [], range: NSRange(location: 0, length: nsRecord.length))
 
         for match in matches {
             guard match.numberOfRanges >= 3 else { continue }
@@ -519,7 +540,7 @@ actor QRZClient {
         addField("mode", qso.mode)
 
         if let freq = qso.frequency {
-            addField("freq", String(format: "%.4f", freq)) // MHz
+            addField("freq", String(format: "%.4f", freq))  // MHz
         }
 
         let dateFormatter = DateFormatter()
