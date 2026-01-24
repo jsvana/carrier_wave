@@ -23,7 +23,8 @@
       "Bash(sips:*)",
       "Skill(documentation-driven-development)",
       "Skill(documentation-driven-development:*)",
-      "mcp__acp__Write"
+      "mcp__acp__Write",
+      "mcp__acp__Edit"
     ]
   }
 }

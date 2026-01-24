@@ -76,7 +76,7 @@ struct FetchedQSO {
             "band": band,
             "mode": mode,
             "timestamp": ISO8601DateFormatter().string(from: timestamp),
-            "myCallsign": myCallsign
+            "myCallsign": myCallsign,
         ]
         if let f = frequency { fields["frequency"] = String(format: "%.4f MHz", f) }
         if let g = myGrid { fields["myGrid"] = g }
@@ -137,8 +137,9 @@ struct FetchedQSO {
     /// Create from LoFi fetched QSO
     static func fromLoFi(_ lofi: LoFiQso, operation: LoFiOperation) -> FetchedQSO? {
         guard let callsign = lofi.theirCall,
-              let band = lofi.band,
-              let mode = lofi.mode else {
+            let band = lofi.band,
+            let mode = lofi.mode
+        else {
             return nil
         }
 
@@ -179,6 +180,11 @@ class SyncService: ObservableObject {
     /// Timeout for individual service sync operations (in seconds)
     private let syncTimeoutSeconds: TimeInterval = 60
 
+    /// Check if read-only mode is enabled (disables uploads)
+    private var isReadOnlyMode: Bool {
+        UserDefaults.standard.bool(forKey: "readOnlyMode")
+    }
+
     @Published var isSyncing = false
     @Published var lastSyncDate: Date?
     @Published var syncPhase: SyncPhase?
@@ -197,7 +203,10 @@ class SyncService: ObservableObject {
         var mergedQSOs: Int
     }
 
-    init(modelContext: ModelContext, potaAuthService: POTAAuthService, lofiClient: LoFiClient = LoFiClient()) {
+    init(
+        modelContext: ModelContext, potaAuthService: POTAAuthService,
+        lofiClient: LoFiClient = LoFiClient()
+    ) {
         self.modelContext = modelContext
         self.qrzClient = QRZClient()
         self.potaAuthService = potaAuthService
@@ -236,7 +245,8 @@ class SyncService: ObservableObject {
                 result.downloaded[service] = qsos.count
                 allFetched.append(contentsOf: qsos)
             case .failure(let error):
-                result.errors.append("\(service.displayName) download: \(error.localizedDescription)")
+                result.errors.append(
+                    "\(service.displayName) download: \(error.localizedDescription)")
             }
         }
 
@@ -247,22 +257,28 @@ class SyncService: ObservableObject {
         result.mergedQSOs = processResult.merged
 
         // PHASE 2.5: Reconcile QRZ presence against what QRZ actually returned
-        let qrzDownloadedKeys = Set(allFetched.filter { $0.source == .qrz }.map { $0.deduplicationKey })
+        let qrzDownloadedKeys = Set(
+            allFetched.filter { $0.source == .qrz }.map { $0.deduplicationKey })
         if !qrzDownloadedKeys.isEmpty {
             try reconcileQRZPresence(downloadedKeys: qrzDownloadedKeys)
         }
 
         try modelContext.save()
 
-        // PHASE 3: Upload to all destinations in parallel
-        let uploadResults = await uploadToAllDestinations()
+        // PHASE 3: Upload to all destinations in parallel (unless read-only mode)
+        if isReadOnlyMode {
+            debugLog.info("Read-only mode enabled, skipping uploads")
+        } else {
+            let uploadResults = await uploadToAllDestinations()
 
-        for (service, uploadResult) in uploadResults {
-            switch uploadResult {
-            case .success(let count):
-                result.uploaded[service] = count
-            case .failure(let error):
-                result.errors.append("\(service.displayName) upload: \(error.localizedDescription)")
+            for (service, uploadResult) in uploadResults {
+                switch uploadResult {
+                case .success(let count):
+                    result.uploaded[service] = count
+                case .failure(let error):
+                    result.errors.append(
+                        "\(service.displayName) upload: \(error.localizedDescription)")
+                }
             }
         }
 
@@ -298,7 +314,8 @@ class SyncService: ObservableObject {
                         }
                         return (.qrz, .success(fetched))
                     } catch {
-                        await debugLog.error("QRZ download failed: \(error.localizedDescription)", service: .qrz)
+                        await debugLog.error(
+                            "QRZ download failed: \(error.localizedDescription)", service: .qrz)
                         return (.qrz, .failure(error))
                     }
                 }
@@ -314,19 +331,22 @@ class SyncService: ObservableObject {
                         let qsos = try await withTimeout(seconds: timeout, service: .pota) {
                             try await self.potaClient.fetchAllQSOs()
                         }
-                        await debugLog.info("Downloaded \(qsos.count) QSOs from POTA", service: .pota)
+                        await debugLog.info(
+                            "Downloaded \(qsos.count) QSOs from POTA", service: .pota)
                         let fetched = qsos.map { FetchedQSO.fromPOTA($0) }
                         // Log raw QSOs for debugging
                         for (index, qso) in fetched.prefix(5).enumerated() {
                             await debugLog.logRawQSO(
                                 service: .pota,
-                                rawJSON: "POTA QSO: \(qsos[index].callsign) @ \(qsos[index].timestamp)",
+                                rawJSON:
+                                    "POTA QSO: \(qsos[index].callsign) @ \(qsos[index].timestamp)",
                                 parsedFields: qso.debugFields
                             )
                         }
                         return (.pota, .success(fetched))
                     } catch {
-                        await debugLog.error("POTA download failed: \(error.localizedDescription)", service: .pota)
+                        await debugLog.error(
+                            "POTA download failed: \(error.localizedDescription)", service: .pota)
                         return (.pota, .failure(error))
                     }
                 }
@@ -342,7 +362,8 @@ class SyncService: ObservableObject {
                         let qsos = try await withTimeout(seconds: timeout, service: .lofi) {
                             try await self.lofiClient.fetchAllQsosSinceLastSync()
                         }
-                        await debugLog.info("Downloaded \(qsos.count) raw QSOs from LoFi API", service: .lofi)
+                        await debugLog.info(
+                            "Downloaded \(qsos.count) raw QSOs from LoFi API", service: .lofi)
 
                         // Track how many pass the filter
                         var skippedCount = 0
@@ -353,24 +374,28 @@ class SyncService: ObservableObject {
                             } else {
                                 skippedCount += 1
                                 // Log why it was skipped
-                                await debugLog.warning("Skipped QSO: call=\(lofiQso.theirCall ?? "nil"), band=\(lofiQso.band ?? "nil"), mode=\(lofiQso.mode ?? "nil")", service: .lofi)
+                                await debugLog.warning(
+                                    "Skipped QSO: call=\(lofiQso.theirCall ?? "nil"), band=\(lofiQso.band ?? "nil"), mode=\(lofiQso.mode ?? "nil")",
+                                    service: .lofi)
                             }
                         }
                         let fetched = fetchedList
-                        await debugLog.info("After filtering: \(fetched.count) valid, \(skippedCount) skipped", service: .lofi)
+                        await debugLog.info(
+                            "After filtering: \(fetched.count) valid, \(skippedCount) skipped",
+                            service: .lofi)
                         // Log raw QSOs for debugging
                         for (index, (lofiQso, op)) in qsos.prefix(5).enumerated() {
                             let rawJSON = """
-                            {
-                              "uuid": "\(lofiQso.uuid)",
-                              "startAtMillis": \(lofiQso.startAtMillis),
-                              "band": "\(lofiQso.band ?? "nil")",
-                              "mode": "\(lofiQso.mode ?? "nil")",
-                              "freq": \(lofiQso.freq.map { String($0) } ?? "nil"),
-                              "their": { "call": "\(lofiQso.their?.call ?? "nil")" },
-                              "operation": "\(op.uuid)"
-                            }
-                            """
+                                {
+                                  "uuid": "\(lofiQso.uuid)",
+                                  "startAtMillis": \(lofiQso.startAtMillis),
+                                  "band": "\(lofiQso.band ?? "nil")",
+                                  "mode": "\(lofiQso.mode ?? "nil")",
+                                  "freq": \(lofiQso.freq.map { String($0) } ?? "nil"),
+                                  "their": { "call": "\(lofiQso.their?.call ?? "nil")" },
+                                  "operation": "\(op.uuid)"
+                                }
+                                """
                             if index < fetched.count {
                                 await debugLog.logRawQSO(
                                     service: .lofi,
@@ -381,7 +406,8 @@ class SyncService: ObservableObject {
                         }
                         return (.lofi, .success(fetched))
                     } catch {
-                        await debugLog.error("LoFi download failed: \(error.localizedDescription)", service: .lofi)
+                        await debugLog.error(
+                            "LoFi download failed: \(error.localizedDescription)", service: .lofi)
                         return (.lofi, .failure(error))
                     }
                 }
@@ -416,7 +442,9 @@ class SyncService: ObservableObject {
         for qso in fetched {
             sourceBreakdown[qso.source, default: 0] += 1
         }
-        debugLog.info("Processing \(fetched.count) QSOs: \(sourceBreakdown.map { "\($0.key.displayName)=\($0.value)" }.joined(separator: ", "))")
+        debugLog.info(
+            "Processing \(fetched.count) QSOs: \(sourceBreakdown.map { "\($0.key.displayName)=\($0.value)" }.joined(separator: ", "))"
+        )
 
         // Fetch existing QSOs
         let descriptor = FetchDescriptor<QSO>()
@@ -449,7 +477,8 @@ class SyncService: ObservableObject {
                 }
 
                 // Mark as needing upload to services that don't have it
-                for service in ServiceType.allCases where service.supportsUpload && !sources.contains(service) {
+                for service in ServiceType.allCases
+                where service.supportsUpload && !sources.contains(service) {
                     let presence = ServicePresence.needsUpload(to: service, qso: newQSO)
                     modelContext.insert(presence)
                     newQSO.servicePresence.append(presence)
@@ -588,7 +617,10 @@ class SyncService: ObservableObject {
 
             // POTA upload (only if authenticated)
             if potaAuthService.isAuthenticated {
-                let potaQSOs = qsosNeedingUpload?.filter { $0.needsUpload(to: .pota) && $0.parkReference?.isEmpty == false } ?? []
+                let potaQSOs =
+                    qsosNeedingUpload?.filter {
+                        $0.needsUpload(to: .pota) && $0.parkReference?.isEmpty == false
+                    } ?? []
                 if !potaQSOs.isEmpty {
                     group.addTask {
                         await MainActor.run { self.syncPhase = .uploading(service: .pota) }
@@ -706,13 +738,15 @@ class SyncService: ObservableObject {
 
         try modelContext.save()
 
-        // Upload with timeout
-        syncPhase = .uploading(service: .qrz)
-        let qsosToUpload = try fetchQSOsNeedingUpload().filter { $0.needsUpload(to: .qrz) }
-        uploaded = try await withTimeout(seconds: syncTimeoutSeconds, service: .qrz) {
-            try await self.uploadToQRZ(qsos: qsosToUpload)
+        // Upload with timeout (unless read-only mode)
+        if !isReadOnlyMode {
+            syncPhase = .uploading(service: .qrz)
+            let qsosToUpload = try fetchQSOsNeedingUpload().filter { $0.needsUpload(to: .qrz) }
+            uploaded = try await withTimeout(seconds: syncTimeoutSeconds, service: .qrz) {
+                try await self.uploadToQRZ(qsos: qsosToUpload)
+            }
+            try modelContext.save()
         }
-        try modelContext.save()
 
         return (downloaded, uploaded)
     }
@@ -740,13 +774,17 @@ class SyncService: ObservableObject {
         downloaded = processResult.created
         try modelContext.save()
 
-        // Upload with timeout
-        syncPhase = .uploading(service: .pota)
-        let qsosToUpload = try fetchQSOsNeedingUpload().filter { $0.needsUpload(to: .pota) && $0.parkReference?.isEmpty == false }
-        uploaded = try await withTimeout(seconds: syncTimeoutSeconds, service: .pota) {
-            try await self.uploadToPOTA(qsos: qsosToUpload)
+        // Upload with timeout (unless read-only mode)
+        if !isReadOnlyMode {
+            syncPhase = .uploading(service: .pota)
+            let qsosToUpload = try fetchQSOsNeedingUpload().filter {
+                $0.needsUpload(to: .pota) && $0.parkReference?.isEmpty == false
+            }
+            uploaded = try await withTimeout(seconds: syncTimeoutSeconds, service: .pota) {
+                try await self.uploadToPOTA(qsos: qsosToUpload)
+            }
+            try modelContext.save()
         }
-        try modelContext.save()
 
         return (downloaded, uploaded)
     }
@@ -804,7 +842,8 @@ class SyncService: ObservableObject {
                 result.downloaded[service] = qsos.count
                 allFetched.append(contentsOf: qsos)
             case .failure(let error):
-                result.errors.append("\(service.displayName) download: \(error.localizedDescription)")
+                result.errors.append(
+                    "\(service.displayName) download: \(error.localizedDescription)")
             }
         }
 

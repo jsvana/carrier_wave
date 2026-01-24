@@ -1,48 +1,28 @@
 # Setup & Build Commands
 
-## Build Commands
-
-**Prefer using the `ios-simulator-skill` over running xcodebuild commands directly.** The skill provides optimized scripts for building, testing, and simulator management with minimal token output.
-
-### Simulator Workflow
-
-**Always rebuild and reinstall to test code changes.** Simply launching the app will run the old version.
-
-```bash
-# Full workflow: build, install, launch (use this after code changes)
-python3 ~/.claude/skills/ios-simulator-skill/scripts/build_and_test.py --project FullDuplex.xcodeproj --scheme FullDuplex
-xcrun simctl install booted ~/Library/Developer/Xcode/DerivedData/FullDuplex-*/Build/Products/Debug-iphonesimulator/FullDuplex.app
-python3 ~/.claude/skills/ios-simulator-skill/scripts/app_launcher.py --launch com.jsvana.FullDuplex
-
-# If app is already running, terminate first
-python3 ~/.claude/skills/ios-simulator-skill/scripts/app_launcher.py --terminate com.jsvana.FullDuplex
-```
-
-### Manual xcodebuild Commands
+NEVER run or build the app yourself. Prompt the user to do so.
 
 ```bash
 # Build for simulator
-xcodebuild -project FullDuplex.xcodeproj -scheme FullDuplex \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
+make build
 
-# Run all tests
-xcodebuild -project FullDuplex.xcodeproj -scheme FullDuplex \
-  -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
-```
-
-### Device Build (device name: theseus)
-
-```bash
 # Build for device
-xcodebuild -project FullDuplex.xcodeproj -scheme FullDuplex \
-  -destination 'platform=iOS,name=theseus' build
+make build-device
 
-# Install on device
-xcrun devicectl device install app --device theseus \
-  ~/Library/Developer/Xcode/DerivedData/FullDuplex-*/Build/Products/Debug-iphoneos/FullDuplex.app
+# Run tests
+make test
 
-# Launch on device
-xcrun devicectl device process launch --device theseus com.jsvana.FullDuplex
+# List available devices
+make devices
+
+# Install app on device (requires build-device first)
+make install
+
+# Launch app on device
+make launch
+
+# Build, install, and launch on device
+make deploy
 ```
 
 ## Required Xcode Configuration

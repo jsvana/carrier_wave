@@ -26,33 +26,6 @@ FullDuplex is a SwiftUI/SwiftData iOS app for amateur radio QSO (contact) loggin
 
 ## Getting Started
 
-
-NEVER run or build the app yourself. Prompt the user to do so.
-
-```bash
-# Build for simulator
-make build
-
-# Build for device
-make build-device
-
-# Run tests
-make test
-
-# List available devices
-make devices
-
-# Install app on device (requires build-device first)
-make install
-
-# Launch app on device
-make launch
-
-# Build, install, and launch on device
-make deploy
-
-```
-
 See [docs/SETUP.md](docs/SETUP.md) for device builds and additional commands.
 
 ## Issue Tracking

@@ -1,5 +1,5 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct SettingsMainView: View {
     @Environment(\.modelContext) private var modelContext
@@ -19,6 +19,7 @@ struct SettingsMainView: View {
     @State private var dedupeResultMessage = ""
 
     @AppStorage("debugMode") private var debugMode = false
+    @AppStorage("readOnlyMode") private var readOnlyMode = false
 
     private let lofiClient = LoFiClient()
 
@@ -114,7 +115,9 @@ struct SettingsMainView: View {
                 }
 
                 Section {
-                    Stepper("Time window: \(dedupeTimeWindow) min", value: $dedupeTimeWindow, in: 1...15)
+                    Stepper(
+                        "Time window: \(dedupeTimeWindow) min", value: $dedupeTimeWindow, in: 1...15
+                    )
 
                     Button {
                         Task { await runDeduplication() }
@@ -133,7 +136,9 @@ struct SettingsMainView: View {
                 } header: {
                     Text("Deduplication")
                 } footer: {
-                    Text("Find QSOs with same callsign, band, and mode within \(dedupeTimeWindow) minutes and merge them.")
+                    Text(
+                        "Find QSOs with same callsign, band, and mode within \(dedupeTimeWindow) minutes and merge them."
+                    )
                 }
 
                 Section {
@@ -150,6 +155,8 @@ struct SettingsMainView: View {
                     Toggle("Debug Mode", isOn: $debugMode)
 
                     if debugMode {
+                        Toggle("Read-Only Mode", isOn: $readOnlyMode)
+
                         NavigationLink {
                             SyncDebugView()
                         } label: {
@@ -159,7 +166,13 @@ struct SettingsMainView: View {
                 } header: {
                     Text("Developer")
                 } footer: {
-                    Text("Shows individual sync buttons on service cards and debug tools")
+                    if debugMode && readOnlyMode {
+                        Text(
+                            "Read-only mode: uploads disabled. Downloads and local changes still work."
+                        )
+                    } else {
+                        Text("Shows individual sync buttons on service cards and debug tools")
+                    }
                 }
 
                 Section {
@@ -187,20 +200,22 @@ struct SettingsMainView: View {
                 POTALoginSheet(authService: potaAuth)
             }
             .alert("Error", isPresented: $showingError) {
-                Button("OK") { }
+                Button("OK") {}
             } message: {
                 Text(errorMessage)
             }
             .alert("Clear All QSOs?", isPresented: $showingClearAllConfirmation) {
-                Button("Cancel", role: .cancel) { }
+                Button("Cancel", role: .cancel) {}
                 Button("Clear All", role: .destructive) {
                     Task { await clearAllQSOs() }
                 }
             } message: {
-                Text("This will permanently delete all QSOs from this device. This cannot be undone.")
+                Text(
+                    "This will permanently delete all QSOs from this device. This cannot be undone."
+                )
             }
             .alert("Deduplication Complete", isPresented: $showingDedupeResult) {
-                Button("OK") { }
+                Button("OK") {}
             } message: {
                 Text(dedupeResultMessage)
             }
@@ -214,7 +229,8 @@ struct SettingsMainView: View {
         do {
             _ = try KeychainHelper.shared.readString(for: KeychainHelper.Keys.qrzApiKey)
             qrzIsAuthenticated = true
-            qrzCallsign = try? KeychainHelper.shared.readString(for: KeychainHelper.Keys.qrzCallsign)
+            qrzCallsign = try? KeychainHelper.shared.readString(
+                for: KeychainHelper.Keys.qrzCallsign)
         } catch {
             qrzIsAuthenticated = false
             qrzCallsign = nil
@@ -262,12 +278,14 @@ struct SettingsMainView: View {
 
         do {
             let service = DeduplicationService(modelContext: modelContext)
-            let result = try await service.findAndMergeDuplicates(timeWindowMinutes: dedupeTimeWindow)
+            let result = try await service.findAndMergeDuplicates(
+                timeWindowMinutes: dedupeTimeWindow)
 
             if result.duplicateGroupsFound == 0 {
                 dedupeResultMessage = "No duplicates found."
             } else {
-                dedupeResultMessage = "Found \(result.duplicateGroupsFound) duplicate groups.\nMerged \(result.qsosMerged) QSOs, removed \(result.qsosRemoved) duplicates."
+                dedupeResultMessage =
+                    "Found \(result.duplicateGroupsFound) duplicate groups.\nMerged \(result.qsosMerged) QSOs, removed \(result.qsosRemoved) duplicates."
             }
             showingDedupeResult = true
         } catch {
@@ -291,9 +309,11 @@ struct QRZApiKeySheet: View {
         NavigationStack {
             Form {
                 Section {
-                    Text("Enter your QRZ Logbook API key. You can find this in your QRZ logbook settings.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                    Text(
+                        "Enter your QRZ Logbook API key. You can find this in your QRZ logbook settings."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
 
                     Link(destination: URL(string: "https://logbook.qrz.com/logbook")!) {
                         Label("Get API key from QRZ Logbook", systemImage: "arrow.up.right.square")
@@ -401,8 +421,11 @@ struct LoFiSettingsView: View {
             if isConfigured {
                 Section {
                     HStack {
-                        Label(isLinked ? "Connected" : "Pending", systemImage: isLinked ? "checkmark.circle.fill" : "clock")
-                            .foregroundStyle(isLinked ? .green : .orange)
+                        Label(
+                            isLinked ? "Connected" : "Pending",
+                            systemImage: isLinked ? "checkmark.circle.fill" : "clock"
+                        )
+                        .foregroundStyle(isLinked ? .green : .orange)
                         Spacer()
                         if let callsign = lofiClient.getCallsign() {
                             Text(callsign)
@@ -445,7 +468,9 @@ struct LoFiSettingsView: View {
                 } header: {
                     Text("Setup")
                 } footer: {
-                    Text("Your callsign is used to access your LoFi account. Email is used for device verification.")
+                    Text(
+                        "Your callsign is used to access your LoFi account. Email is used for device verification."
+                    )
                 }
 
                 Section {
@@ -474,7 +499,7 @@ struct LoFiSettingsView: View {
         }
         .navigationTitle("Ham2K LoFi")
         .alert("Error", isPresented: $showingError) {
-            Button("OK") { }
+            Button("OK") {}
         } message: {
             Text(errorMessage)
         }
