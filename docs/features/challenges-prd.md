@@ -258,17 +258,19 @@ Challenges sync is an optional sync destination alongside QRZ, POTA, LoFi:
 
 ---
 
+## Design Decisions
+
+1. **Offline behavior**: Connectivity required for challenge features. Progress is not cached offline.
+
+2. **Invite link controls**: Expiration and max participant limits are configurable per-challenge in the configurator.
+
 ## Open Questions
 
-1. **Offline behavior**: How should challenge progress work when offline? Cache last-known state? Queue updates?
+1. **Conflict resolution**: If a QSO qualifies for multiple challenges, any special handling needed?
 
-2. **Conflict resolution**: If a QSO qualifies for multiple challenges, any special handling needed?
+2. **Rate limiting**: For real-time leaderboard updates, what's the acceptable refresh rate?
 
-3. **Rate limiting**: For real-time leaderboard updates, what's the acceptable refresh rate?
-
-4. **Badge format**: What image formats/sizes for uploadable badges?
-
-5. **Invite link expiration**: Should invite links expire? Have participant limits?
+3. **Badge format**: What image formats/sizes for uploadable badges?
 
 ---
 
