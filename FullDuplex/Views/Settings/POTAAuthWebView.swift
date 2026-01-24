@@ -5,11 +5,13 @@
 import SwiftUI
 import WebKit
 
+// MARK: - POTAAuthWebView
+
 struct POTAAuthWebView: UIViewRepresentable {
     let webView: WKWebView
 
     func makeUIView(context: Context) -> WKWebView {
-        return webView
+        webView
     }
 
     func updateUIView(_ uiView: WKWebView, context: Context) {
@@ -17,9 +19,12 @@ struct POTAAuthWebView: UIViewRepresentable {
     }
 }
 
+// MARK: - POTALoginSheet
+
 struct POTALoginSheet: View {
+    // MARK: Internal
+
     @ObservedObject var authService: POTAAuthService
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
@@ -42,4 +47,8 @@ struct POTALoginSheet: View {
             }
         }
     }
+
+    // MARK: Private
+
+    @Environment(\.dismiss) private var dismiss
 }

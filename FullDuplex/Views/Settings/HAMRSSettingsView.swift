@@ -1,14 +1,7 @@
 import SwiftUI
 
 struct HAMRSSettingsView: View {
-    @State private var apiKey = ""
-    @State private var isConfigured = false
-    @State private var isValidating = false
-    @State private var showingError = false
-    @State private var errorMessage = ""
-    @State private var statusMessage = ""
-
-    private let hamrsClient = HAMRSClient()
+    // MARK: Internal
 
     var body: some View {
         List {
@@ -86,6 +79,17 @@ struct HAMRSSettingsView: View {
             await checkStatus()
         }
     }
+
+    // MARK: Private
+
+    @State private var apiKey = ""
+    @State private var isConfigured = false
+    @State private var isValidating = false
+    @State private var showingError = false
+    @State private var errorMessage = ""
+    @State private var statusMessage = ""
+
+    private let hamrsClient = HAMRSClient()
 
     private func checkStatus() async {
         isConfigured = hamrsClient.isConfigured

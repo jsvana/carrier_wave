@@ -3,10 +3,7 @@ import SwiftData
 
 @Model
 final class UploadDestination {
-    var id: UUID
-    var type: ServiceType
-    var isEnabled: Bool
-    var lastSyncAt: Date?
+    // MARK: Lifecycle
 
     init(
         id: UUID = UUID(),
@@ -19,6 +16,13 @@ final class UploadDestination {
         self.isEnabled = isEnabled
         self.lastSyncAt = lastSyncAt
     }
+
+    // MARK: Internal
+
+    var id: UUID
+    var type: ServiceType
+    var isEnabled: Bool
+    var lastSyncAt: Date?
 }
 
 // Note: Credentials (API keys, tokens) stored in Keychain, not SwiftData

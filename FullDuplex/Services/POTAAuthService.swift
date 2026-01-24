@@ -6,8 +6,10 @@
 
 import Combine
 import Foundation
-import WebKit
 import SwiftUI
+import WebKit
+
+// MARK: - POTAAuthError
 
 enum POTAAuthError: Error, LocalizedError {
     case tokenExtractionFailed
@@ -15,19 +17,23 @@ enum POTAAuthError: Error, LocalizedError {
     case networkError(Error)
     case tokenExpired
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .tokenExtractionFailed:
-            return "Failed to extract authentication token from POTA"
+            "Failed to extract authentication token from POTA"
         case .authenticationCancelled:
-            return "Authentication was cancelled"
-        case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
+            "Authentication was cancelled"
+        case let .networkError(error):
+            "Network error: \(error.localizedDescription)"
         case .tokenExpired:
-            return "POTA token has expired, please re-authenticate"
+            "POTA token has expired, please re-authenticate"
         }
     }
 }
+
+// MARK: - POTAToken
 
 struct POTAToken: Codable {
     let idToken: String
@@ -43,16 +49,84 @@ struct POTAToken: Codable {
     }
 }
 
+// MARK: - POTAAuthService
+
 @MainActor
 class POTAAuthService: NSObject, ObservableObject {
+    // MARK: Lifecycle
+
+    override init() {
+        super.init()
+        loadStoredToken()
+    }
+
+    // MARK: Internal
+
     @Published var isAuthenticating = false
     @Published var currentToken: POTAToken?
 
     /// Check if we have a valid (non-expired) POTA authentication token
     var isAuthenticated: Bool {
-        guard let token = currentToken else { return false }
+        guard let token = currentToken else {
+            return false
+        }
         return !token.isExpired
     }
+
+    func loadStoredToken() {
+        do {
+            let tokenData = try keychain.read(for: KeychainHelper.Keys.potaIdToken)
+            let token = try JSONDecoder().decode(POTAToken.self, from: tokenData)
+            if !token.isExpired {
+                currentToken = token
+            }
+        } catch {
+            // No stored token or expired
+            currentToken = nil
+        }
+    }
+
+    func authenticate() async throws -> POTAToken {
+        // Check if we have a valid token
+        if let token = currentToken, !token.isExpiringSoon() {
+            return token
+        }
+
+        isAuthenticating = true
+        defer { isAuthenticating = false }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            self.authContinuation = continuation
+            self.setupWebView()
+        }
+    }
+
+    func getWebView() -> WKWebView? {
+        webView
+    }
+
+    func cancelAuthentication() {
+        authContinuation?.resume(throwing: POTAAuthError.authenticationCancelled)
+        authContinuation = nil
+        webView = nil
+    }
+
+    func logout() {
+        try? keychain.delete(for: KeychainHelper.Keys.potaIdToken)
+        currentToken = nil
+        webView = nil
+    }
+
+    func ensureValidToken() async throws -> String {
+        if let token = currentToken, !token.isExpiringSoon() {
+            return token.idToken
+        }
+
+        let newToken = try await authenticate()
+        return newToken.idToken
+    }
+
+    // MARK: Private
 
     private let keychain = KeychainHelper.shared
     private var webView: WKWebView?
@@ -60,7 +134,7 @@ class POTAAuthService: NSObject, ObservableObject {
 
     private let potaAppURL = "https://pota.app"
 
-    // JavaScript to extract token from cookies/localStorage
+    /// JavaScript to extract token from cookies/localStorage
     private let extractTokenJS = """
     (function() {
         // Check cookies first
@@ -121,39 +195,6 @@ class POTAAuthService: NSObject, ObservableObject {
     })()
     """
 
-    override init() {
-        super.init()
-        loadStoredToken()
-    }
-
-    func loadStoredToken() {
-        do {
-            let tokenData = try keychain.read(for: KeychainHelper.Keys.potaIdToken)
-            let token = try JSONDecoder().decode(POTAToken.self, from: tokenData)
-            if !token.isExpired {
-                currentToken = token
-            }
-        } catch {
-            // No stored token or expired
-            currentToken = nil
-        }
-    }
-
-    func authenticate() async throws -> POTAToken {
-        // Check if we have a valid token
-        if let token = currentToken, !token.isExpiringSoon() {
-            return token
-        }
-
-        isAuthenticating = true
-        defer { isAuthenticating = false }
-
-        return try await withCheckedThrowingContinuation { continuation in
-            self.authContinuation = continuation
-            self.setupWebView()
-        }
-    }
-
     private func setupWebView() {
         let config = WKWebViewConfiguration()
         config.websiteDataStore = .nonPersistent() // Don't persist between sessions
@@ -169,25 +210,14 @@ class POTAAuthService: NSObject, ObservableObject {
         webView?.load(URLRequest(url: url))
     }
 
-    func getWebView() -> WKWebView? {
-        return webView
-    }
-
-    func cancelAuthentication() {
-        authContinuation?.resume(throwing: POTAAuthError.authenticationCancelled)
-        authContinuation = nil
-        webView = nil
-    }
-
     private func extractToken() async throws -> POTAToken {
-        guard let webView = webView else {
+        guard let webView else {
             throw POTAAuthError.tokenExtractionFailed
         }
 
         // Try multiple times with delay
-        for _ in 0..<5 {
-            if let token = try await webView.evaluateJavaScript(extractTokenJS) as? String,
-               !token.isEmpty {
+        for _ in 0 ..< 5 {
+            if let token = try await webView.evaluateJavaScript(extractTokenJS) as? String, !token.isEmpty {
                 let potaToken = try decodeToken(token)
                 try saveToken(potaToken)
                 currentToken = potaToken
@@ -216,11 +246,12 @@ class POTAAuthService: NSObject, ObservableObject {
         }
 
         guard let data = Data(base64Encoded: base64),
-              let claims = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let claims = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else {
             throw POTAAuthError.tokenExtractionFailed
         }
 
-        let exp = claims["exp"] as? TimeInterval ?? (Date().timeIntervalSince1970 + 3600)
+        let exp = claims["exp"] as? TimeInterval ?? (Date().timeIntervalSince1970 + 3_600)
         let callsign = claims["pota:callsign"] as? String
 
         return POTAToken(
@@ -234,30 +265,19 @@ class POTAAuthService: NSObject, ObservableObject {
         let data = try JSONEncoder().encode(token)
         try keychain.save(data, for: KeychainHelper.Keys.potaIdToken)
     }
-
-    func logout() {
-        try? keychain.delete(for: KeychainHelper.Keys.potaIdToken)
-        currentToken = nil
-        webView = nil
-    }
-
-    func ensureValidToken() async throws -> String {
-        if let token = currentToken, !token.isExpiringSoon() {
-            return token.idToken
-        }
-
-        let newToken = try await authenticate()
-        return newToken.idToken
-    }
 }
+
+// MARK: WKNavigationDelegate
 
 extension POTAAuthService: WKNavigationDelegate {
     nonisolated func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
         Task { @MainActor in
-            guard let url = webView.url?.absoluteString else { return }
+            guard let url = webView.url?.absoluteString else {
+                return
+            }
 
             // Check if we've returned to POTA after Cognito auth
-            if url.contains("pota.app") && !url.contains("cognito") && !url.contains("login") {
+            if url.contains("pota.app"), !url.contains("cognito"), !url.contains("login") {
                 do {
                     let token = try await extractToken()
                     authContinuation?.resume(returning: token)

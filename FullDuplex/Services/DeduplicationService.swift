@@ -1,18 +1,24 @@
 import Foundation
 import SwiftData
 
+// MARK: - DeduplicationResult
+
 struct DeduplicationResult {
     let duplicateGroupsFound: Int
     let qsosMerged: Int
     let qsosRemoved: Int
 }
 
+// MARK: - DeduplicationService
+
 actor DeduplicationService {
-    private let modelContext: ModelContext
+    // MARK: Lifecycle
 
     init(modelContext: ModelContext) {
         self.modelContext = modelContext
     }
+
+    // MARK: Internal
 
     /// Find and merge duplicate QSOs within the given time window
     func findAndMergeDuplicates(timeWindowMinutes: Int = 5) async throws -> DeduplicationResult {
@@ -29,21 +35,27 @@ actor DeduplicationService {
         var processed = Set<UUID>()
 
         // Find duplicate groups
-        for i in 0..<allQSOs.count {
+        for i in 0 ..< allQSOs.count {
             let qso = allQSOs[i]
-            if processed.contains(qso.id) { continue }
+            if processed.contains(qso.id) {
+                continue
+            }
 
             var group = [qso]
             processed.insert(qso.id)
 
             // Check subsequent QSOs within time window
-            for j in (i + 1)..<allQSOs.count {
+            for j in (i + 1) ..< allQSOs.count {
                 let candidate = allQSOs[j]
-                if processed.contains(candidate.id) { continue }
+                if processed.contains(candidate.id) {
+                    continue
+                }
 
                 // Stop if beyond time window
                 let timeDelta = candidate.timestamp.timeIntervalSince(qso.timestamp)
-                if timeDelta > timeWindow { break }
+                if timeDelta > timeWindow {
+                    break
+                }
 
                 // Check if duplicate (same call/band/mode within window)
                 if isDuplicate(qso, candidate) {
@@ -76,40 +88,48 @@ actor DeduplicationService {
         )
     }
 
+    // MARK: Private
+
+    private let modelContext: ModelContext
+
     /// Check if two QSOs are duplicates (same callsign, mode, and optionally band)
     /// When either QSO has no band (empty string), matches on callsign+mode+time only.
     /// This handles POTA.app QSOs which don't include frequency/band info.
-    private func isDuplicate(_ a: QSO, _ b: QSO) -> Bool {
-        let callsignMatch = a.callsign.uppercased() == b.callsign.uppercased()
-        let modeMatch = a.mode.uppercased() == b.mode.uppercased()
+    private func isDuplicate(_ qso1: QSO, _ qso2: QSO) -> Bool {
+        let callsignMatch = qso1.callsign.uppercased() == qso2.callsign.uppercased()
+        let modeMatch = qso1.mode.uppercased() == qso2.mode.uppercased()
 
-        guard callsignMatch && modeMatch else { return false }
+        guard callsignMatch && modeMatch else {
+            return false
+        }
 
         // If either QSO has no band, consider it a match (band-agnostic)
-        let aBand = a.band.trimmingCharacters(in: .whitespaces)
-        let bBand = b.band.trimmingCharacters(in: .whitespaces)
+        let band1 = qso1.band.trimmingCharacters(in: .whitespaces)
+        let band2 = qso2.band.trimmingCharacters(in: .whitespaces)
 
-        if aBand.isEmpty || bBand.isEmpty {
+        if band1.isEmpty || band2.isEmpty {
             return true
         }
 
         // Both have bands - require match
-        return aBand.uppercased() == bBand.uppercased()
+        return band1.uppercased() == band2.uppercased()
     }
 
     /// Merge a group of duplicates, keeping the best one
     /// Returns (merged count, removed count)
     private func mergeGroup(_ group: [QSO]) -> (Int, Int) {
-        guard group.count > 1 else { return (0, 0) }
+        guard group.count > 1 else {
+            return (0, 0)
+        }
 
         // Sort to find winner:
         // 1. Most synced services
         // 2. Highest field richness score
-        let sorted = group.sorted { a, b in
-            if a.syncedServicesCount != b.syncedServicesCount {
-                return a.syncedServicesCount > b.syncedServicesCount
+        let sorted = group.sorted { first, second in
+            if first.syncedServicesCount != second.syncedServicesCount {
+                return first.syncedServicesCount > second.syncedServicesCount
             }
-            return a.fieldRichnessScore > b.fieldRichnessScore
+            return first.fieldRichnessScore > second.fieldRichnessScore
         }
 
         let winner = sorted[0]
@@ -127,18 +147,37 @@ actor DeduplicationService {
 
     /// Fill nil/empty fields in winner from loser
     private func absorbFields(from loser: QSO, into winner: QSO) {
-        if winner.rstSent == nil { winner.rstSent = loser.rstSent }
-        if winner.rstReceived == nil { winner.rstReceived = loser.rstReceived }
-        if winner.myGrid == nil { winner.myGrid = loser.myGrid }
-        if winner.theirGrid == nil { winner.theirGrid = loser.theirGrid }
-        if winner.parkReference == nil { winner.parkReference = loser.parkReference }
-        if winner.notes == nil { winner.notes = loser.notes }
-        if winner.qrzLogId == nil { winner.qrzLogId = loser.qrzLogId }
-        if winner.rawADIF == nil { winner.rawADIF = loser.rawADIF }
-        if winner.frequency == nil { winner.frequency = loser.frequency }
+        if winner.rstSent == nil {
+            winner.rstSent = loser.rstSent
+        }
+        if winner.rstReceived == nil {
+            winner.rstReceived = loser.rstReceived
+        }
+        if winner.myGrid == nil {
+            winner.myGrid = loser.myGrid
+        }
+        if winner.theirGrid == nil {
+            winner.theirGrid = loser.theirGrid
+        }
+        if winner.parkReference == nil {
+            winner.parkReference = loser.parkReference
+        }
+        if winner.notes == nil {
+            winner.notes = loser.notes
+        }
+        if winner.qrzLogId == nil {
+            winner.qrzLogId = loser.qrzLogId
+        }
+        if winner.rawADIF == nil {
+            winner.rawADIF = loser.rawADIF
+        }
+        if winner.frequency == nil {
+            winner.frequency = loser.frequency
+        }
         // Absorb band if winner has empty band (e.g., from POTA)
-        if winner.band.trimmingCharacters(in: .whitespaces).isEmpty &&
-           !loser.band.trimmingCharacters(in: .whitespaces).isEmpty {
+        let winnerBand = winner.band.trimmingCharacters(in: .whitespaces)
+        let loserBand = loser.band.trimmingCharacters(in: .whitespaces)
+        if winnerBand.isEmpty, !loserBand.isEmpty {
             winner.band = loser.band
         }
     }
@@ -149,7 +188,7 @@ actor DeduplicationService {
             // Check if winner already has this service
             if let existing = winner.presence(for: presence.serviceType) {
                 // Update if loser's is "better" (present beats not present)
-                if presence.isPresent && !existing.isPresent {
+                if presence.isPresent, !existing.isPresent {
                     existing.isPresent = true
                     existing.needsUpload = false
                     existing.lastConfirmedAt = presence.lastConfirmedAt

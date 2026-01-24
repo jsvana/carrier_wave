@@ -1,5 +1,7 @@
 import Foundation
 
+// MARK: - QRZError
+
 enum QRZError: Error, LocalizedError {
     case invalidApiKey(String)
     case subscriptionRequired
@@ -10,27 +12,31 @@ enum QRZError: Error, LocalizedError {
     case invalidResponse(String)
     case noQSOs
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
-        case .invalidApiKey(let reason):
-            return "Invalid QRZ API key: \(reason)"
+        case let .invalidApiKey(reason):
+            "Invalid QRZ API key: \(reason)"
         case .subscriptionRequired:
-            return "QRZ XML Logbook Data subscription required. Visit shop.qrz.com to subscribe."
+            "QRZ XML Logbook Data subscription required. Visit shop.qrz.com to subscribe."
         case .sessionExpired:
-            return "QRZ session expired, please re-authenticate"
-        case .uploadFailed(let reason):
-            return "Upload failed: \(reason)"
-        case .fetchFailed(let reason):
-            return "Fetch failed: \(reason)"
-        case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
-        case .invalidResponse(let details):
-            return "Invalid response from QRZ: \(details)"
+            "QRZ session expired, please re-authenticate"
+        case let .uploadFailed(reason):
+            "Upload failed: \(reason)"
+        case let .fetchFailed(reason):
+            "Fetch failed: \(reason)"
+        case let .networkError(error):
+            "Network error: \(error.localizedDescription)"
+        case let .invalidResponse(details):
+            "Invalid response from QRZ: \(details)"
         case .noQSOs:
-            return "No QSOs found"
+            "No QSOs found"
         }
     }
 }
+
+// MARK: - QRZStatusResponse
 
 /// Response from QRZ STATUS action
 struct QRZStatusResponse {
@@ -38,6 +44,8 @@ struct QRZStatusResponse {
     let qsoCount: Int
     let confirmedCount: Int
 }
+
+// MARK: - QRZFetchedQSO
 
 /// A QSO fetched from QRZ logbook
 struct QRZFetchedQSO {
@@ -59,10 +67,16 @@ struct QRZFetchedQSO {
     let rawADIF: String
 }
 
+// MARK: - QRZClient
+
 actor QRZClient {
-    private let baseURL = "https://logbook.qrz.com/api"
-    private let keychain = KeychainHelper.shared
-    private let userAgent = "FullDuplex/1.0"
+    // MARK: Internal
+
+    // MARK: Internal (for extension access)
+
+    let baseURL = "https://logbook.qrz.com/api"
+    nonisolated let keychain = KeychainHelper.shared
+    let userAgent = "FullDuplex/1.0"
 
     // MARK: - Response Parsing
 
@@ -76,7 +90,9 @@ actor QRZClient {
             // Parse everything before ADIF normally
             let beforeADIF = String(response[..<adifRange.lowerBound])
             for pair in beforeADIF.components(separatedBy: "&") {
-                if pair.isEmpty { continue }
+                if pair.isEmpty {
+                    continue
+                }
                 let parts = pair.components(separatedBy: "=")
                 if parts.count >= 2 {
                     result[parts[0]] = parts.dropFirst().joined(separator: "=")
@@ -165,7 +181,7 @@ actor QRZClient {
             }
             let reason =
                 parsed["REASON"]
-                ?? "RESULT=\(parsed["RESULT"] ?? "nil"), response: \(responseString.prefix(200))"
+                    ?? "RESULT=\(parsed["RESULT"] ?? "nil"), response: \(responseString.prefix(200))"
             throw QRZError.invalidApiKey(reason)
         }
 
@@ -181,23 +197,6 @@ actor QRZClient {
             qsoCount: qsoCount,
             confirmedCount: confirmedCount
         )
-    }
-
-    /// Form-encode a dictionary for POST body (application/x-www-form-urlencoded)
-    private func formEncode(_ params: [String: String]) -> String {
-        // For form encoding, we need a restricted character set
-        // Only alphanumerics, *, -, ., _ are safe; space becomes +
-        var allowed = CharacterSet.alphanumerics
-        allowed.insert(charactersIn: "*-._")
-
-        return params.map { key, value in
-            let escapedKey = key.addingPercentEncoding(withAllowedCharacters: allowed) ?? key
-            let escapedValue =
-                value
-                .replacingOccurrences(of: " ", with: "+")
-                .addingPercentEncoding(withAllowedCharacters: allowed) ?? value
-            return "\(escapedKey)=\(escapedValue)"
-        }.joined(separator: "&")
     }
 
     /// Upload QSOs to QRZ logbook
@@ -261,305 +260,28 @@ actor QRZClient {
     /// Fetch QSOs from QRZ logbook with pagination
     func fetchQSOs(since: Date? = nil) async throws -> [QRZFetchedQSO] {
         let apiKey = try getApiKey()
-
         var allQSOs: [QRZFetchedQSO] = []
         var offset = 0
-        let pageSize = 2000  // QRZ max is 2000 per request
+        let pageSize = 2_000
 
         guard let url = URL(string: baseURL) else {
             throw QRZError.invalidResponse("Invalid URL")
         }
 
         while true {
-            // Build OPTION parameter with comma-separated filters
-            // Note: QRZ doesn't like OFFSET:0, so only include it when > 0
-            var optionParts = ["MAX:\(pageSize)"]
-            if offset > 0 {
-                optionParts.append("OFFSET:\(offset)")
-            }
-
-            // Add MODSINCE filter if date provided
-            if let since = since {
-                let formatter = DateFormatter()
-                formatter.dateFormat = "yyyy-MM-dd"
-                formatter.timeZone = TimeZone(identifier: "UTC")
-                optionParts.append("MODSINCE:\(formatter.string(from: since))")
-            }
-
-            var request = URLRequest(url: url)
-            request.httpMethod = "POST"
-            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-            request.setValue(
-                "application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-
-            // Form-encode the body
-            let formData = [
-                "KEY": apiKey,
-                "ACTION": "FETCH",
-                "OPTION": optionParts.joined(separator: ","),
-            ]
-            let body = formEncode(formData)
-            request.httpBody = body.data(using: .utf8)
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            // Check HTTP status code
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
-                throw QRZError.invalidResponse(
-                    "HTTP \(httpResponse.statusCode), body: \(String(data: data, encoding: .utf8)?.prefix(200) ?? "nil")"
-                )
-            }
-
-            // Try UTF-8 first, then fall back to ISO Latin 1 (common for ADIF data)
-            let responseString: String
-            if let utf8String = String(data: data, encoding: .utf8) {
-                responseString = utf8String
-            } else if let latin1String = String(data: data, encoding: .isoLatin1) {
-                responseString = latin1String
-            } else {
-                // Show first bytes for debugging
-                let firstBytes = data.prefix(20).map { String(format: "%02x", $0) }.joined(
-                    separator: " ")
-                throw QRZError.invalidResponse(
-                    "Cannot decode \(data.count) bytes, first bytes: \(firstBytes)")
-            }
-
-            let parsed = Self.parseResponse(responseString)
-
-            if parsed["RESULT"] == "AUTH" {
-                throw QRZError.sessionExpired
-            }
-
-            // Handle "no results" scenarios - QRZ returns FAIL when there are no QSOs
-            let result = parsed["RESULT"] ?? ""
-            let reason = parsed["REASON"]?.lowercased() ?? ""
-            let responseCount = Int(parsed["COUNT"] ?? "") ?? 0
-
-            // "no log entries found" or FAIL with COUNT=0 means no more results
-            if reason.contains("no log entries found") || (result == "FAIL" && responseCount == 0) {
-                break
-            }
-
-            guard result == "OK" else {
-                // Show full response for debugging when no REASON provided
-                let errorReason =
-                    parsed["REASON"] ?? "RESULT=\(result), Response: \(responseString.prefix(300))"
-                throw QRZError.fetchFailed(errorReason)
-            }
-
-            guard let encodedADIF = parsed["ADIF"] else {
-                break
-            }
-
-            let adif = decodeADIF(encodedADIF)
-            let pageQSOs = parseADIFRecords(adif)
+            let request = buildFetchRequest(url: url, apiKey: apiKey, offset: offset, pageSize: pageSize, since: since)
+            let (pageQSOs, responseCount) = try await fetchQSOPage(request: request)
 
             allQSOs.append(contentsOf: pageQSOs)
 
-            // Use the response COUNT to determine if there are more pages
-            // If QRZ returned fewer than we asked for, we've reached the end
             if responseCount < pageSize {
                 break
             }
-
             offset += pageSize
-
-            // Small delay between pages to be nice to the API
-            try await Task.sleep(nanoseconds: 200_000_000)  // 200ms
+            try await Task.sleep(nanoseconds: 200_000_000)
         }
 
         return allQSOs
-    }
-
-    // MARK: - ADIF Helpers
-
-    /// Decode ADIF from QRZ response (URL decode then HTML entity decode)
-    private func decodeADIF(_ encoded: String) -> String {
-        // First URL decode
-        var decoded = encoded.removingPercentEncoding ?? encoded
-
-        // Then decode HTML entities
-        let htmlEntities: [(String, String)] = [
-            ("&lt;", "<"),
-            ("&gt;", ">"),
-            ("&amp;", "&"),
-            ("&quot;", "\""),
-            ("&apos;", "'"),
-            ("&#39;", "'"),
-            ("&#x27;", "'"),
-        ]
-
-        for (entity, char) in htmlEntities {
-            decoded = decoded.replacingOccurrences(of: entity, with: char)
-        }
-
-        return decoded
-    }
-
-    /// Parse ADIF string into QRZFetchedQSO records
-    private func parseADIFRecords(_ adif: String) -> [QRZFetchedQSO] {
-        var qsos: [QRZFetchedQSO] = []
-
-        // Split by end of record marker
-        let records =
-            adif.lowercased().contains("<eor>")
-            ? adif.components(separatedBy: "<eor>").compactMap { $0.isEmpty ? nil : $0 }
-            : adif.components(separatedBy: "<EOR>").compactMap { $0.isEmpty ? nil : $0 }
-
-        for record in records {
-            let trimmed = record.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmed.isEmpty {
-                continue
-            }
-
-            let fields = parseADIFFields(record)
-
-            guard let callsign = fields["CALL"] ?? fields["call"],
-                let band = fields["BAND"] ?? fields["band"],
-                let mode = fields["MODE"] ?? fields["mode"]
-            else {
-                continue
-            }
-
-            let timestamp =
-                parseTimestamp(
-                    date: fields["QSO_DATE"] ?? fields["qso_date"],
-                    time: fields["TIME_ON"] ?? fields["time_on"]
-                ) ?? Date()
-
-            // Parse frequency (ADIF FREQ field is in MHz)
-            var frequency: Double?
-            if let freqStr = fields["FREQ"] ?? fields["freq"], let freq = Double(freqStr) {
-                frequency = freq  // MHz - keep as-is
-            }
-
-            // Check QRZ confirmation status
-            let qrzStatus = fields["APP_QRZLOG_STATUS"] ?? fields["app_qrzlog_status"]
-            let qrzConfirmed = qrzStatus?.uppercased() == "C"
-
-            // Parse LoTW confirmed date
-            let lotwDate = parseLotwDate(fields["LOTW_QSL_RCVD"] ?? fields["lotw_qsl_rcvd"])
-
-            let qso = QRZFetchedQSO(
-                callsign: callsign.uppercased(),
-                band: band.uppercased(),
-                mode: mode.uppercased(),
-                frequency: frequency,
-                timestamp: timestamp,
-                rstSent: fields["RST_SENT"] ?? fields["rst_sent"],
-                rstReceived: fields["RST_RCVD"] ?? fields["rst_rcvd"],
-                myCallsign: fields["STATION_CALLSIGN"] ?? fields["station_callsign"],
-                myGrid: fields["MY_GRIDSQUARE"] ?? fields["my_gridsquare"],
-                theirGrid: fields["GRIDSQUARE"] ?? fields["gridsquare"],
-                parkReference: fields["SIG_INFO"] ?? fields["sig_info"],
-                notes: fields["COMMENT"] ?? fields["comment"],
-                qrzLogId: fields["APP_QRZLOG_LOGID"] ?? fields["app_qrzlog_logid"],
-                qrzConfirmed: qrzConfirmed,
-                lotwConfirmedDate: lotwDate,
-                rawADIF: record
-            )
-            qsos.append(qso)
-        }
-
-        return qsos
-    }
-
-    /// Parse ADIF fields from a record string
-    private func parseADIFFields(_ record: String) -> [String: String] {
-        var fields: [String: String] = [:]
-
-        // Match <FIELD:length>value pattern
-        let pattern = #"<(\w+):(\d+)(?::\w+)?>"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: []) else {
-            return fields
-        }
-
-        let nsRecord = record as NSString
-        let matches = regex.matches(
-            in: record, options: [], range: NSRange(location: 0, length: nsRecord.length))
-
-        for match in matches {
-            guard match.numberOfRanges >= 3 else { continue }
-
-            let fieldNameRange = match.range(at: 1)
-            let lengthRange = match.range(at: 2)
-
-            let fieldName = nsRecord.substring(with: fieldNameRange)
-            guard let length = Int(nsRecord.substring(with: lengthRange)) else { continue }
-
-            // Value starts right after the closing >
-            let valueStart = match.range.location + match.range.length
-            if valueStart + length <= nsRecord.length {
-                let valueRange = NSRange(location: valueStart, length: length)
-                let value = nsRecord.substring(with: valueRange)
-                fields[fieldName] = value
-            }
-        }
-
-        return fields
-    }
-
-    /// Parse ADIF date/time fields into Date
-    private func parseTimestamp(date: String?, time: String?) -> Date? {
-        guard let date = date else { return nil }
-
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: "UTC")
-
-        if let time = time, time.count >= 4 {
-            formatter.dateFormat = "yyyyMMddHHmm"
-            return formatter.date(from: date + time.prefix(4))
-        } else {
-            formatter.dateFormat = "yyyyMMdd"
-            return formatter.date(from: date)
-        }
-    }
-
-    /// Parse LoTW date string
-    private func parseLotwDate(_ dateStr: String?) -> Date? {
-        guard let dateStr = dateStr, !dateStr.isEmpty else { return nil }
-
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        formatter.dateFormat = "yyyyMMdd"
-
-        return formatter.date(from: dateStr)
-    }
-
-    /// Generate ADIF for a QSO
-    private func generateADIF(for qso: QSO) -> String {
-        var fields: [String] = []
-
-        func addField(_ name: String, _ value: String?) {
-            guard let value = value, !value.isEmpty else { return }
-            fields.append("<\(name):\(value.count)>\(value)")
-        }
-
-        addField("call", qso.callsign)
-        addField("band", qso.band)
-        addField("mode", qso.mode)
-
-        if let freq = qso.frequency {
-            addField("freq", String(format: "%.4f", freq))  // MHz
-        }
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyyMMdd"
-        dateFormatter.timeZone = TimeZone(identifier: "UTC")
-        addField("qso_date", dateFormatter.string(from: qso.timestamp))
-
-        dateFormatter.dateFormat = "HHmm"
-        addField("time_on", dateFormatter.string(from: qso.timestamp))
-
-        addField("rst_sent", qso.rstSent)
-        addField("rst_rcvd", qso.rstReceived)
-        addField("station_callsign", qso.myCallsign)
-        addField("my_gridsquare", qso.myGrid)
-        addField("gridsquare", qso.theirGrid)
-        addField("sig_info", qso.parkReference)
-        addField("comment", qso.notes)
-
-        return fields.joined(separator: " ") + " <eor>"
     }
 
     // MARK: - Session Management
@@ -576,4 +298,79 @@ actor QRZClient {
         try? keychain.delete(for: KeychainHelper.Keys.qrzLastUploadDate)
         try? keychain.delete(for: KeychainHelper.Keys.qrzLastDownloadDate)
     }
+
+    // MARK: Private
+
+    private func buildFetchRequest(
+        url: URL, apiKey: String, offset: Int, pageSize: Int, since: Date?
+    ) -> URLRequest {
+        var optionParts = ["MAX:\(pageSize)"]
+        if offset > 0 {
+            optionParts.append("OFFSET:\(offset)")
+        }
+        if let since {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "yyyy-MM-dd"
+            formatter.timeZone = TimeZone(identifier: "UTC")
+            optionParts.append("MODSINCE:\(formatter.string(from: since))")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        let formData = ["KEY": apiKey, "ACTION": "FETCH", "OPTION": optionParts.joined(separator: ",")]
+        request.httpBody = formEncode(formData).data(using: .utf8)
+        return request
+    }
+
+    private func fetchQSOPage(request: URLRequest) async throws -> ([QRZFetchedQSO], Int) {
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+            let bodyPreview = String(data: data, encoding: .utf8)?.prefix(200) ?? "nil"
+            throw QRZError.invalidResponse("HTTP \(httpResponse.statusCode), body: \(bodyPreview)")
+        }
+
+        let responseString = try decodeResponseData(data)
+        let parsed = Self.parseResponse(responseString)
+
+        if parsed["RESULT"] == "AUTH" {
+            throw QRZError.sessionExpired
+        }
+
+        let result = parsed["RESULT"] ?? ""
+        let reason = parsed["REASON"]?.lowercased() ?? ""
+        let responseCount = Int(parsed["COUNT"] ?? "") ?? 0
+
+        if reason.contains("no log entries found") || (result == "FAIL" && responseCount == 0) {
+            return ([], 0)
+        }
+
+        guard result == "OK" else {
+            let errorReason = parsed["REASON"] ?? "RESULT=\(result), Response: \(responseString.prefix(300))"
+            throw QRZError.fetchFailed(errorReason)
+        }
+
+        guard let encodedADIF = parsed["ADIF"] else {
+            return ([], 0)
+        }
+
+        let adif = decodeADIF(encodedADIF)
+        return (parseADIFRecords(adif), responseCount)
+    }
+
+    private func decodeResponseData(_ data: Data) throws -> String {
+        if let utf8String = String(data: data, encoding: .utf8) {
+            return utf8String
+        }
+        if let latin1String = String(data: data, encoding: .isoLatin1) {
+            return latin1String
+        }
+        let firstBytes = data.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " ")
+        throw QRZError.invalidResponse("Cannot decode \(data.count) bytes, first bytes: \(firstBytes)")
+    }
 }
+
+// ADIF helper methods are in QRZClient+ADIF.swift

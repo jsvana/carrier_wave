@@ -1,4 +1,4 @@
-.PHONY: build build-device test devices install launch deploy clean
+.PHONY: build build-device test devices install launch deploy clean lint format format-check setup-hooks
 
 DEVICE_NAME := theseus
 BUNDLE_ID := com.jsvana.FullDuplex
@@ -44,3 +44,26 @@ deploy: build-device install launch
 clean:
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) clean
 	rm -rf ~/Library/Developer/Xcode/DerivedData/FullDuplex-*
+
+# Lint Swift files
+lint:
+	swiftlint lint --strict
+
+# Format Swift files
+format:
+	swiftformat .
+
+# Check formatting without modifying files
+format-check:
+	swiftformat --lint .
+
+# Setup pre-commit hooks (call from project root)
+setup-hooks:
+	@echo "Adding pre-commit script to git hooks..."
+	@echo '#!/usr/bin/env bash' > .git/hooks/pre-commit.local
+	@echo 'scripts/pre-commit.sh' >> .git/hooks/pre-commit.local
+	@chmod +x .git/hooks/pre-commit.local
+	@echo "Done. The bd hook will call scripts/pre-commit.sh"
+	@echo ""
+	@echo "To enable, add this to your bd pre-commit hook or run:"
+	@echo "  ./scripts/pre-commit.sh"

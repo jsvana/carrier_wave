@@ -1,34 +1,10 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
+
+// MARK: - LogsListView
 
 struct LogsListView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \QSO.timestamp, order: .reverse) private var qsos: [QSO]
-
-    @State private var searchText = ""
-    @State private var selectedBand: String?
-    @State private var selectedMode: String?
-
-    private var filteredQSOs: [QSO] {
-        qsos.filter { qso in
-            let matchesSearch = searchText.isEmpty ||
-                qso.callsign.localizedCaseInsensitiveContains(searchText) ||
-                (qso.parkReference?.localizedCaseInsensitiveContains(searchText) ?? false)
-
-            let matchesBand = selectedBand == nil || qso.band == selectedBand
-            let matchesMode = selectedMode == nil || qso.mode == selectedMode
-
-            return matchesSearch && matchesBand && matchesMode
-        }
-    }
-
-    private var availableBands: [String] {
-        Array(Set(qsos.map(\.band))).sorted()
-    }
-
-    private var availableModes: [String] {
-        Array(Set(qsos.map(\.mode))).sorted()
-    }
+    // MARK: Internal
 
     var body: some View {
         NavigationStack {
@@ -73,6 +49,36 @@ struct LogsListView: View {
         }
     }
 
+    // MARK: Private
+
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \QSO.timestamp, order: .reverse) private var qsos: [QSO]
+
+    @State private var searchText = ""
+    @State private var selectedBand: String?
+    @State private var selectedMode: String?
+
+    private var filteredQSOs: [QSO] {
+        qsos.filter { qso in
+            let matchesSearch = searchText.isEmpty ||
+                qso.callsign.localizedCaseInsensitiveContains(searchText) ||
+                (qso.parkReference?.localizedCaseInsensitiveContains(searchText) ?? false)
+
+            let matchesBand = selectedBand == nil || qso.band == selectedBand
+            let matchesMode = selectedMode == nil || qso.mode == selectedMode
+
+            return matchesSearch && matchesBand && matchesMode
+        }
+    }
+
+    private var availableBands: [String] {
+        Array(Set(qsos.map(\.band))).sorted()
+    }
+
+    private var availableModes: [String] {
+        Array(Set(qsos.map(\.mode))).sorted()
+    }
+
     private func deleteQSOs(at offsets: IndexSet) {
         for index in offsets {
             let qso = filteredQSOs[index]
@@ -81,12 +87,12 @@ struct LogsListView: View {
     }
 }
 
-struct QSORow: View {
-    let qso: QSO
+// MARK: - QSORow
 
-    private var sortedPresence: [ServicePresence] {
-        qso.servicePresence.sorted { $0.serviceType.rawValue < $1.serviceType.rawValue }
-    }
+struct QSORow: View {
+    // MARK: Internal
+
+    let qso: QSO
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -126,9 +132,19 @@ struct QSORow: View {
         }
         .padding(.vertical, 4)
     }
+
+    // MARK: Private
+
+    private var sortedPresence: [ServicePresence] {
+        qso.servicePresence.sorted { $0.serviceType.rawValue < $1.serviceType.rawValue }
+    }
 }
 
+// MARK: - ServicePresenceBadge
+
 struct ServicePresenceBadge: View {
+    // MARK: Internal
+
     let presence: ServicePresence
 
     var body: some View {
@@ -144,23 +160,25 @@ struct ServicePresenceBadge: View {
         .clipShape(Capsule())
     }
 
+    // MARK: Private
+
     private var iconName: String {
         if presence.isPresent {
-            return "checkmark"
+            "checkmark"
         } else if presence.needsUpload {
-            return "clock"
+            "clock"
         } else {
-            return "minus"
+            "minus"
         }
     }
 
     private var backgroundColor: Color {
         if presence.isPresent {
-            return .green
+            .green
         } else if presence.needsUpload {
-            return .orange
+            .orange
         } else {
-            return .gray
+            .gray
         }
     }
 }

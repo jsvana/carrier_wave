@@ -1,5 +1,7 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
+
+// MARK: - AppTab
 
 enum AppTab: Hashable {
     case dashboard
@@ -8,17 +10,14 @@ enum AppTab: Hashable {
     case settings
 }
 
+// MARK: - ContentView
+
 struct ContentView: View {
-    @Environment(\.modelContext) private var modelContext
-    @StateObject private var iCloudMonitor = ICloudMonitor()
-    @StateObject private var potaAuthService = POTAAuthService()
-    @State private var selectedTab: AppTab = .dashboard
-    @State private var syncService: SyncService?
-    @State private var potaClient: POTAClient?
+    // MARK: Internal
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            if let syncService = syncService {
+            if let syncService {
                 DashboardView(
                     iCloudMonitor: iCloudMonitor,
                     potaAuth: potaAuthService,
@@ -43,7 +42,7 @@ struct ContentView: View {
                 }
                 .tag(AppTab.logs)
 
-            if let potaClient = potaClient {
+            if let potaClient {
                 POTAUploadsView(potaClient: potaClient, potaAuth: potaAuthService)
                     .tabItem {
                         Label("POTA Uploads", systemImage: "arrow.up.doc")
@@ -76,9 +75,21 @@ struct ContentView: View {
             }
         }
     }
+
+    // MARK: Private
+
+    @Environment(\.modelContext) private var modelContext
+    @StateObject private var iCloudMonitor = ICloudMonitor()
+    @StateObject private var potaAuthService = POTAAuthService()
+    @State private var selectedTab: AppTab = .dashboard
+    @State private var syncService: SyncService?
+    @State private var potaClient: POTAClient?
 }
 
 #Preview {
     ContentView()
-        .modelContainer(for: [QSO.self, ServicePresence.self, UploadDestination.self, POTAUploadAttempt.self], inMemory: true)
+        .modelContainer(
+            for: [QSO.self, ServicePresence.self, UploadDestination.self, POTAUploadAttempt.self],
+            inMemory: true
+        )
 }

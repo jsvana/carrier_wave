@@ -1,5 +1,5 @@
-import XCTest
 import SwiftData
+import XCTest
 @testable import FullDuplex
 
 final class DeduplicationServiceTests: XCTestCase {

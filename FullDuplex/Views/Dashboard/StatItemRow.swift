@@ -1,12 +1,9 @@
 import SwiftUI
 
 struct StatItemRow: View {
+    // MARK: Internal
+
     let item: StatCategoryItem
-
-    @State private var isExpanded = false
-    @State private var visibleQSOCount = 5
-
-    private let batchSize = 5
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -31,6 +28,13 @@ struct StatItemRow: View {
         }
         .padding(.vertical, 8)
     }
+
+    // MARK: Private
+
+    @State private var isExpanded = false
+    @State private var visibleQSOCount = 5
+
+    private let batchSize = 5
 
     private var headerRow: some View {
         VStack(alignment: .leading, spacing: 4) {

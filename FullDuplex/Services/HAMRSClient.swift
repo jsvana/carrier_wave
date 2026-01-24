@@ -1,18 +1,15 @@
 import Foundation
 
 actor HAMRSClient {
-    private let hamrsBaseURL = "https://hamrs.app"
-    private let keychain = KeychainHelper.shared
-    private let session: URLSession
-
-    /// Cached CouchDB URL (contains embedded auth credentials)
-    private var couchDBURL: URL?
+    // MARK: Lifecycle
 
     init() {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 30
-        self.session = URLSession(configuration: config)
+        session = URLSession(configuration: config)
     }
+
+    // MARK: Internal
 
     // MARK: - Configuration
 
@@ -52,6 +49,61 @@ actor HAMRSClient {
         try? keychain.delete(for: KeychainHelper.Keys.hamrsApiKey)
         couchDBURL = nil
     }
+
+    // MARK: - Fetch QSOs
+
+    /// Fetch all QSOs from HAMRS, joined with their logbook info
+    func fetchAllQSOs() async throws -> [(HAMRSQSO, HAMRSLogbook)] {
+        let couchURL = try await ensureCouchDBURL()
+
+        // Fetch logbooks and QSOs in parallel
+        async let logbooksTask = fetchLogbooks(from: couchURL)
+        async let qsosTask = fetchQSOs(from: couchURL)
+
+        let logbooks = try await logbooksTask
+        let qsos = try await qsosTask
+
+        // Build logbook lookup by ID
+        var logbookById: [String: HAMRSLogbook] = [:]
+        for logbook in logbooks {
+            logbookById[logbook.logbookId] = logbook
+        }
+
+        // Join QSOs with their logbooks
+        var results: [(HAMRSQSO, HAMRSLogbook)] = []
+        for qso in qsos {
+            guard let logbookId = qso.logbookId,
+                  let logbook = logbookById[logbookId]
+            else {
+                // QSO without matching logbook - use empty logbook
+                let emptyLogbook = HAMRSLogbook(
+                    id: "LOGBOOK:unknown",
+                    rev: nil,
+                    title: nil,
+                    createdAt: nil,
+                    updatedAt: nil,
+                    template: nil,
+                    myPark: nil,
+                    myGridsquare: nil,
+                    operatorCall: nil
+                )
+                results.append((qso, emptyLogbook))
+                continue
+            }
+            results.append((qso, logbook))
+        }
+
+        return results
+    }
+
+    // MARK: Private
+
+    private let hamrsBaseURL = "https://hamrs.app"
+    private let keychain = KeychainHelper.shared
+    private let session: URLSession
+
+    /// Cached CouchDB URL (contains embedded auth credentials)
+    private var couchDBURL: URL?
 
     // MARK: - Authentication
 
@@ -109,52 +161,6 @@ actor HAMRSClient {
         return url
     }
 
-    // MARK: - Fetch QSOs
-
-    /// Fetch all QSOs from HAMRS, joined with their logbook info
-    func fetchAllQSOs() async throws -> [(HAMRSQSO, HAMRSLogbook)] {
-        let couchURL = try await ensureCouchDBURL()
-
-        // Fetch logbooks and QSOs in parallel
-        async let logbooksTask = fetchLogbooks(from: couchURL)
-        async let qsosTask = fetchQSOs(from: couchURL)
-
-        let logbooks = try await logbooksTask
-        let qsos = try await qsosTask
-
-        // Build logbook lookup by ID
-        var logbookById: [String: HAMRSLogbook] = [:]
-        for logbook in logbooks {
-            logbookById[logbook.logbookId] = logbook
-        }
-
-        // Join QSOs with their logbooks
-        var results: [(HAMRSQSO, HAMRSLogbook)] = []
-        for qso in qsos {
-            guard let logbookId = qso.logbookId,
-                let logbook = logbookById[logbookId]
-            else {
-                // QSO without matching logbook - use empty logbook
-                let emptyLogbook = HAMRSLogbook(
-                    id: "LOGBOOK:unknown",
-                    rev: nil,
-                    title: nil,
-                    createdAt: nil,
-                    updatedAt: nil,
-                    template: nil,
-                    myPark: nil,
-                    myGridsquare: nil,
-                    operatorCall: nil
-                )
-                results.append((qso, emptyLogbook))
-                continue
-            }
-            results.append((qso, logbook))
-        }
-
-        return results
-    }
-
     /// Extract Basic Auth header from URL with embedded credentials
     private func basicAuthHeader(from url: URL) -> String? {
         guard let user = url.user, let password = url.password else {
@@ -179,12 +185,12 @@ actor HAMRSClient {
     private func fetchLogbooks(from couchURL: URL) async throws -> [HAMRSLogbook] {
         let url =
             couchURL
-            .appendingPathComponent("_all_docs")
-            .appending(queryItems: [
-                URLQueryItem(name: "include_docs", value: "true"),
-                URLQueryItem(name: "startkey", value: "\"LOGBOOK:\""),
-                URLQueryItem(name: "endkey", value: "\"LOGBOOK:\u{ffff}\""),
-            ])
+                .appendingPathComponent("_all_docs")
+                .appending(queryItems: [
+                    URLQueryItem(name: "include_docs", value: "true"),
+                    URLQueryItem(name: "startkey", value: "\"LOGBOOK:\""),
+                    URLQueryItem(name: "endkey", value: "\"LOGBOOK:\u{ffff}\""),
+                ])
 
         var request = URLRequest(url: urlWithoutCredentials(url))
         request.httpMethod = "GET"
@@ -207,7 +213,7 @@ actor HAMRSClient {
                 CouchDBAllDocsResponse<HAMRSLogbook>.self,
                 from: data
             )
-            return result.rows.compactMap { $0.doc }
+            return result.rows.compactMap(\.doc)
         } catch {
             throw HAMRSError.decodingError(error)
         }
@@ -217,12 +223,12 @@ actor HAMRSClient {
     private func fetchQSOs(from couchURL: URL) async throws -> [HAMRSQSO] {
         let url =
             couchURL
-            .appendingPathComponent("_all_docs")
-            .appending(queryItems: [
-                URLQueryItem(name: "include_docs", value: "true"),
-                URLQueryItem(name: "startkey", value: "\"QSO:\""),
-                URLQueryItem(name: "endkey", value: "\"QSO:\u{ffff}\""),
-            ])
+                .appendingPathComponent("_all_docs")
+                .appending(queryItems: [
+                    URLQueryItem(name: "include_docs", value: "true"),
+                    URLQueryItem(name: "startkey", value: "\"QSO:\""),
+                    URLQueryItem(name: "endkey", value: "\"QSO:\u{ffff}\""),
+                ])
 
         var request = URLRequest(url: urlWithoutCredentials(url))
         request.httpMethod = "GET"
@@ -245,7 +251,7 @@ actor HAMRSClient {
                 CouchDBAllDocsResponse<HAMRSQSO>.self,
                 from: data
             )
-            return result.rows.compactMap { $0.doc }
+            return result.rows.compactMap(\.doc)
         } catch {
             throw HAMRSError.decodingError(error)
         }

@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Auth Response
+// MARK: - HAMRSAuthResponse
 
 /// Response from HAMRS /api/v1/couchdb_url endpoint
 struct HAMRSAuthResponse: Codable {
@@ -8,32 +8,12 @@ struct HAMRSAuthResponse: Codable {
     let url: String?
 }
 
-// MARK: - Logbook
+// MARK: - HAMRSLogbook
 
 /// HAMRS Logbook document from CouchDB
 /// Contains activation info that applies to all QSOs in the logbook
 struct HAMRSLogbook: Codable {
-    let id: String
-    let rev: String?
-    let title: String?
-    let createdAt: String?
-    let updatedAt: String?
-    let template: String?
-    let myPark: String?
-    let myGridsquare: String?
-    let operatorCall: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id = "_id"
-        case rev = "_rev"
-        case title
-        case createdAt
-        case updatedAt
-        case template
-        case myPark
-        case myGridsquare
-        case operatorCall = "operator"
-    }
+    // MARK: Lifecycle
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -70,6 +50,30 @@ struct HAMRSLogbook: Codable {
         self.operatorCall = operatorCall
     }
 
+    // MARK: Internal
+
+    enum CodingKeys: String, CodingKey {
+        case id = "_id"
+        case rev = "_rev"
+        case title
+        case createdAt
+        case updatedAt
+        case template
+        case myPark
+        case myGridsquare
+        case operatorCall = "operator"
+    }
+
+    let id: String
+    let rev: String?
+    let title: String?
+    let createdAt: String?
+    let updatedAt: String?
+    let template: String?
+    let myPark: String?
+    let myGridsquare: String?
+    let operatorCall: String?
+
     /// Logbook ID without the "LOGBOOK:" prefix
     var logbookId: String {
         if id.hasPrefix("LOGBOOK:") {
@@ -79,10 +83,63 @@ struct HAMRSLogbook: Codable {
     }
 }
 
-// MARK: - QSO
+// MARK: - HAMRSQSO
 
 /// HAMRS QSO document from CouchDB
 struct HAMRSQSO: Codable {
+    // MARK: Lifecycle
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        rev = try container.decodeIfPresent(String.self, forKey: .rev)
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        call = try container.decodeIfPresent(String.self, forKey: .call)
+        name = try container.decodeIfPresent(String.self, forKey: .name)
+        qth = try container.decodeIfPresent(String.self, forKey: .qth)
+        state = try container.decodeIfPresent(String.self, forKey: .state)
+        country = try container.decodeIfPresent(String.self, forKey: .country)
+        gridsquare = try container.decodeIfPresent(String.self, forKey: .gridsquare)
+        freq = try container.decodeIfPresent(FrequencyValue.self, forKey: .freq)
+        band = try container.decodeIfPresent(String.self, forKey: .band)
+        mode = try container.decodeIfPresent(String.self, forKey: .mode)
+        rstSent = try container.decodeIfPresent(String.self, forKey: .rstSent)
+        rstRcvd = try container.decodeIfPresent(String.self, forKey: .rstRcvd)
+        qsoDate = try container.decodeIfPresent(String.self, forKey: .qsoDate)
+        timeOn = try container.decodeIfPresent(String.self, forKey: .timeOn)
+        qsoDateTime = try container.decodeIfPresent(String.self, forKey: .qsoDateTime)
+        txPwr = try container.decodeIfPresent(PowerValue.self, forKey: .txPwr)
+        potaRef = try container.decodeIfPresent(String.self, forKey: .potaRef)
+        sotaRef = try container.decodeIfPresent(String.self, forKey: .sotaRef)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+    }
+
+    // MARK: Internal
+
+    enum CodingKeys: String, CodingKey {
+        case id = "_id"
+        case rev = "_rev"
+        case createdAt
+        case call
+        case name
+        case qth
+        case state
+        case country
+        case gridsquare
+        case freq
+        case band
+        case mode
+        case rstSent
+        case rstRcvd
+        case qsoDate
+        case timeOn
+        case qsoDateTime
+        case txPwr
+        case potaRef
+        case sotaRef
+        case notes
+    }
+
     let id: String
     let rev: String?
     let createdAt: String?
@@ -110,43 +167,8 @@ struct HAMRSQSO: Codable {
     let potaRef: String?
     let sotaRef: String?
 
-    // Other
+    /// Other
     let notes: String?
-
-    enum CodingKeys: String, CodingKey {
-        case id = "_id"
-        case rev = "_rev"
-        case createdAt
-        case call, name, qth, state, country, gridsquare
-        case freq, band, mode, rstSent, rstRcvd
-        case qsoDate, timeOn, qsoDateTime, txPwr
-        case potaRef, sotaRef, notes
-    }
-
-    init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        id = try container.decode(String.self, forKey: .id)
-        rev = try container.decodeIfPresent(String.self, forKey: .rev)
-        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
-        call = try container.decodeIfPresent(String.self, forKey: .call)
-        name = try container.decodeIfPresent(String.self, forKey: .name)
-        qth = try container.decodeIfPresent(String.self, forKey: .qth)
-        state = try container.decodeIfPresent(String.self, forKey: .state)
-        country = try container.decodeIfPresent(String.self, forKey: .country)
-        gridsquare = try container.decodeIfPresent(String.self, forKey: .gridsquare)
-        freq = try container.decodeIfPresent(FrequencyValue.self, forKey: .freq)
-        band = try container.decodeIfPresent(String.self, forKey: .band)
-        mode = try container.decodeIfPresent(String.self, forKey: .mode)
-        rstSent = try container.decodeIfPresent(String.self, forKey: .rstSent)
-        rstRcvd = try container.decodeIfPresent(String.self, forKey: .rstRcvd)
-        qsoDate = try container.decodeIfPresent(String.self, forKey: .qsoDate)
-        timeOn = try container.decodeIfPresent(String.self, forKey: .timeOn)
-        qsoDateTime = try container.decodeIfPresent(String.self, forKey: .qsoDateTime)
-        txPwr = try container.decodeIfPresent(PowerValue.self, forKey: .txPwr)
-        potaRef = try container.decodeIfPresent(String.self, forKey: .potaRef)
-        sotaRef = try container.decodeIfPresent(String.self, forKey: .sotaRef)
-        notes = try container.decodeIfPresent(String.self, forKey: .notes)
-    }
 
     /// Extract logbook ID from QSO ID
     /// Format: QSO:LOGBOOK:{logbook-uuid}:{qso-uuid}
@@ -175,7 +197,9 @@ struct HAMRSQSO: Codable {
         }
 
         // Fall back to qsoDate + timeOn
-        guard let dateStr = qsoDate else { return nil }
+        guard let dateStr = qsoDate else {
+            return nil
+        }
 
         let dateFormatter = DateFormatter()
         dateFormatter.timeZone = TimeZone(identifier: "UTC")
@@ -198,12 +222,14 @@ struct HAMRSQSO: Codable {
     }
 }
 
-// MARK: - Flexible Value Types
+// MARK: - FrequencyValue
 
 /// Handles frequency that can be either a number or string in JSON
 enum FrequencyValue: Codable {
     case double(Double)
     case string(String)
+
+    // MARK: Lifecycle
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -222,30 +248,36 @@ enum FrequencyValue: Codable {
         }
     }
 
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .double(let value):
-            try container.encode(value)
-        case .string(let value):
-            try container.encode(value)
-        }
-    }
+    // MARK: Internal
 
     var doubleValue: Double? {
         switch self {
-        case .double(let value):
-            return value
-        case .string(let value):
-            return Double(value)
+        case let .double(value):
+            value
+        case let .string(value):
+            Double(value)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case let .double(value):
+            try container.encode(value)
+        case let .string(value):
+            try container.encode(value)
         }
     }
 }
+
+// MARK: - PowerValue
 
 /// Handles power that can be either a number or string in JSON
 enum PowerValue: Codable {
     case int(Int)
     case string(String)
+
+    // MARK: Lifecycle
 
     init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -264,34 +296,39 @@ enum PowerValue: Codable {
         }
     }
 
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.singleValueContainer()
-        switch self {
-        case .int(let value):
-            try container.encode(value)
-        case .string(let value):
-            try container.encode(value)
-        }
-    }
+    // MARK: Internal
 
     var intValue: Int? {
         switch self {
-        case .int(let value):
-            return value
-        case .string(let value):
-            return Int(value)
+        case let .int(value):
+            value
+        case let .string(value):
+            Int(value)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case let .int(value):
+            try container.encode(value)
+        case let .string(value):
+            try container.encode(value)
         }
     }
 }
 
-// MARK: - CouchDB Response Wrappers
+// MARK: - CouchDBAllDocsResponse
 
 /// CouchDB _all_docs response
 struct CouchDBAllDocsResponse<T: Codable>: Codable {
+    // swiftlint:disable:next identifier_name
     let total_rows: Int
     let offset: Int
     let rows: [CouchDBRow<T>]
 }
+
+// MARK: - CouchDBRow
 
 /// Single row in CouchDB _all_docs response
 struct CouchDBRow<T: Codable>: Codable {

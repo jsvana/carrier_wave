@@ -3,8 +3,8 @@
 // Displays unified timeline of local upload attempts and remote POTA job
 // status, with refresh capability and authentication state handling.
 
-import SwiftUI
 import SwiftData
+import SwiftUI
 
 struct POTAUploadsView: View {
     @Environment(\.modelContext) private var modelContext
@@ -31,7 +31,7 @@ struct POTAUploadsView: View {
             Group {
                 if !isAuthenticated {
                     notAuthenticatedView
-                } else if entries.isEmpty && !isLoading {
+                } else if entries.isEmpty, !isLoading {
                     emptyStateView
                 } else {
                     timelineList
@@ -55,7 +55,7 @@ struct POTAUploadsView: View {
                 }
             }
             .onAppear {
-                if isAuthenticated && jobs.isEmpty {
+                if isAuthenticated, jobs.isEmpty {
                     Task { await fetchJobs() }
                 }
             }
@@ -137,7 +137,9 @@ struct POTAUploadsView: View {
     }
 
     private func fetchJobs() async {
-        guard isAuthenticated else { return }
+        guard isAuthenticated else {
+            return
+        }
 
         isLoading = true
         errorMessage = nil
@@ -145,9 +147,9 @@ struct POTAUploadsView: View {
         do {
             let fetchedJobs = try await potaClient.fetchJobs()
             await MainActor.run {
-                self.jobs = fetchedJobs
-                self.lastFetchTime = Date()
-                self.correlateJobsWithAttempts()
+                jobs = fetchedJobs
+                lastFetchTime = Date()
+                correlateJobsWithAttempts()
             }
         } catch POTAError.notAuthenticated {
             await MainActor.run {
@@ -168,7 +170,7 @@ struct POTAUploadsView: View {
         for attempt in attempts where attempt.correlatedJobId == nil {
             if let matchingJob = jobs.first(where: { job in
                 job.reference.uppercased() == attempt.parkReference.uppercased() &&
-                abs(job.submitted.timeIntervalSince(attempt.timestamp)) < 300
+                    abs(job.submitted.timeIntervalSince(attempt.timestamp)) < 300
             }) {
                 attempt.correlatedJobId = matchingJob.jobId
             }

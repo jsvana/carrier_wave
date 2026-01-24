@@ -1,0 +1,186 @@
+import SwiftData
+import SwiftUI
+
+// MARK: - DashboardView Actions
+
+extension DashboardView {
+    func loadQRZConfig() async {
+        qrzIsConfigured = await qrzClient.hasApiKey()
+        qrzCallsign = await qrzClient.getCallsign()
+    }
+
+    func performFullSync() async {
+        isSyncing = true
+        defer {
+            isSyncing = false
+            lastSyncDate = Date()
+        }
+
+        do {
+            let result = try await syncService.syncAll()
+            print("Sync: down=\(result.downloaded), up=\(result.uploaded), new=\(result.newQSOs)")
+            if !result.errors.isEmpty {
+                print("Sync errors: \(result.errors)")
+            }
+        } catch {
+            print("Sync error: \(error.localizedDescription)")
+        }
+    }
+
+    func performDownloadOnly() async {
+        isSyncing = true
+        defer {
+            isSyncing = false
+            lastSyncDate = Date()
+        }
+
+        do {
+            let result = try await syncService.downloadOnly()
+            let msg = "Download-only: down=\(result.downloaded), new=\(result.newQSOs), " +
+                "merged=\(result.mergedQSOs)"
+            print(msg)
+            if !result.errors.isEmpty {
+                print("Download-only sync errors: \(result.errors)")
+            }
+        } catch {
+            print("Download-only sync error: \(error.localizedDescription)")
+        }
+    }
+
+    func syncFromLoFi() async {
+        isSyncing = true
+        syncingService = .lofi
+        lofiSyncResult = "Syncing..."
+        defer {
+            isSyncing = false
+            syncingService = nil
+        }
+
+        do {
+            let count = try await syncService.syncLoFi()
+            lofiSyncResult = count > 0 ? "+\(count) QSOs" : "Already in sync"
+        } catch {
+            lofiSyncResult = "Error: \(error.localizedDescription)"
+        }
+    }
+
+    func performQRZSync() async {
+        isSyncing = true
+        syncingService = .qrz
+        qrzSyncResult = "Syncing..."
+        defer {
+            isSyncing = false
+            syncingService = nil
+        }
+
+        do {
+            let result = try await syncService.syncQRZ()
+            if result.downloaded == 0, result.uploaded == 0 {
+                qrzSyncResult = "Already in sync"
+            } else {
+                var parts: [String] = []
+                if result.downloaded > 0 {
+                    parts.append("↓\(result.downloaded)")
+                }
+                if result.uploaded > 0 {
+                    parts.append("↑\(result.uploaded)")
+                }
+                qrzSyncResult = parts.joined(separator: " ")
+            }
+        } catch {
+            qrzSyncResult = "Error: \(error.localizedDescription)"
+        }
+    }
+
+    func performPOTASync() async {
+        isSyncing = true
+        syncingService = .pota
+        potaSyncResult = "Syncing..."
+        defer {
+            isSyncing = false
+            syncingService = nil
+        }
+
+        do {
+            let result = try await syncService.syncPOTA()
+            if result.downloaded == 0, result.uploaded == 0 {
+                potaSyncResult = "Already in sync"
+            } else {
+                var parts: [String] = []
+                if result.downloaded > 0 {
+                    parts.append("↓\(result.downloaded)")
+                }
+                if result.uploaded > 0 {
+                    parts.append("↑\(result.uploaded)")
+                }
+                potaSyncResult = parts.joined(separator: " ")
+            }
+        } catch {
+            potaSyncResult = "Error: \(error.localizedDescription)"
+        }
+    }
+
+    func clearQRZData() async {
+        isSyncing = true
+        qrzSyncResult = "Clearing..."
+        defer { isSyncing = false }
+
+        do {
+            let descriptor = FetchDescriptor<QSO>()
+            let allQSOs = try modelContext.fetch(descriptor)
+            let qrzQSOs = allQSOs.filter { $0.importSource == .qrz }
+            for qso in qrzQSOs {
+                modelContext.delete(qso)
+            }
+            try modelContext.save()
+            qrzSyncResult = "Cleared \(qrzQSOs.count) QSOs"
+        } catch {
+            qrzSyncResult = "Error: \(error.localizedDescription)"
+        }
+    }
+
+    func clearLoFiData() async {
+        isSyncing = true
+        lofiSyncResult = "Clearing..."
+        defer { isSyncing = false }
+
+        do {
+            let descriptor = FetchDescriptor<QSO>()
+            let allQSOs = try modelContext.fetch(descriptor)
+            let lofiQSOs = allQSOs.filter { $0.importSource == .lofi }
+            for qso in lofiQSOs {
+                modelContext.delete(qso)
+            }
+            try modelContext.save()
+
+            // Reset sync timestamp so QSOs can be re-downloaded
+            await lofiClient.resetSyncTimestamp()
+
+            lofiSyncResult = "Cleared \(lofiQSOs.count) QSOs"
+        } catch {
+            lofiSyncResult = "Error: \(error.localizedDescription)"
+        }
+    }
+
+    func syncFromHAMRS() async {
+        isSyncing = true
+        syncingService = .hamrs
+        hamrsSyncResult = "Syncing..."
+        defer {
+            isSyncing = false
+            syncingService = nil
+        }
+
+        do {
+            let count = try await syncService.syncHAMRS()
+            hamrsSyncResult = count > 0 ? "+\(count) QSOs" : "Already in sync"
+        } catch {
+            hamrsSyncResult = "Error: \(error.localizedDescription)"
+        }
+    }
+
+    func clearHAMRSCredentials() async {
+        await hamrsClient.clearCredentials()
+        hamrsSyncResult = nil
+    }
+}

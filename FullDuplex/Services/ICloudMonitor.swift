@@ -4,11 +4,16 @@ import UserNotifications
 
 @MainActor
 class ICloudMonitor: ObservableObject {
+    // MARK: Lifecycle
+
+    init() {
+        setupNotifications()
+    }
+
+    // MARK: Internal
+
     @Published var pendingFiles: [URL] = []
     @Published var isMonitoring = false
-
-    private var metadataQuery: NSMetadataQuery?
-    private let fileManager = FileManager.default
 
     var iCloudContainerURL: URL? {
         fileManager.url(forUbiquityContainerIdentifier: nil)?
@@ -16,23 +21,10 @@ class ICloudMonitor: ObservableObject {
             .appendingPathComponent("Import")
     }
 
-    init() {
-        setupNotifications()
-    }
-
-    private func setupNotifications() {
-        Task {
-            let center = UNUserNotificationCenter.current()
-            let settings = await center.notificationSettings()
-
-            if settings.authorizationStatus == .notDetermined {
-                try? await center.requestAuthorization(options: [.alert, .sound, .badge])
-            }
-        }
-    }
-
     func startMonitoring() {
-        guard !isMonitoring else { return }
+        guard !isMonitoring else {
+            return
+        }
         guard iCloudContainerURL != nil else {
             print("iCloud not available")
             return
@@ -40,7 +32,7 @@ class ICloudMonitor: ObservableObject {
 
         metadataQuery = NSMetadataQuery()
         metadataQuery?.predicate = NSPredicate(format: "%K LIKE[c] '*.adi' OR %K LIKE[c] '*.adif'",
-                                                NSMetadataItemFSNameKey, NSMetadataItemFSNameKey)
+                                               NSMetadataItemFSNameKey, NSMetadataItemFSNameKey)
         metadataQuery?.searchScopes = [NSMetadataQueryUbiquitousDocumentsScope]
 
         NotificationCenter.default.addObserver(
@@ -67,6 +59,46 @@ class ICloudMonitor: ObservableObject {
         isMonitoring = false
     }
 
+    func markFileAsProcessed(_ url: URL) {
+        pendingFiles.removeAll { $0 == url }
+
+        // Optionally move to Processed folder
+        guard let containerURL = iCloudContainerURL else {
+            return
+        }
+        let processedURL = containerURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("Processed")
+
+        try? fileManager.createDirectory(at: processedURL, withIntermediateDirectories: true)
+
+        let destination = processedURL.appendingPathComponent(url.lastPathComponent)
+        try? fileManager.moveItem(at: url, to: destination)
+    }
+
+    func createImportFolderIfNeeded() {
+        guard let url = iCloudContainerURL else {
+            return
+        }
+        try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)
+    }
+
+    // MARK: Private
+
+    private var metadataQuery: NSMetadataQuery?
+    private let fileManager = FileManager.default
+
+    private func setupNotifications() {
+        Task {
+            let center = UNUserNotificationCenter.current()
+            let settings = await center.notificationSettings()
+
+            if settings.authorizationStatus == .notDetermined {
+                try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+            }
+        }
+    }
+
     @objc private func queryDidFinishGathering(_ notification: Notification) {
         processQueryResults()
     }
@@ -76,7 +108,9 @@ class ICloudMonitor: ObservableObject {
     }
 
     private func processQueryResults() {
-        guard let query = metadataQuery else { return }
+        guard let query = metadataQuery else {
+            return
+        }
 
         query.disableUpdates()
         defer { query.enableUpdates() }
@@ -85,12 +119,14 @@ class ICloudMonitor: ObservableObject {
 
         for item in query.results {
             guard let metadataItem = item as? NSMetadataItem,
-                  let url = metadataItem.value(forAttribute: NSMetadataItemURLKey) as? URL else {
+                  let url = metadataItem.value(forAttribute: NSMetadataItemURLKey) as? URL
+            else {
                 continue
             }
 
             // Check if file is downloaded
-            let downloadStatus = metadataItem.value(forAttribute: NSMetadataUbiquitousItemDownloadingStatusKey) as? String
+            let downloadStatus = metadataItem
+                .value(forAttribute: NSMetadataUbiquitousItemDownloadingStatusKey) as? String
 
             if downloadStatus == NSMetadataUbiquitousItemDownloadingStatusCurrent {
                 // File is downloaded and ready
@@ -129,25 +165,5 @@ class ICloudMonitor: ObservableObject {
         )
 
         UNUserNotificationCenter.current().add(request)
-    }
-
-    func markFileAsProcessed(_ url: URL) {
-        pendingFiles.removeAll { $0 == url }
-
-        // Optionally move to Processed folder
-        guard let containerURL = iCloudContainerURL else { return }
-        let processedURL = containerURL
-            .deletingLastPathComponent()
-            .appendingPathComponent("Processed")
-
-        try? fileManager.createDirectory(at: processedURL, withIntermediateDirectories: true)
-
-        let destination = processedURL.appendingPathComponent(url.lastPathComponent)
-        try? fileManager.moveItem(at: url, to: destination)
-    }
-
-    func createImportFolderIfNeeded() {
-        guard let url = iCloudContainerURL else { return }
-        try? fileManager.createDirectory(at: url, withIntermediateDirectories: true)
     }
 }

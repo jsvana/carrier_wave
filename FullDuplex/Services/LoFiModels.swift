@@ -1,6 +1,6 @@
 import Foundation
 
-// MARK: - Client Registration
+// MARK: - LoFiRegistrationRequest
 
 struct LoFiRegistrationRequest: Encodable {
     let client: LoFiClientCredentials
@@ -8,19 +8,27 @@ struct LoFiRegistrationRequest: Encodable {
     let meta: LoFiMetaRequest
 }
 
+// MARK: - LoFiClientCredentials
+
 struct LoFiClientCredentials: Encodable {
     let key: String
     let name: String
     let secret: String
 }
 
+// MARK: - LoFiAccountRequest
+
 struct LoFiAccountRequest: Encodable {
     let call: String
 }
 
+// MARK: - LoFiMetaRequest
+
 struct LoFiMetaRequest: Encodable {
     let app: String
 }
+
+// MARK: - LoFiRegistrationResponse
 
 struct LoFiRegistrationResponse: Decodable {
     let token: String
@@ -29,71 +37,75 @@ struct LoFiRegistrationResponse: Decodable {
     let meta: LoFiMetaInfo
 }
 
+// MARK: - LoFiClientInfo
+
 struct LoFiClientInfo: Decodable {
     let uuid: String
     let name: String
 }
 
+// MARK: - LoFiAccountInfo
+
 struct LoFiAccountInfo: Decodable {
+    enum CodingKeys: String, CodingKey {
+        case uuid
+        case call
+        case name
+        case email
+        case cutoffDate = "cutoff_date"
+        case cutoffDateMillis = "cutoff_date_millis"
+    }
+
     let uuid: String
     let call: String
     let name: String?
     let email: String?
     let cutoffDate: String?
     let cutoffDateMillis: Int64?
-
-    enum CodingKeys: String, CodingKey {
-        case uuid, call, name, email
-        case cutoffDate = "cutoff_date"
-        case cutoffDateMillis = "cutoff_date_millis"
-    }
 }
+
+// MARK: - LoFiMetaInfo
 
 struct LoFiMetaInfo: Decodable {
     let flags: LoFiSyncFlags
 }
 
-struct LoFiSyncFlags: Decodable {
-    let suggestedSyncBatchSize: Int
-    let suggestedSyncLoopDelay: Int
-    let suggestedSyncCheckPeriod: Int
+// MARK: - LoFiSyncFlags
 
+struct LoFiSyncFlags: Decodable {
     enum CodingKeys: String, CodingKey {
         case suggestedSyncBatchSize = "suggested_sync_batch_size"
         case suggestedSyncLoopDelay = "suggested_sync_loop_delay"
         case suggestedSyncCheckPeriod = "suggested_sync_check_period"
     }
+
+    let suggestedSyncBatchSize: Int
+    let suggestedSyncLoopDelay: Int
+    let suggestedSyncCheckPeriod: Int
 }
 
-// MARK: - Link Device
+// MARK: - LoFiLinkDeviceRequest
 
 struct LoFiLinkDeviceRequest: Encodable {
     let email: String
 }
 
-// MARK: - Operations API
+// MARK: - LoFiOperationsResponse
 
 struct LoFiOperationsResponse: Decodable {
     let operations: [LoFiOperation]
     let meta: LoFiOperationsMetaWrapper
 }
 
+// MARK: - LoFiOperationsMetaWrapper
+
 struct LoFiOperationsMetaWrapper: Decodable {
     let operations: LoFiOperationsMeta
 }
 
-struct LoFiOperationsMeta: Decodable {
-    let totalRecords: Int
-    let syncedUntilMillis: Double?
-    let syncedUntil: String?
-    let syncedSinceMillis: Double?
-    let limit: Int
-    let recordsLeft: Int
-    let nextUpdatedAtMillis: Double?
-    let nextSyncedAtMillis: Double?
-    let extendedPage: Bool?
-    let otherClientsOnly: Bool?
+// MARK: - LoFiOperationsMeta
 
+struct LoFiOperationsMeta: Decodable {
     enum CodingKeys: String, CodingKey {
         case totalRecords = "total_records"
         case syncedUntilMillis = "synced_until_millis"
@@ -106,7 +118,20 @@ struct LoFiOperationsMeta: Decodable {
         case extendedPage = "extended_page"
         case otherClientsOnly = "other_clients_only"
     }
+
+    let totalRecords: Int
+    let syncedUntilMillis: Double?
+    let syncedUntil: String?
+    let syncedSinceMillis: Double?
+    let limit: Int
+    let recordsLeft: Int
+    let nextUpdatedAtMillis: Double?
+    let nextSyncedAtMillis: Double?
+    let extendedPage: Bool?
+    let otherClientsOnly: Bool?
 }
+
+// MARK: - LoFiOperation
 
 struct LoFiOperation: Decodable {
     let uuid: String
@@ -129,15 +154,9 @@ struct LoFiOperation: Decodable {
     let synced: Int?
 }
 
-struct LoFiOperationRef: Decodable {
-    let refType: String
-    let reference: String?
-    let name: String?
-    let location: String?
-    let label: String?
-    let shortLabel: String?
-    let program: String?
+// MARK: - LoFiOperationRef
 
+struct LoFiOperationRef: Decodable {
     enum CodingKeys: String, CodingKey {
         case refType = "type"
         case reference = "ref"
@@ -145,6 +164,14 @@ struct LoFiOperationRef: Decodable {
         case shortLabel = "short_label"
         case program
     }
+
+    let refType: String
+    let reference: String?
+    let name: String?
+    let location: String?
+    let label: String?
+    let shortLabel: String?
+    let program: String?
 }
 
 extension LoFiOperation {
@@ -157,29 +184,22 @@ extension LoFiOperation {
     }
 }
 
-// MARK: - QSOs API
+// MARK: - LoFiQsosResponse
 
 struct LoFiQsosResponse: Decodable {
     let qsos: [LoFiQso]
     let meta: LoFiQsosMetaWrapper
 }
 
+// MARK: - LoFiQsosMetaWrapper
+
 struct LoFiQsosMetaWrapper: Decodable {
     let qsos: LoFiQsosMeta
 }
 
-struct LoFiQsosMeta: Decodable {
-    let totalRecords: Int
-    let syncedUntilMillis: Double?
-    let syncedUntil: String?
-    let syncedSinceMillis: Double?
-    let limit: Int
-    let recordsLeft: Int
-    let nextUpdatedAtMillis: Double?
-    let nextSyncedAtMillis: Double?
-    let extendedPage: Bool?
-    let otherClientsOnly: Bool?
+// MARK: - LoFiQsosMeta
 
+struct LoFiQsosMeta: Decodable {
     enum CodingKeys: String, CodingKey {
         case totalRecords = "total_records"
         case syncedUntilMillis = "synced_until_millis"
@@ -192,7 +212,20 @@ struct LoFiQsosMeta: Decodable {
         case extendedPage = "extended_page"
         case otherClientsOnly = "other_clients_only"
     }
+
+    let totalRecords: Int
+    let syncedUntilMillis: Double?
+    let syncedUntil: String?
+    let syncedSinceMillis: Double?
+    let limit: Int
+    let recordsLeft: Int
+    let nextUpdatedAtMillis: Double?
+    let nextSyncedAtMillis: Double?
+    let extendedPage: Bool?
+    let otherClientsOnly: Bool?
 }
+
+// MARK: - LoFiQso
 
 struct LoFiQso: Decodable {
     let uuid: String
@@ -205,7 +238,7 @@ struct LoFiQso: Decodable {
     let their: LoFiTheirInfo?
     let our: LoFiOurInfo?
     let band: String?
-    let freq: Double?  // kHz
+    let freq: Double? // kHz
     let mode: String?
     let refs: [LoFiQsoRef]?
     let txPwr: String?
@@ -213,18 +246,38 @@ struct LoFiQso: Decodable {
     let deleted: Int?
 }
 
+// MARK: - LoFiTheirInfo
+
 struct LoFiTheirInfo: Decodable {
     let call: String?
     let sent: String?
     let guess: LoFiGuessInfo?
 }
 
+// MARK: - LoFiOurInfo
+
 struct LoFiOurInfo: Decodable {
     let call: String?
     let sent: String?
 }
 
+// MARK: - LoFiGuessInfo
+
 struct LoFiGuessInfo: Decodable {
+    enum CodingKeys: String, CodingKey {
+        case call
+        case name
+        case state
+        case city
+        case grid
+        case country
+        case entityName = "entity_name"
+        case cqZone = "cq_zone"
+        case ituZone = "itu_zone"
+        case dxccCode = "dxcc_code"
+        case continent
+    }
+
     let call: String?
     let name: String?
     let state: String?
@@ -236,29 +289,22 @@ struct LoFiGuessInfo: Decodable {
     let ituZone: Int?
     let dxccCode: Int?
     let continent: String?
-
-    enum CodingKeys: String, CodingKey {
-        case call, name, state, city, grid, country
-        case entityName = "entity_name"
-        case cqZone = "cq_zone"
-        case ituZone = "itu_zone"
-        case dxccCode = "dxcc_code"
-        case continent
-    }
 }
 
-struct LoFiQsoRef: Decodable {
-    let refType: String?
-    let reference: String?
-    let program: String?
-    let ourNumber: String?
+// MARK: - LoFiQsoRef
 
+struct LoFiQsoRef: Decodable {
     enum CodingKeys: String, CodingKey {
         case refType = "type"
         case reference = "ref"
         case program
         case ourNumber = "our_number"
     }
+
+    let refType: String?
+    let reference: String?
+    let program: String?
+    let ourNumber: String?
 }
 
 // MARK: - QSO Helpers
@@ -274,11 +320,11 @@ extension LoFiQso {
     var theirCountry: String? { their?.guess?.entityName }
 
     /// Frequency in MHz (API returns kHz)
-    var freqMHz: Double? { freq.map { $0 / 1000.0 } }
+    var freqMHz: Double? { freq.map { $0 / 1_000.0 } }
 
     /// QSO timestamp as Date
     var timestamp: Date {
-        Date(timeIntervalSince1970: startAtMillis / 1000.0)
+        Date(timeIntervalSince1970: startAtMillis / 1_000.0)
     }
 
     /// Get their POTA reference

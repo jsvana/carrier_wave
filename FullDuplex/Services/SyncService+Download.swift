@@ -1,0 +1,207 @@
+import Foundation
+import SwiftData
+
+// MARK: - SyncService Download Methods
+
+extension SyncService {
+    func downloadFromAllSources() async -> [ServiceType: Result<[FetchedQSO], Error>] {
+        let timeout = syncTimeoutSeconds
+        return await withTaskGroup(of: (ServiceType, Result<[FetchedQSO], Error>).self) { group in
+            // QRZ download
+            if await qrzClient.hasApiKey() {
+                group.addTask {
+                    await self.downloadFromQRZ(timeout: timeout)
+                }
+            }
+
+            // POTA download
+            if potaAuthService.isAuthenticated {
+                group.addTask {
+                    await self.downloadFromPOTA(timeout: timeout)
+                }
+            }
+
+            // LoFi download
+            if lofiClient.isConfigured, lofiClient.isLinked {
+                group.addTask {
+                    await self.downloadFromLoFi(timeout: timeout)
+                }
+            }
+
+            // HAMRS download
+            if hamrsClient.isConfigured {
+                group.addTask {
+                    await self.downloadFromHAMRS(timeout: timeout)
+                }
+            }
+
+            var results: [ServiceType: Result<[FetchedQSO], Error>] = [:]
+            for await (service, result) in group {
+                results[service] = result
+            }
+            return results
+        }
+    }
+
+    private func downloadFromQRZ(timeout: TimeInterval) async -> (ServiceType, Result<[FetchedQSO], Error>) {
+        await MainActor.run { self.syncPhase = .downloading(service: .qrz) }
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Starting QRZ download", service: .qrz)
+        do {
+            let qsos = try await withTimeout(seconds: timeout, service: .qrz) {
+                try await self.qrzClient.fetchQSOs(since: nil)
+            }
+            debugLog.info("Downloaded \(qsos.count) QSOs from QRZ", service: .qrz)
+            let fetched = qsos.map { FetchedQSO.fromQRZ($0) }
+            for (index, qso) in qsos.prefix(5).enumerated() {
+                debugLog.logRawQSO(
+                    service: .qrz,
+                    rawJSON: qso.rawADIF,
+                    parsedFields: fetched[index].debugFields
+                )
+            }
+            return (.qrz, .success(fetched))
+        } catch {
+            debugLog.error("QRZ download failed: \(error.localizedDescription)", service: .qrz)
+            return (.qrz, .failure(error))
+        }
+    }
+
+    private func downloadFromPOTA(timeout: TimeInterval) async -> (ServiceType, Result<[FetchedQSO], Error>) {
+        await MainActor.run { self.syncPhase = .downloading(service: .pota) }
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Starting POTA download", service: .pota)
+        do {
+            let qsos = try await withTimeout(seconds: timeout, service: .pota) {
+                try await self.potaClient.fetchAllQSOs()
+            }
+            debugLog.info("Downloaded \(qsos.count) QSOs from POTA", service: .pota)
+            let fetched = qsos.map { FetchedQSO.fromPOTA($0) }
+            for (index, qso) in fetched.prefix(5).enumerated() {
+                debugLog.logRawQSO(
+                    service: .pota,
+                    rawJSON: "POTA QSO: \(qsos[index].callsign) @ \(qsos[index].timestamp)",
+                    parsedFields: qso.debugFields
+                )
+            }
+            return (.pota, .success(fetched))
+        } catch {
+            debugLog.error("POTA download failed: \(error.localizedDescription)", service: .pota)
+            return (.pota, .failure(error))
+        }
+    }
+
+    private func downloadFromLoFi(timeout: TimeInterval) async -> (ServiceType, Result<[FetchedQSO], Error>) {
+        await MainActor.run { self.syncPhase = .downloading(service: .lofi) }
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Starting LoFi download", service: .lofi)
+        do {
+            let qsos = try await withTimeout(seconds: timeout, service: .lofi) {
+                try await self.lofiClient.fetchAllQsosSinceLastSync()
+            }
+            debugLog.info("Downloaded \(qsos.count) raw QSOs from LoFi API", service: .lofi)
+
+            var skippedCount = 0
+            var fetchedList: [FetchedQSO] = []
+            for (lofiQso, operation) in qsos {
+                if let fetched = FetchedQSO.fromLoFi(lofiQso, operation: operation) {
+                    fetchedList.append(fetched)
+                } else {
+                    skippedCount += 1
+                    debugLog.warning(
+                        """
+                        Skipped QSO: call=\(lofiQso.theirCall ?? "nil"), \
+                        band=\(lofiQso.band ?? "nil"), mode=\(lofiQso.mode ?? "nil")
+                        """,
+                        service: .lofi
+                    )
+                }
+            }
+
+            debugLog.info(
+                "After filtering: \(fetchedList.count) valid, \(skippedCount) skipped",
+                service: .lofi
+            )
+            logLoFiSampleQSOs(qsos: qsos, fetched: fetchedList, debugLog: debugLog)
+            return (.lofi, .success(fetchedList))
+        } catch {
+            debugLog.error("LoFi download failed: \(error.localizedDescription)", service: .lofi)
+            return (.lofi, .failure(error))
+        }
+    }
+
+    private func logLoFiSampleQSOs(
+        qsos: [(LoFiQso, LoFiOperation)],
+        fetched: [FetchedQSO],
+        debugLog: SyncDebugLog
+    ) {
+        for (index, (lofiQso, op)) in qsos.prefix(5).enumerated() {
+            let rawJSON = """
+            {
+              "uuid": "\(lofiQso.uuid)",
+              "startAtMillis": \(lofiQso.startAtMillis),
+              "band": "\(lofiQso.band ?? "nil")",
+              "mode": "\(lofiQso.mode ?? "nil")",
+              "freq": \(lofiQso.freq.map { String($0) } ?? "nil"),
+              "their": { "call": "\(lofiQso.their?.call ?? "nil")" },
+              "operation": "\(op.uuid)"
+            }
+            """
+            if index < fetched.count {
+                debugLog.logRawQSO(
+                    service: .lofi,
+                    rawJSON: rawJSON,
+                    parsedFields: fetched[index].debugFields
+                )
+            }
+        }
+    }
+
+    private func downloadFromHAMRS(timeout: TimeInterval) async -> (ServiceType, Result<[FetchedQSO], Error>) {
+        await MainActor.run { self.syncPhase = .downloading(service: .hamrs) }
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Starting HAMRS download", service: .hamrs)
+        do {
+            let qsos = try await withTimeout(seconds: timeout, service: .hamrs) {
+                try await self.hamrsClient.fetchAllQSOs()
+            }
+            debugLog.info("Downloaded \(qsos.count) raw QSOs from HAMRS", service: .hamrs)
+
+            var skippedCount = 0
+            var fetchedList: [FetchedQSO] = []
+            for (hamrsQso, logbook) in qsos {
+                if let fetched = FetchedQSO.fromHAMRS(hamrsQso, logbook: logbook) {
+                    fetchedList.append(fetched)
+                } else {
+                    skippedCount += 1
+                    debugLog.warning(
+                        """
+                        Skipped QSO: call=\(hamrsQso.call ?? "nil"), \
+                        band=\(hamrsQso.band ?? "nil"), mode=\(hamrsQso.mode ?? "nil")
+                        """,
+                        service: .hamrs
+                    )
+                }
+            }
+            debugLog.info(
+                "After filtering: \(fetchedList.count) valid, \(skippedCount) skipped",
+                service: .hamrs
+            )
+
+            for fetched in fetchedList.prefix(5) {
+                debugLog.logRawQSO(
+                    service: .hamrs,
+                    rawJSON: "HAMRS QSO: \(fetched.callsign) @ \(fetched.timestamp)",
+                    parsedFields: fetched.debugFields
+                )
+            }
+            return (.hamrs, .success(fetchedList))
+        } catch HAMRSError.subscriptionInactive {
+            debugLog.warning("HAMRS subscription inactive - skipping download", service: .hamrs)
+            return (.hamrs, .success([]))
+        } catch {
+            debugLog.error("HAMRS download failed: \(error.localizedDescription)", service: .hamrs)
+            return (.hamrs, .failure(error))
+        }
+    }
+}

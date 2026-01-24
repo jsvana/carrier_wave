@@ -7,25 +7,29 @@
 
 import Foundation
 
+// MARK: - ADIFRecord
+
 struct ADIFRecord {
     var callsign: String
     var band: String
     var mode: String
     var frequency: Double?
-    var qsoDate: String?       // YYYYMMDD
-    var timeOn: String?        // HHMM or HHMMSS
+    var qsoDate: String? // YYYYMMDD
+    var timeOn: String? // HHMM or HHMMSS
     var rstSent: String?
     var rstReceived: String?
     var myCallsign: String?
     var myGridsquare: String?
-    var gridsquare: String?    // Their grid
-    var sigInfo: String?       // Their park reference (hunter contacts)
-    var mySigInfo: String?     // My park reference (activations)
+    var gridsquare: String? // Their grid
+    var sigInfo: String? // Their park reference (hunter contacts)
+    var mySigInfo: String? // My park reference (activations)
     var comment: String?
     var rawADIF: String
 
     var timestamp: Date? {
-        guard let dateStr = qsoDate else { return nil }
+        guard let dateStr = qsoDate else {
+            return nil
+        }
         let timeStr = timeOn ?? "0000"
 
         let formatter = DateFormatter()
@@ -36,17 +40,19 @@ struct ADIFRecord {
     }
 }
 
+// MARK: - ADIFParser
+
 struct ADIFParser {
+    // MARK: Internal
 
     func parse(_ content: String) throws -> [ADIFRecord] {
         var records: [ADIFRecord] = []
 
         // Find header end if present
-        let workingContent: String
-        if let headerEnd = content.range(of: "<eoh>", options: .caseInsensitive) {
-            workingContent = String(content[headerEnd.upperBound...])
+        let workingContent: String = if let headerEnd = content.range(of: "<eoh>", options: .caseInsensitive) {
+            String(content[headerEnd.upperBound...])
         } else {
-            workingContent = content
+            content
         }
 
         // Split by <eor> (end of record)
@@ -57,12 +63,15 @@ struct ADIFParser {
 
         for rawRecord in rawRecords {
             let trimmed = rawRecord.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty else { continue }
+            guard !trimmed.isEmpty else {
+                continue
+            }
 
             let fields = parseFields(from: trimmed)
             guard let callsign = fields["call"],
                   let band = fields["band"],
-                  let mode = fields["mode"] else {
+                  let mode = fields["mode"]
+            else {
                 continue // Skip records missing required fields
             }
 
@@ -90,6 +99,8 @@ struct ADIFParser {
         return records
     }
 
+    // MARK: Private
+
     private func parseFields(from record: String) -> [String: String] {
         var fields: [String: String] = [:]
 
@@ -103,14 +114,20 @@ struct ADIFParser {
         let matches = regex.matches(in: record, range: NSRange(location: 0, length: nsString.length))
 
         for match in matches {
-            guard match.numberOfRanges >= 3 else { continue }
+            guard match.numberOfRanges >= 3 else {
+                continue
+            }
 
             let fieldName = nsString.substring(with: match.range(at: 1)).lowercased()
             let lengthStr = nsString.substring(with: match.range(at: 2))
-            guard let length = Int(lengthStr) else { continue }
+            guard let length = Int(lengthStr) else {
+                continue
+            }
 
             let valueStart = match.range.location + match.range.length
-            guard valueStart + length <= nsString.length else { continue }
+            guard valueStart + length <= nsString.length else {
+                continue
+            }
 
             let value = nsString.substring(with: NSRange(location: valueStart, length: length))
             fields[fieldName] = value.trimmingCharacters(in: .whitespaces)

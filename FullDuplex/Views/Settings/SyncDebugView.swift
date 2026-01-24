@@ -1,6 +1,8 @@
 import SwiftData
 import SwiftUI
 
+// MARK: - SyncDebugView
+
 struct SyncDebugView: View {
     @Environment(\.modelContext) private var modelContext
     @ObservedObject var debugLog = SyncDebugLog.shared
@@ -123,15 +125,12 @@ struct SyncDebugView: View {
     }
 }
 
-struct RawQSORow: View {
-    let qso: SyncDebugLog.RawQSOData
-    @State private var isExpanded = false
+// MARK: - RawQSORow
 
-    private var timeFormatter: DateFormatter {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f
-    }
+struct RawQSORow: View {
+    // MARK: Internal
+
+    let qso: SyncDebugLog.RawQSOData
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -211,25 +210,24 @@ struct RawQSORow: View {
             }
         }
     }
-}
 
-struct LogEntryRow: View {
-    let entry: SyncDebugLog.LogEntry
+    // MARK: Private
+
+    @State private var isExpanded = false
 
     private var timeFormatter: DateFormatter {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss.SSS"
-        return f
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
     }
+}
 
-    private var levelColor: Color {
-        switch entry.level {
-        case .info: return .blue
-        case .warning: return .orange
-        case .error: return .red
-        case .debug: return .gray
-        }
-    }
+// MARK: - LogEntryRow
+
+struct LogEntryRow: View {
+    // MARK: Internal
+
+    let entry: SyncDebugLog.LogEntry
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
@@ -255,6 +253,23 @@ struct LogEntryRow: View {
             Text(entry.message)
                 .font(.caption)
                 .textSelection(.enabled)
+        }
+    }
+
+    // MARK: Private
+
+    private var timeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss.SSS"
+        return formatter
+    }
+
+    private var levelColor: Color {
+        switch entry.level {
+        case .info: .blue
+        case .warning: .orange
+        case .error: .red
+        case .debug: .gray
         }
     }
 }

@@ -1,6 +1,8 @@
 import Foundation
 import Security
 
+// MARK: - KeychainError
+
 enum KeychainError: Error {
     case duplicateItem
     case itemNotFound
@@ -8,12 +10,16 @@ enum KeychainError: Error {
     case invalidData
 }
 
-struct KeychainHelper {
-    static let shared = KeychainHelper()
+// MARK: - KeychainHelper
 
-    private let service = "com.fullduplex.credentials"
+struct KeychainHelper {
+    // MARK: Lifecycle
 
     private init() {}
+
+    // MARK: Internal
+
+    static let shared = KeychainHelper()
 
     func save(_ data: Data, for key: String) throws {
         let query: [String: Any] = [
@@ -87,9 +93,15 @@ struct KeychainHelper {
             throw KeychainError.unexpectedStatus(status)
         }
     }
+
+    // MARK: Private
+
+    private let service = "com.fullduplex.credentials"
 }
 
-// Keychain keys for each service
+// MARK: KeychainHelper.Keys
+
+/// Keychain keys for each service
 extension KeychainHelper {
     enum Keys {
         // QRZ - token-based auth (new)
@@ -117,7 +129,7 @@ extension KeychainHelper {
         static let lofiDeviceLinked = "lofi.device.linked"
         static let lofiLastSyncMillis = "lofi.last.sync.millis"
 
-        // HAMRS
+        /// HAMRS
         static let hamrsApiKey = "hamrs.api.key"
     }
 }

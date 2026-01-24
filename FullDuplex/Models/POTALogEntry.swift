@@ -10,36 +10,38 @@ enum POTALogEntry: Identifiable {
     case potaJob(POTAJob)
     case correlated(attempt: POTAUploadAttempt, job: POTAJob)
 
+    // MARK: Internal
+
     var id: String {
         switch self {
-        case .localAttempt(let attempt):
-            return "local-\(attempt.id.uuidString)"
-        case .potaJob(let job):
-            return "job-\(job.jobId)"
-        case .correlated(let attempt, _):
-            return "correlated-\(attempt.id.uuidString)"
+        case let .localAttempt(attempt):
+            "local-\(attempt.id.uuidString)"
+        case let .potaJob(job):
+            "job-\(job.jobId)"
+        case let .correlated(attempt, _):
+            "correlated-\(attempt.id.uuidString)"
         }
     }
 
     var timestamp: Date {
         switch self {
-        case .localAttempt(let attempt):
-            return attempt.timestamp
-        case .potaJob(let job):
-            return job.submitted
-        case .correlated(let attempt, _):
-            return attempt.timestamp
+        case let .localAttempt(attempt):
+            attempt.timestamp
+        case let .potaJob(job):
+            job.submitted
+        case let .correlated(attempt, _):
+            attempt.timestamp
         }
     }
 
     var parkReference: String {
         switch self {
-        case .localAttempt(let attempt):
-            return attempt.parkReference
-        case .potaJob(let job):
-            return job.reference
-        case .correlated(let attempt, _):
-            return attempt.parkReference
+        case let .localAttempt(attempt):
+            attempt.parkReference
+        case let .potaJob(job):
+            job.reference
+        case let .correlated(attempt, _):
+            attempt.parkReference
         }
     }
 
@@ -54,7 +56,7 @@ enum POTALogEntry: Identifiable {
             // Look for a matching job within 5 minutes
             let matchingJob = jobs.first { job in
                 job.reference.uppercased() == attempt.parkReference.uppercased() &&
-                abs(job.submitted.timeIntervalSince(attempt.timestamp)) < 300 // 5 minutes
+                    abs(job.submitted.timeIntervalSince(attempt.timestamp)) < 300 // 5 minutes
             }
 
             if let job = matchingJob {

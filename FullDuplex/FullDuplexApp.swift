@@ -1,9 +1,13 @@
-import SwiftUI
 import SwiftData
+import SwiftUI
 import UniformTypeIdentifiers
+
+// MARK: - FullDuplexApp
 
 @main
 struct FullDuplexApp: App {
+    // MARK: Internal
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             QSO.self,
@@ -38,6 +42,8 @@ struct FullDuplexApp: App {
         }
         .modelContainer(sharedModelContainer)
     }
+
+    // MARK: Private
 
     private func handleADIFFile(_ url: URL) {
         NotificationCenter.default.post(

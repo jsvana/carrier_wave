@@ -1,18 +1,10 @@
 import SwiftUI
 
 struct StatDetailView: View {
+    // MARK: Internal
+
     let category: StatCategoryType
     let items: [StatCategoryItem]
-
-    @State private var sortByCount = true
-
-    private var sortedItems: [StatCategoryItem] {
-        if sortByCount {
-            return items.sorted { $0.count > $1.count }
-        } else {
-            return items.sorted { $0.identifier.localizedCaseInsensitiveCompare($1.identifier) == .orderedAscending }
-        }
-    }
 
     var body: some View {
         List {
@@ -40,6 +32,18 @@ struct StatDetailView: View {
                     Image(systemName: "arrow.up.arrow.down")
                 }
             }
+        }
+    }
+
+    // MARK: Private
+
+    @State private var sortByCount = true
+
+    private var sortedItems: [StatCategoryItem] {
+        if sortByCount {
+            items.sorted { $0.count > $1.count }
+        } else {
+            items.sorted { $0.identifier.localizedCaseInsensitiveCompare($1.identifier) == .orderedAscending }
         }
     }
 }

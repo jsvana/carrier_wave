@@ -3,13 +3,7 @@ import SwiftData
 
 @Model
 final class ServicePresence {
-    var id: UUID
-    var serviceType: ServiceType
-    var isPresent: Bool
-    var needsUpload: Bool
-    var lastConfirmedAt: Date?
-
-    var qso: QSO?
+    // MARK: Lifecycle
 
     init(
         id: UUID = UUID(),
@@ -26,6 +20,16 @@ final class ServicePresence {
         self.lastConfirmedAt = lastConfirmedAt
         self.qso = qso
     }
+
+    // MARK: Internal
+
+    var id: UUID
+    var serviceType: ServiceType
+    var isPresent: Bool
+    var needsUpload: Bool
+    var lastConfirmedAt: Date?
+
+    var qso: QSO?
 
     /// Create a presence record for a QSO that was downloaded from a service
     static func downloaded(from service: ServiceType, qso: QSO? = nil) -> ServicePresence {

@@ -9,7 +9,6 @@ import XCTest
 @testable import FullDuplex
 
 final class ADIFParserTests: XCTestCase {
-
     func testParseSimpleRecord() throws {
         let adif = "<call:4>W1AW <band:3>20m <mode:2>CW <qso_date:8>20240115 <time_on:4>1430 <eor>"
 
@@ -69,7 +68,10 @@ final class ADIFParserTests: XCTestCase {
     }
 
     func testParsePOTAFields() throws {
-        let adif = "<call:4>W1AW <band:3>20m <mode:2>CW <qso_date:8>20240115 <time_on:4>1430 <sig_info:6>K-1234 <my_gridsquare:6>FN31pr <eor>"
+        let adif = """
+        <call:4>W1AW <band:3>20m <mode:2>CW <qso_date:8>20240115 <time_on:4>1430 \
+        <sig_info:6>K-1234 <my_gridsquare:6>FN31pr <eor>
+        """
 
         let parser = ADIFParser()
         let records = try parser.parse(adif)
@@ -80,13 +82,16 @@ final class ADIFParserTests: XCTestCase {
 
     func testParseMySigInfo() throws {
         // my_sig_info is YOUR park reference (activations), sig_info is THEIR park (hunter contacts)
-        let adif = "<call:4>W1AW <band:3>20m <mode:2>CW <qso_date:8>20240115 <time_on:4>1430 <my_sig_info:6>K-5678 <sig_info:6>K-1234 <eor>"
+        let adif = """
+        <call:4>W1AW <band:3>20m <mode:2>CW <qso_date:8>20240115 <time_on:4>1430 \
+        <my_sig_info:6>K-5678 <sig_info:6>K-1234 <eor>
+        """
 
         let parser = ADIFParser()
         let records = try parser.parse(adif)
 
-        XCTAssertEqual(records[0].mySigInfo, "K-5678")  // Activation park
-        XCTAssertEqual(records[0].sigInfo, "K-1234")    // Hunter contact park
+        XCTAssertEqual(records[0].mySigInfo, "K-5678") // Activation park
+        XCTAssertEqual(records[0].sigInfo, "K-1234") // Hunter contact park
     }
 
     func testSkipsInvalidRecords() throws {

@@ -10,11 +10,7 @@ import SwiftData
 /// Keyed by park reference + date (UTC start of day)
 @Model
 final class ActivationMetadata {
-    // Default values required for SwiftData lightweight migration
-    var parkReference: String = ""
-    var date: Date = Date()
-    var weather: String?
-    var solarConditions: String?
+    // MARK: Lifecycle
 
     init(parkReference: String, date: Date, weather: String? = nil, solarConditions: String? = nil) {
         self.parkReference = parkReference
@@ -25,4 +21,12 @@ final class ActivationMetadata {
         self.weather = weather
         self.solarConditions = solarConditions
     }
+
+    // MARK: Internal
+
+    // Default values required for SwiftData lightweight migration
+    var parkReference = ""
+    var date = Date()
+    var weather: String?
+    var solarConditions: String?
 }

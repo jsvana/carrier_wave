@@ -1,8 +1,9 @@
 import XCTest
 @testable import FullDuplex
 
-final class LoFiClientTests: XCTestCase {
+// MARK: - LoFiClientTests
 
+final class LoFiClientTests: XCTestCase {
     func testParseRegistrationResponse() throws {
         let json = """
         {
@@ -87,57 +88,18 @@ final class LoFiClientTests: XCTestCase {
     }
 
     func testParseQsosResponse() throws {
-        let json = """
-        {
-            "qsos": [
-                {
-                    "uuid": "qso-uuid-123",
-                    "operation": "op-uuid-123",
-                    "startAtMillis": 1704067200000,
-                    "band": "20m",
-                    "freq": 14250.0,
-                    "mode": "SSB",
-                    "their": {
-                        "call": "K1ABC",
-                        "sent": "59",
-                        "guess": {
-                            "name": "John",
-                            "state": "MA",
-                            "grid": "FN42",
-                            "entity_name": "United States"
-                        }
-                    },
-                    "our": {
-                        "call": "W1AW",
-                        "sent": "59"
-                    },
-                    "refs": [
-                        {
-                            "type": "pota",
-                            "ref": "US-5678",
-                            "program": "POTA"
-                        }
-                    ],
-                    "notes": "Test QSO"
-                }
-            ],
-            "meta": {
-                "qsos": {
-                    "total_records": 1,
-                    "synced_until_millis": 1704067200000,
-                    "limit": 50,
-                    "records_left": 0
-                }
-            }
-        }
-        """
-
-        let data = json.data(using: .utf8)!
+        let data = TestData.qsosResponseJSON.data(using: .utf8)!
         let response = try JSONDecoder().decode(LoFiQsosResponse.self, from: data)
 
         XCTAssertEqual(response.qsos.count, 1)
+        XCTAssertEqual(response.meta.qsos.recordsLeft, 0)
+    }
 
+    func testParseQsoFields() throws {
+        let data = TestData.qsosResponseJSON.data(using: .utf8)!
+        let response = try JSONDecoder().decode(LoFiQsosResponse.self, from: data)
         let qso = response.qsos[0]
+
         XCTAssertEqual(qso.uuid, "qso-uuid-123")
         XCTAssertEqual(qso.band, "20m")
         XCTAssertEqual(qso.mode, "SSB")
@@ -149,8 +111,6 @@ final class LoFiClientTests: XCTestCase {
         XCTAssertEqual(qso.theirName, "John")
         XCTAssertEqual(qso.theirPotaRef, "US-5678")
         XCTAssertEqual(qso.notes, "Test QSO")
-
-        // Check freq conversion (kHz to MHz)
         XCTAssertEqual(qso.freqMHz, 14.25)
     }
 
@@ -166,7 +126,7 @@ final class LoFiClientTests: XCTestCase {
         let qso = try JSONDecoder().decode(LoFiQso.self, from: data)
 
         // 1704067200000 ms = 2024-01-01 00:00:00 UTC
-        let expected = Date(timeIntervalSince1970: 1704067200)
+        let expected = Date(timeIntervalSince1970: 1_704_067_200)
         XCTAssertEqual(qso.timestamp, expected)
     }
 
@@ -200,4 +160,24 @@ final class LoFiClientTests: XCTestCase {
         XCTAssertEqual(operation.potaRef?.reference, "US-1234")
         XCTAssertEqual(operation.sotaRef?.reference, "W1/MB-001")
     }
+}
+
+// MARK: - TestData
+
+private enum TestData {
+    static let qsosResponseJSON = """
+    {
+        "qsos": [{
+            "uuid": "qso-uuid-123", "operation": "op-uuid-123", "startAtMillis": 1704067200000,
+            "band": "20m", "freq": 14250.0, "mode": "SSB",
+            "their": {"call": "K1ABC", "sent": "59",
+                     "guess": {"name": "John", "state": "MA", "grid": "FN42", "entity_name": "United States"}},
+            "our": {"call": "W1AW", "sent": "59"},
+            "refs": [{"type": "pota", "ref": "US-5678", "program": "POTA"}],
+            "notes": "Test QSO"
+        }],
+        "meta": {"qsos": {"total_records": 1, "synced_until_millis": 1704067200000, "limit": 50,
+                         "records_left": 0}}
+    }
+    """
 }

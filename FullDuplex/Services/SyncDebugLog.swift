@@ -4,7 +4,11 @@ import Foundation
 /// Captures raw QSO data and sync operations for debugging
 @MainActor
 class SyncDebugLog: ObservableObject {
-    static let shared = SyncDebugLog()
+    // MARK: Lifecycle
+
+    private init() {}
+
+    // MARK: Internal
 
     struct RawQSOData: Identifiable {
         let id = UUID()
@@ -15,27 +19,24 @@ class SyncDebugLog: ObservableObject {
     }
 
     struct LogEntry: Identifiable {
-        let id = UUID()
-        let timestamp: Date
-        let level: Level
-        let service: ServiceType?
-        let message: String
-
         enum Level: String {
             case info = "INFO"
             case warning = "WARN"
             case error = "ERROR"
             case debug = "DEBUG"
         }
+
+        let id = UUID()
+        let timestamp: Date
+        let level: Level
+        let service: ServiceType?
+        let message: String
     }
+
+    static let shared = SyncDebugLog()
 
     @Published var rawQSOs: [ServiceType: [RawQSOData]] = [:]
     @Published var logEntries: [LogEntry] = []
-
-    private let maxQSOsPerService = 5
-    private let maxLogEntries = 100
-
-    private init() {}
 
     func clearAll() {
         rawQSOs = [:]
@@ -99,4 +100,9 @@ class SyncDebugLog: ObservableObject {
     func debug(_ message: String, service: ServiceType? = nil) {
         log(message, level: .debug, service: service)
     }
+
+    // MARK: Private
+
+    private let maxQSOsPerService = 5
+    private let maxLogEntries = 100
 }

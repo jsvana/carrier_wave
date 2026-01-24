@@ -7,25 +7,27 @@ enum StatCategoryType: String, CaseIterable, Identifiable {
     case modes
     case parks
 
+    // MARK: Internal
+
     var id: String { rawValue }
 
     var title: String {
         switch self {
-        case .entities: return "DXCC Entities"
-        case .grids: return "Grids"
-        case .bands: return "Bands"
-        case .modes: return "Modes"
-        case .parks: return "Activations"
+        case .entities: "DXCC Entities"
+        case .grids: "Grids"
+        case .bands: "Bands"
+        case .modes: "Modes"
+        case .parks: "Activations"
         }
     }
 
     var icon: String {
         switch self {
-        case .entities: return "globe"
-        case .grids: return "square.grid.3x3"
-        case .bands: return "waveform"
-        case .modes: return "dot.radiowaves.right"
-        case .parks: return "leaf"
+        case .entities: "globe"
+        case .grids: "square.grid.3x3"
+        case .bands: "waveform"
+        case .modes: "dot.radiowaves.right"
+        case .parks: "leaf"
         }
     }
 }

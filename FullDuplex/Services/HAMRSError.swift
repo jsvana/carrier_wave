@@ -9,22 +9,24 @@ enum HAMRSError: Error, LocalizedError {
     case decodingError(Error)
     case invalidCouchDBURL
 
+    // MARK: Internal
+
     var errorDescription: String? {
         switch self {
         case .notConfigured:
-            return "HAMRS is not configured. Please enter your API key."
+            "HAMRS is not configured. Please enter your API key."
         case .invalidApiKey:
-            return "Invalid API key. Check your HAMRS Pro settings at hamrs.app"
+            "Invalid API key. Check your HAMRS Pro settings at hamrs.app"
         case .subscriptionInactive:
-            return "HAMRS Pro subscription is inactive. Visit hamrs.app to resubscribe."
-        case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
-        case .invalidResponse(let msg):
-            return "Invalid response: \(msg)"
-        case .decodingError(let error):
-            return "Failed to decode response: \(error.localizedDescription)"
+            "HAMRS Pro subscription is inactive. Visit hamrs.app to resubscribe."
+        case let .networkError(error):
+            "Network error: \(error.localizedDescription)"
+        case let .invalidResponse(msg):
+            "Invalid response: \(msg)"
+        case let .decodingError(error):
+            "Failed to decode response: \(error.localizedDescription)"
         case .invalidCouchDBURL:
-            return "Invalid CouchDB URL received from HAMRS"
+            "Invalid CouchDB URL received from HAMRS"
         }
     }
 }

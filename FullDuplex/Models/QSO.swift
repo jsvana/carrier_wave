@@ -3,39 +3,7 @@ import SwiftData
 
 @Model
 final class QSO {
-    var id: UUID
-    var callsign: String
-    var band: String
-    var mode: String
-    var frequency: Double?
-    var timestamp: Date
-    var rstSent: String?
-    var rstReceived: String?
-    var myCallsign: String
-    var myGrid: String?
-    var theirGrid: String?
-    var parkReference: String?
-    var theirParkReference: String?
-    var notes: String?
-    var importSource: ImportSource
-    var importedAt: Date
-    var rawADIF: String?
-
-    // Contact info (from HAMRS and other sources)
-    var name: String?
-    var qth: String?
-    var state: String?
-    var country: String?
-    var power: Int?
-    var sotaRef: String?
-
-    // QRZ sync tracking
-    var qrzLogId: String?
-    var qrzConfirmed: Bool = false
-    var lotwConfirmedDate: Date?
-
-    @Relationship(deleteRule: .cascade, inverse: \ServicePresence.qso)
-    var servicePresence: [ServicePresence] = []
+    // MARK: Lifecycle
 
     init(
         id: UUID = UUID(),
@@ -93,10 +61,46 @@ final class QSO {
         self.lotwConfirmedDate = lotwConfirmedDate
     }
 
+    // MARK: Internal
+
+    var id: UUID
+    var callsign: String
+    var band: String
+    var mode: String
+    var frequency: Double?
+    var timestamp: Date
+    var rstSent: String?
+    var rstReceived: String?
+    var myCallsign: String
+    var myGrid: String?
+    var theirGrid: String?
+    var parkReference: String?
+    var theirParkReference: String?
+    var notes: String?
+    var importSource: ImportSource
+    var importedAt: Date
+    var rawADIF: String?
+
+    // Contact info (from HAMRS and other sources)
+    var name: String?
+    var qth: String?
+    var state: String?
+    var country: String?
+    var power: Int?
+    var sotaRef: String?
+
+    // QRZ sync tracking
+    var qrzLogId: String?
+    var qrzConfirmed: Bool = false
+    var lotwConfirmedDate: Date?
+
+    @Relationship(deleteRule: .cascade, inverse: \ServicePresence.qso)
+    var servicePresence: [ServicePresence] = []
+
     /// Deduplication key: callsign + band + mode + timestamp (rounded to 2 min)
     var deduplicationKey: String {
         let roundedTimestamp = timestamp.timeIntervalSince1970
-        let rounded = Int(roundedTimestamp / 120) * 120  // 2 minute buckets
+        let rounded = Int(roundedTimestamp / 120) * 120 // 2 minute buckets
         return "\(callsign.uppercased())|\(band.uppercased())|\(mode.uppercased())|\(rounded)"
     }
 
@@ -111,7 +115,7 @@ final class QSO {
             if char.isLetter || char.isNumber {
                 prefix.append(char)
                 // Most prefixes are 1-3 characters
-                if prefix.count >= 2 && char.isNumber {
+                if prefix.count >= 2, char.isNumber {
                     break
                 }
                 if prefix.count >= 3 {
@@ -129,34 +133,66 @@ final class QSO {
 
     /// Check if this is likely a US station (for state counting)
     var isUSStation: Bool {
-        dxccEntity?.number == 291  // United States DXCC number
+        dxccEntity?.number == 291 // United States DXCC number
     }
 
     /// Count of populated optional fields (for deduplication tiebreaker)
     var fieldRichnessScore: Int {
         var score = 0
-        if rstSent != nil { score += 1 }
-        if rstReceived != nil { score += 1 }
-        if myGrid != nil { score += 1 }
-        if theirGrid != nil { score += 1 }
-        if parkReference != nil { score += 1 }
-        if theirParkReference != nil { score += 1 }
-        if notes != nil { score += 1 }
-        if qrzLogId != nil { score += 1 }
-        if rawADIF != nil { score += 1 }
-        if frequency != nil { score += 1 }
-        if name != nil { score += 1 }
-        if qth != nil { score += 1 }
-        if state != nil { score += 1 }
-        if country != nil { score += 1 }
-        if power != nil { score += 1 }
-        if sotaRef != nil { score += 1 }
+        if rstSent != nil {
+            score += 1
+        }
+        if rstReceived != nil {
+            score += 1
+        }
+        if myGrid != nil {
+            score += 1
+        }
+        if theirGrid != nil {
+            score += 1
+        }
+        if parkReference != nil {
+            score += 1
+        }
+        if theirParkReference != nil {
+            score += 1
+        }
+        if notes != nil {
+            score += 1
+        }
+        if qrzLogId != nil {
+            score += 1
+        }
+        if rawADIF != nil {
+            score += 1
+        }
+        if frequency != nil {
+            score += 1
+        }
+        if name != nil {
+            score += 1
+        }
+        if qth != nil {
+            score += 1
+        }
+        if state != nil {
+            score += 1
+        }
+        if country != nil {
+            score += 1
+        }
+        if power != nil {
+            score += 1
+        }
+        if sotaRef != nil {
+            score += 1
+        }
         return score
     }
 
     /// Count of services where this QSO is confirmed present
     var syncedServicesCount: Int {
-        servicePresence.filter { $0.isPresent }.count
+        servicePresence.filter(\.isPresent).count
     }
 
     /// Date only (for activity tracking)
@@ -196,7 +232,9 @@ final class QSO {
 
     /// Mark QSO as needing upload to a service (if it supports upload)
     func markNeedsUpload(to service: ServiceType, context: ModelContext) {
-        guard service.supportsUpload else { return }
+        guard service.supportsUpload else {
+            return
+        }
 
         if let existing = presence(for: service) {
             if !existing.isPresent {

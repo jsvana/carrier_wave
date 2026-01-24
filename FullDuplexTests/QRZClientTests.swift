@@ -2,7 +2,6 @@ import XCTest
 @testable import FullDuplex
 
 final class QRZClientTests: XCTestCase {
-
     func testParseLoginResponse() throws {
         let response = "RESULT=OK&KEY=abc123&COUNT=1"
 

@@ -6,14 +6,9 @@
 import SwiftUI
 
 struct POTALogEntryRow: View {
-    let entry: POTALogEntry
-    @State private var isExpanded = false
+    // MARK: Internal
 
-    private var dateFormatter: DateFormatter {
-        let f = DateFormatter()
-        f.dateFormat = "MMM d, HH:mm"
-        return f
-    }
+    let entry: POTALogEntry
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -30,6 +25,16 @@ struct POTALogEntryRow: View {
             }
         }
         .padding(.vertical, 4)
+    }
+
+    // MARK: Private
+
+    @State private var isExpanded = false
+
+    private var dateFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, HH:mm"
+        return formatter
     }
 
     @ViewBuilder
@@ -83,7 +88,7 @@ struct POTALogEntryRow: View {
     @ViewBuilder
     private var statusBadge: some View {
         switch entry {
-        case .localAttempt(let attempt):
+        case let .localAttempt(attempt):
             if attempt.success {
                 Label("Sent", systemImage: "checkmark.circle.fill")
                     .font(.caption)
@@ -94,10 +99,10 @@ struct POTALogEntryRow: View {
                     .foregroundStyle(.red)
             }
 
-        case .potaJob(let job):
+        case let .potaJob(job):
             jobStatusBadge(job.status)
 
-        case .correlated(let attempt, let job):
+        case let .correlated(attempt, job):
             HStack(spacing: 4) {
                 if attempt.success {
                     Image(systemName: "checkmark.circle.fill")
@@ -115,39 +120,19 @@ struct POTALogEntryRow: View {
     }
 
     @ViewBuilder
-    private func jobStatusBadge(_ status: POTAJobStatus) -> some View {
-        Text(status.displayName)
-            .font(.caption)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 2)
-            .background(jobStatusColor(status).opacity(0.2))
-            .foregroundStyle(jobStatusColor(status))
-            .clipShape(Capsule())
-    }
-
-    private func jobStatusColor(_ status: POTAJobStatus) -> Color {
-        switch status {
-        case .pending, .processing: return .orange
-        case .completed: return .green
-        case .failed, .error: return .red
-        case .duplicate: return .yellow
-        }
-    }
-
-    @ViewBuilder
     private var qsoCountText: some View {
         switch entry {
-        case .localAttempt(let attempt):
+        case let .localAttempt(attempt):
             Text("\(attempt.qsoCount) QSOs")
 
-        case .potaJob(let job):
+        case let .potaJob(job):
             if job.totalQsos >= 0 {
                 Text("\(job.insertedQsos)/\(job.totalQsos) QSOs")
             } else {
                 Text("QSOs: --")
             }
 
-        case .correlated(let attempt, let job):
+        case let .correlated(attempt, job):
             if job.insertedQsos >= 0 {
                 Text("\(attempt.qsoCount) → \(job.insertedQsos) inserted")
             } else {
@@ -160,13 +145,13 @@ struct POTALogEntryRow: View {
     private var expandedContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch entry {
-            case .localAttempt(let attempt):
+            case let .localAttempt(attempt):
                 localAttemptDetails(attempt)
 
-            case .potaJob(let job):
+            case let .potaJob(job):
                 jobDetails(job)
 
-            case .correlated(let attempt, let job):
+            case let .correlated(attempt, job):
                 localAttemptDetails(attempt)
                 Divider()
                 jobDetails(job)
@@ -178,6 +163,17 @@ struct POTALogEntryRow: View {
     }
 
     @ViewBuilder
+    private func jobStatusBadge(_ status: POTAJobStatus) -> some View {
+        Text(status.displayName)
+            .font(.caption)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(jobStatusColor(status).opacity(0.2))
+            .foregroundStyle(jobStatusColor(status))
+            .clipShape(Capsule())
+    }
+
+    @ViewBuilder
     private func localAttemptDetails(_ attempt: POTAUploadAttempt) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Local Upload Attempt")
@@ -185,6 +181,16 @@ struct POTALogEntryRow: View {
                 .fontWeight(.semibold)
                 .foregroundStyle(.secondary)
 
+            attemptBasicInfo(attempt)
+            attemptHeadersSection(attempt)
+            attemptResponseSection(attempt)
+            attemptADIFSection(attempt)
+        }
+    }
+
+    @ViewBuilder
+    private func attemptBasicInfo(_ attempt: POTAUploadAttempt) -> some View {
+        Group {
             detailRow("Callsign", attempt.callsign)
             detailRow("Location", attempt.location)
             detailRow("Filename", attempt.filename)
@@ -199,51 +205,57 @@ struct POTALogEntryRow: View {
                 detailRow("Error", error)
                     .foregroundStyle(.red)
             }
-
-            // Headers
-            if !attempt.requestHeaders.isEmpty {
-                Text("Request Headers")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .padding(.top, 4)
-
-                ForEach(attempt.requestHeaders.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
-                    Text("\(key): \(value)")
-                        .font(.caption2)
-                        .fontDesign(.monospaced)
-                        .foregroundStyle(.secondary)
-                }
-            }
-
-            // Response
-            if let response = attempt.responseBody, !response.isEmpty {
-                Text("Response")
-                    .font(.caption2)
-                    .fontWeight(.semibold)
-                    .padding(.top, 4)
-
-                ScrollView(.horizontal, showsIndicators: true) {
-                    Text(response.prefix(1000))
-                        .font(.caption2)
-                        .fontDesign(.monospaced)
-                        .textSelection(.enabled)
-                }
-                .frame(maxHeight: 80)
-            }
-
-            // ADIF
-            DisclosureGroup("ADIF Content") {
-                ScrollView {
-                    Text(attempt.adifContent)
-                        .font(.caption2)
-                        .fontDesign(.monospaced)
-                        .textSelection(.enabled)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .frame(maxHeight: 200)
-            }
-            .font(.caption2)
         }
+    }
+
+    @ViewBuilder
+    private func attemptHeadersSection(_ attempt: POTAUploadAttempt) -> some View {
+        if !attempt.requestHeaders.isEmpty {
+            Text("Request Headers")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .padding(.top, 4)
+
+            ForEach(attempt.requestHeaders.sorted(by: { $0.key < $1.key }), id: \.key) { key, value in
+                Text("\(key): \(value)")
+                    .font(.caption2)
+                    .fontDesign(.monospaced)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func attemptResponseSection(_ attempt: POTAUploadAttempt) -> some View {
+        if let response = attempt.responseBody, !response.isEmpty {
+            Text("Response")
+                .font(.caption2)
+                .fontWeight(.semibold)
+                .padding(.top, 4)
+
+            ScrollView(.horizontal, showsIndicators: true) {
+                Text(response.prefix(1_000))
+                    .font(.caption2)
+                    .fontDesign(.monospaced)
+                    .textSelection(.enabled)
+            }
+            .frame(maxHeight: 80)
+        }
+    }
+
+    @ViewBuilder
+    private func attemptADIFSection(_ attempt: POTAUploadAttempt) -> some View {
+        DisclosureGroup("ADIF Content") {
+            ScrollView {
+                Text(attempt.adifContent)
+                    .font(.caption2)
+                    .fontDesign(.monospaced)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .frame(maxHeight: 200)
+        }
+        .font(.caption2)
     }
 
     @ViewBuilder
@@ -288,6 +300,17 @@ struct POTALogEntryRow: View {
             Text(value)
                 .font(.caption2)
                 .textSelection(.enabled)
+        }
+    }
+
+    private func jobStatusColor(_ status: POTAJobStatus) -> Color {
+        switch status {
+        case .pending,
+             .processing: .orange
+        case .completed: .green
+        case .failed,
+             .error: .red
+        case .duplicate: .yellow
         }
     }
 }

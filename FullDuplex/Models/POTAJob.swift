@@ -5,6 +5,8 @@
 
 import Foundation
 
+// MARK: - POTAJobStatus
+
 enum POTAJobStatus: Int, Codable {
     case pending = 0
     case processing = 1
@@ -13,50 +15,35 @@ enum POTAJobStatus: Int, Codable {
     case duplicate = 7
     case error = -1
 
+    // MARK: Internal
+
     var displayName: String {
         switch self {
-        case .pending: return "Pending"
-        case .processing: return "Processing"
-        case .completed: return "Completed"
-        case .failed: return "Failed"
-        case .duplicate: return "Duplicate"
-        case .error: return "Error"
+        case .pending: "Pending"
+        case .processing: "Processing"
+        case .completed: "Completed"
+        case .failed: "Failed"
+        case .duplicate: "Duplicate"
+        case .error: "Error"
         }
     }
 
     var color: String {
         switch self {
-        case .pending, .processing: return "orange"
-        case .completed: return "green"
-        case .failed, .error: return "red"
-        case .duplicate: return "yellow"
+        case .pending,
+             .processing: "orange"
+        case .completed: "green"
+        case .failed,
+             .error: "red"
+        case .duplicate: "yellow"
         }
     }
 }
 
+// MARK: - POTAJob
+
 struct POTAJob: Identifiable, Codable {
-    let jobId: Int
-    let status: POTAJobStatus
-    let submitted: Date
-    let processed: Date?
-    let reference: String
-    let parkName: String?
-    let location: String?
-    let totalQsos: Int
-    let insertedQsos: Int
-    let callsignUsed: String?
-    let userComment: String?
-
-    var id: Int { jobId }
-
-    enum CodingKeys: String, CodingKey {
-        case jobId, status, submitted, processed, reference, location
-        case parkName = "parkName"
-        case totalQsos = "total"
-        case insertedQsos = "inserted"
-        case callsignUsed = "callsignUsed"
-        case userComment = "userComment"
-    }
+    // MARK: Lifecycle
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -90,6 +77,55 @@ struct POTAJob: Identifiable, Codable {
         }
     }
 
+    /// For testing/previews
+    init(
+        jobId: Int, status: POTAJobStatus, submitted: Date, processed: Date?,
+        reference: String, parkName: String?, location: String?,
+        totalQsos: Int, insertedQsos: Int, callsignUsed: String?, userComment: String?
+    ) {
+        self.jobId = jobId
+        self.status = status
+        self.submitted = submitted
+        self.processed = processed
+        self.reference = reference
+        self.parkName = parkName
+        self.location = location
+        self.totalQsos = totalQsos
+        self.insertedQsos = insertedQsos
+        self.callsignUsed = callsignUsed
+        self.userComment = userComment
+    }
+
+    // MARK: Internal
+
+    enum CodingKeys: String, CodingKey {
+        case jobId
+        case status
+        case submitted
+        case processed
+        case reference
+        case location
+        case parkName
+        case totalQsos = "total"
+        case insertedQsos = "inserted"
+        case callsignUsed
+        case userComment
+    }
+
+    let jobId: Int
+    let status: POTAJobStatus
+    let submitted: Date
+    let processed: Date?
+    let reference: String
+    let parkName: String?
+    let location: String?
+    let totalQsos: Int
+    let insertedQsos: Int
+    let callsignUsed: String?
+    let userComment: String?
+
+    var id: Int { jobId }
+
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(jobId, forKey: .jobId)
@@ -104,25 +140,8 @@ struct POTAJob: Identifiable, Codable {
 
         let dateFormatter = ISO8601DateFormatter()
         try container.encode(dateFormatter.string(from: submitted), forKey: .submitted)
-        if let processed = processed {
+        if let processed {
             try container.encode(dateFormatter.string(from: processed), forKey: .processed)
         }
-    }
-
-    // For testing/previews
-    init(jobId: Int, status: POTAJobStatus, submitted: Date, processed: Date?,
-         reference: String, parkName: String?, location: String?,
-         totalQsos: Int, insertedQsos: Int, callsignUsed: String?, userComment: String?) {
-        self.jobId = jobId
-        self.status = status
-        self.submitted = submitted
-        self.processed = processed
-        self.reference = reference
-        self.parkName = parkName
-        self.location = location
-        self.totalQsos = totalQsos
-        self.insertedQsos = insertedQsos
-        self.callsignUsed = callsignUsed
-        self.userComment = userComment
     }
 }

@@ -1,5 +1,5 @@
-import XCTest
 import SwiftData
+import XCTest
 @testable import FullDuplex
 
 final class ImportServiceTests: XCTestCase {
@@ -58,7 +58,7 @@ final class ImportServiceTests: XCTestCase {
         let qsos = try modelContext.fetch(FetchDescriptor<QSO>())
         // Should have 2 ServicePresence records: QRZ (needsUpload) and POTA (needsUpload)
         XCTAssertEqual(qsos[0].servicePresence.count, 2)
-        XCTAssertTrue(qsos[0].servicePresence.allSatisfy { $0.needsUpload })
+        XCTAssertTrue(qsos[0].servicePresence.allSatisfy(\.needsUpload))
     }
 
     @MainActor
