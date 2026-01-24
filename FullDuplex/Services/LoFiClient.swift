@@ -46,8 +46,8 @@ actor LoFiClient {
     // MARK: - Configuration
 
     nonisolated var isConfigured: Bool {
-        (try? keychain.readString(for: KeychainHelper.Keys.lofiClientKey)) != nil &&
-        (try? keychain.readString(for: KeychainHelper.Keys.lofiCallsign)) != nil
+        (try? keychain.readString(for: KeychainHelper.Keys.lofiClientKey)) != nil
+            && (try? keychain.readString(for: KeychainHelper.Keys.lofiCallsign)) != nil
     }
 
     nonisolated var isLinked: Bool {
@@ -68,7 +68,8 @@ actor LoFiClient {
 
     nonisolated func getLastSyncMillis() -> Int64 {
         guard let str = try? keychain.readString(for: KeychainHelper.Keys.lofiLastSyncMillis),
-              let value = Int64(str) else {
+            let value = Int64(str)
+        else {
             return 0
         }
         return value
@@ -94,8 +95,9 @@ actor LoFiClient {
     /// Register with LoFi and get bearer token
     func register() async throws -> LoFiRegistrationResponse {
         guard let clientKey = try? keychain.readString(for: KeychainHelper.Keys.lofiClientKey),
-              let clientSecret = try? keychain.readString(for: KeychainHelper.Keys.lofiClientSecret),
-              let callsign = try? keychain.readString(for: KeychainHelper.Keys.lofiCallsign) else {
+            let clientSecret = try? keychain.readString(for: KeychainHelper.Keys.lofiClientSecret),
+            let callsign = try? keychain.readString(for: KeychainHelper.Keys.lofiCallsign)
+        else {
             throw LoFiError.notConfigured
         }
 
@@ -172,10 +174,14 @@ actor LoFiClient {
     /// Fetch operations with pagination
     /// - Parameter otherClientsOnly: When true, excludes operations uploaded by this client.
     ///   Should be false for fresh sync to get ALL operations.
+    /// - Parameter deleted: When true, fetches only deleted operations. When nil/false, fetches only active.
+    ///   Note: The server checks `if params[:deleted]` so passing "false" is treated as truthy.
+    ///   Only pass this parameter when true, omit it entirely for active operations.
     func fetchOperations(
         syncedSinceMillis: Int64 = 0,
         limit: Int = 50,
-        otherClientsOnly: Bool = true
+        otherClientsOnly: Bool = true,
+        deleted: Bool = false
     ) async throws -> LoFiOperationsResponse {
         let token = try getToken()
 
@@ -183,8 +189,12 @@ actor LoFiClient {
         components.queryItems = [
             URLQueryItem(name: "synced_since_millis", value: String(syncedSinceMillis)),
             URLQueryItem(name: "other_clients_only", value: String(otherClientsOnly)),
-            URLQueryItem(name: "limit", value: String(limit))
+            URLQueryItem(name: "limit", value: String(limit)),
         ]
+        // Only include deleted param when true - server treats any value as truthy
+        if deleted {
+            components.queryItems?.append(URLQueryItem(name: "deleted", value: "true"))
+        }
 
         var urlRequest = URLRequest(url: components.url!)
         urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -195,11 +205,15 @@ actor LoFiClient {
     /// Fetch QSOs for a specific operation
     /// - Parameter otherClientsOnly: When true, excludes QSOs uploaded by this client.
     ///   Should be false for fresh sync to get ALL QSOs.
+    /// - Parameter deleted: When true, fetches deleted QSOs. When nil/false, fetches active QSOs.
+    ///   Note: The server checks `if params[:deleted]` so passing "false" is treated as truthy.
+    ///   Only pass this parameter when true, omit it entirely for active QSOs.
     func fetchOperationQsos(
         operationUUID: String,
         syncedSinceMillis: Int64 = 0,
         limit: Int = 50,
-        otherClientsOnly: Bool = true
+        otherClientsOnly: Bool = true,
+        deleted: Bool = false
     ) async throws -> LoFiQsosResponse {
         let token = try getToken()
 
@@ -207,8 +221,12 @@ actor LoFiClient {
         components.queryItems = [
             URLQueryItem(name: "synced_since_millis", value: String(syncedSinceMillis)),
             URLQueryItem(name: "other_clients_only", value: String(otherClientsOnly)),
-            URLQueryItem(name: "limit", value: String(limit))
+            URLQueryItem(name: "limit", value: String(limit)),
         ]
+        // Only include deleted param when true - server treats any value as truthy
+        if deleted {
+            components.queryItems?.append(URLQueryItem(name: "deleted", value: "true"))
+        }
 
         var urlRequest = URLRequest(url: components.url!)
         urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
@@ -225,71 +243,115 @@ actor LoFiClient {
         // For fresh sync (lastSyncMillis == 0), fetch ALL QSOs including our own.
         // For incremental sync, only fetch QSOs from other clients to avoid duplicates.
         let isFreshSync = lastSyncMillis == 0
-        print("[LoFi] fetchAllQsosSinceLastSync: lastSyncMillis=\(lastSyncMillis), isFreshSync=\(isFreshSync)")
+        let callsign = getCallsign() ?? "unknown"
+        NSLog(
+            "[LoFi] fetchAllQsosSinceLastSync: callsign=%@, lastSyncMillis=%lld, isFreshSync=%@, otherClientsOnly=%@",
+            callsign, lastSyncMillis, isFreshSync ? "true" : "false",
+            !isFreshSync ? "true" : "false")
 
-        // First, fetch all operations
-        var operations: [LoFiOperation] = []
-        var syncedSince: Int64 = 0
+        // Fetch all operations (both active and deleted, deduplicated by UUID)
+        var operationsByUUID: [String: LoFiOperation] = [:]
 
-        while true {
-            let response = try await fetchOperations(
-                syncedSinceMillis: syncedSince,
-                limit: 50,
-                otherClientsOnly: !isFreshSync
-            )
-            print("[LoFi] Fetched \(response.operations.count) operations (total so far: \(operations.count + response.operations.count)), recordsLeft=\(response.meta.operations.recordsLeft)")
-            operations.append(contentsOf: response.operations)
-
-            if response.meta.operations.recordsLeft == 0 {
-                break
-            }
-
-            // Use next_synced_at_millis for pagination
-            if let next = response.meta.operations.nextSyncedAtMillis {
-                syncedSince = Int64(next)
-            } else {
-                break
-            }
-        }
-
-        print("[LoFi] Total operations fetched: \(operations.count)")
-        for (idx, op) in operations.enumerated() {
-            print("[LoFi]   [\(idx)] \(op.stationCall) - \(op.title ?? "untitled") - qsoCount=\(op.qsoCount)")
-        }
-
-        // Now fetch QSOs for each operation
-        for operation in operations {
-            var qsoSyncedSince: Int64 = lastSyncMillis
-
+        // Helper to fetch operations with given deleted flag
+        func fetchOperationsWithDeleted(_ deleted: Bool) async throws {
+            var syncedSince: Int64 = 0
             while true {
-                let qsosResponse = try await fetchOperationQsos(
-                    operationUUID: operation.uuid,
-                    syncedSinceMillis: qsoSyncedSince,
+                let response = try await fetchOperations(
+                    syncedSinceMillis: syncedSince,
                     limit: 50,
-                    otherClientsOnly: !isFreshSync
+                    otherClientsOnly: !isFreshSync,
+                    deleted: deleted
                 )
-                print("[LoFi] Operation \(operation.uuid): fetched \(qsosResponse.qsos.count) QSOs, recordsLeft=\(qsosResponse.meta.qsos.recordsLeft)")
+                NSLog(
+                    "[LoFi] Fetched %d operations (deleted=%@, total unique so far: %d), recordsLeft=%d",
+                    response.operations.count, deleted ? "true" : "false",
+                    operationsByUUID.count
+                        + response.operations.filter { operationsByUUID[$0.uuid] == nil }.count,
+                    response.meta.operations.recordsLeft)
 
-                for qso in qsosResponse.qsos {
-                    allQsos.append((qso, operation))
-                    if let syncedAt = qso.syncedAtMillis {
-                        maxSyncMillis = max(maxSyncMillis, Int64(syncedAt))
-                    }
+                for op in response.operations {
+                    operationsByUUID[op.uuid] = op
                 }
 
-                if qsosResponse.meta.qsos.recordsLeft == 0 {
+                if response.meta.operations.recordsLeft == 0 {
                     break
                 }
 
-                if let next = qsosResponse.meta.qsos.nextSyncedAtMillis {
-                    qsoSyncedSince = Int64(next)
+                if let next = response.meta.operations.nextSyncedAtMillis {
+                    syncedSince = Int64(next)
                 } else {
                     break
                 }
             }
         }
 
-        print("[LoFi] Total QSOs fetched: \(allQsos.count)")
+        try await fetchOperationsWithDeleted(false)
+        try await fetchOperationsWithDeleted(true)
+
+        let operations = Array(operationsByUUID.values)
+        let expectedTotal = operations.reduce(0) { $0 + $1.qsoCount }
+        NSLog(
+            "[LoFi] Total unique operations fetched: %d, expected QSOs: %d",
+            operations.count,
+            expectedTotal)
+
+        // Fetch QSOs for each operation (both active and deleted, deduplicated by UUID)
+        var qsosByUUID: [String: (LoFiQso, LoFiOperation)] = [:]
+
+        // For fresh sync, always start from 0 to get all QSOs
+        let qsoSyncStart: Int64 = isFreshSync ? 0 : lastSyncMillis
+
+        for operation in operations {
+            var operationQsoCount = 0
+
+            // Helper to fetch QSOs with given deleted flag
+            func fetchQsosWithDeleted(_ deleted: Bool) async throws {
+                var qsoSyncedSince: Int64 = qsoSyncStart
+                while true {
+                    let qsosResponse = try await fetchOperationQsos(
+                        operationUUID: operation.uuid,
+                        syncedSinceMillis: qsoSyncedSince,
+                        limit: 50,
+                        otherClientsOnly: !isFreshSync,
+                        deleted: deleted
+                    )
+
+                    for qso in qsosResponse.qsos {
+                        if qsosByUUID[qso.uuid] == nil {
+                            qsosByUUID[qso.uuid] = (qso, operation)
+                            operationQsoCount += 1
+                            if let syncedAt = qso.syncedAtMillis {
+                                maxSyncMillis = max(maxSyncMillis, Int64(syncedAt))
+                            }
+                        }
+                    }
+
+                    if qsosResponse.meta.qsos.recordsLeft == 0 {
+                        break
+                    }
+
+                    if let next = qsosResponse.meta.qsos.nextSyncedAtMillis {
+                        qsoSyncedSince = Int64(next)
+                    } else {
+                        break
+                    }
+                }
+            }
+
+            try await fetchQsosWithDeleted(false)
+            try await fetchQsosWithDeleted(true)
+
+            // Log if we got fewer QSOs than expected for this operation
+            if operationQsoCount != operation.qsoCount {
+                NSLog(
+                    "[LoFi] Operation %@ (%@): expected %d QSOs, got %d",
+                    operation.uuid, operation.title ?? "untitled",
+                    operation.qsoCount, operationQsoCount)
+            }
+        }
+
+        allQsos = Array(qsosByUUID.values)
+        NSLog("[LoFi] Total unique QSOs fetched: %d", allQsos.count)
 
         // Update last sync timestamp
         if maxSyncMillis > lastSyncMillis {
@@ -303,7 +365,10 @@ actor LoFiClient {
 
     /// Reset just the sync timestamp so QSOs can be re-downloaded
     func resetSyncTimestamp() {
+        let before = getLastSyncMillis()
         try? keychain.delete(for: KeychainHelper.Keys.lofiLastSyncMillis)
+        let after = getLastSyncMillis()
+        NSLog("[LoFi] resetSyncTimestamp: before=%lld, after=%lld", before, after)
     }
 
     func clearCredentials() throws {
@@ -338,6 +403,23 @@ actor LoFiClient {
             throw LoFiError.invalidResponse("Not an HTTP response")
         }
 
+        // Log response details
+        NSLog("[LoFi] ========== RESPONSE ==========")
+        NSLog("[LoFi] Status: %d", httpResponse.statusCode)
+        NSLog("[LoFi] Response Headers:")
+        for (key, value) in httpResponse.allHeaderFields {
+            NSLog("[LoFi]   %@: %@", String(describing: key), String(describing: value))
+        }
+
+        // Log response body (truncate if very long)
+        if let bodyStr = String(data: data, encoding: .utf8) {
+            if bodyStr.count > 2000 {
+                NSLog("[LoFi] Body (truncated): %@...", String(bodyStr.prefix(2000)))
+            } else {
+                NSLog("[LoFi] Body: %@", bodyStr)
+            }
+        }
+
         if httpResponse.statusCode == 401 {
             throw LoFiError.authenticationRequired
         }
@@ -348,7 +430,26 @@ actor LoFiClient {
         }
 
         do {
-            return try JSONDecoder().decode(T.self, from: data)
+            let decoded = try JSONDecoder().decode(T.self, from: data)
+
+            // Log counts for known response types
+            if let opsResponse = decoded as? LoFiOperationsResponse {
+                NSLog("[LoFi] ========== COUNTS ==========")
+                NSLog("[LoFi] Operations returned: %d", opsResponse.operations.count)
+                NSLog("[LoFi] Records left: %d", opsResponse.meta.operations.recordsLeft)
+                if let next = opsResponse.meta.operations.nextSyncedAtMillis {
+                    NSLog("[LoFi] Next synced at millis: %d", next)
+                }
+            } else if let qsosResponse = decoded as? LoFiQsosResponse {
+                NSLog("[LoFi] ========== COUNTS ==========")
+                NSLog("[LoFi] QSOs returned: %d", qsosResponse.qsos.count)
+                NSLog("[LoFi] Records left: %d", qsosResponse.meta.qsos.recordsLeft)
+                if let next = qsosResponse.meta.qsos.nextSyncedAtMillis {
+                    NSLog("[LoFi] Next synced at millis: %d", next)
+                }
+            }
+
+            return decoded
         } catch {
             throw LoFiError.invalidResponse("JSON decode error: \(error)")
         }

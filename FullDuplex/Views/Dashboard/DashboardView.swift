@@ -27,19 +27,15 @@ struct DashboardView: View {
     }
 
     // Derived counts from ServicePresence
+    // Use direct query on allPresence to avoid SwiftData relationship refresh issues
     private func uploadedCount(for service: ServiceType) -> Int {
-        let count = qsos.filter { qso in
-            qso.servicePresence.contains { $0.serviceType == service && $0.isPresent }
-        }.count
+        let count = allPresence.filter { $0.serviceType == service && $0.isPresent }.count
         // Debug: print breakdown
         if service == .lofi && debugMode {
             let total = qsos.count
-            let withLofiPresence = qsos.filter { qso in
-                qso.servicePresence.contains { $0.serviceType == .lofi }
-            }.count
-            let withLofiPresent = qsos.filter { qso in
-                qso.servicePresence.contains { $0.serviceType == .lofi && $0.isPresent }
-            }.count
+            let withLofiPresence = allPresence.filter { $0.serviceType == .lofi }.count
+            let withLofiPresent = allPresence.filter { $0.serviceType == .lofi && $0.isPresent }
+                .count
             print(
                 "[Dashboard] LoFi count: total QSOs=\(total), with LoFi presence=\(withLofiPresence), with LoFi isPresent=true: \(withLofiPresent)"
             )
@@ -48,9 +44,7 @@ struct DashboardView: View {
     }
 
     private func pendingCount(for service: ServiceType) -> Int {
-        qsos.filter { qso in
-            qso.servicePresence.contains { $0.serviceType == service && $0.needsUpload }
-        }.count
+        allPresence.filter { $0.serviceType == service && $0.needsUpload }.count
     }
 
     @State private var isSyncing = false
