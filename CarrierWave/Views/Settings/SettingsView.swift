@@ -22,12 +22,15 @@ struct SettingsMainView: View {
     private let qrzClient = QRZClient()
     private let hamrsClient = HAMRSClient()
     private let lotwClient = LoTWClient()
+    @StateObject private var iCloudMonitor = ICloudMonitor()
 
     @State private var qrzIsConfigured = false
     @State private var qrzCallsign: String?
 
     @State private var lotwIsConfigured = false
     @State private var lotwUsername: String?
+
+    @Query(sort: \ChallengeSource.name) private var challengeSources: [ChallengeSource]
 
     var body: some View {
         NavigationStack {
@@ -134,14 +137,30 @@ struct SettingsMainView: View {
                     NavigationLink {
                         ICloudSettingsView()
                     } label: {
-                        Label("iCloud Folder", systemImage: "icloud")
+                        HStack {
+                            Label("iCloud Folder", systemImage: "icloud")
+                            Spacer()
+                            if iCloudMonitor.iCloudContainerURL != nil {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .accessibilityLabel("Available")
+                            }
+                        }
                     }
 
                     // Challenges
                     NavigationLink {
                         ChallengesSettingsView()
                     } label: {
-                        Label("Challenges", systemImage: "flag.2.crossed")
+                        HStack {
+                            Label("Challenges", systemImage: "flag.2.crossed")
+                            Spacer()
+                            if challengeSources.contains(where: { $0.lastFetched != nil }) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                                    .accessibilityLabel("Connected")
+                            }
+                        }
                     }
                 } header: {
                     Text("Sync Sources")
