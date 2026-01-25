@@ -69,7 +69,9 @@ extension SyncService {
         }
 
         // Mark as needing upload to services that don't have it
-        for service in ServiceType.allCases where service.supportsUpload && !sources.contains(service) {
+        for service in ServiceType.allCases
+            where service.supportsUpload && !sources.contains(service)
+        { // swiftlint:disable:this opening_brace
             let presence = ServicePresence.needsUpload(to: service, qso: newQSO)
             modelContext.insert(presence)
             newQSO.servicePresence.append(presence)
@@ -103,7 +105,8 @@ extension SyncService {
         existing.myGrid = existing.myGrid.nonEmpty ?? fetched.myGrid
         existing.theirGrid = existing.theirGrid.nonEmpty ?? fetched.theirGrid
         existing.parkReference = existing.parkReference.nonEmpty ?? fetched.parkReference
-        existing.theirParkReference = existing.theirParkReference.nonEmpty ?? fetched.theirParkReference
+        existing.theirParkReference =
+            existing.theirParkReference.nonEmpty ?? fetched.theirParkReference
         existing.notes = existing.notes.nonEmpty ?? fetched.notes
         existing.rawADIF = existing.rawADIF.nonEmpty ?? fetched.rawADIF
         existing.name = existing.name.nonEmpty ?? fetched.name
@@ -118,6 +121,14 @@ extension SyncService {
             existing.qrzLogId = existing.qrzLogId ?? fetched.qrzLogId
             existing.qrzConfirmed = existing.qrzConfirmed || fetched.qrzConfirmed
             existing.lotwConfirmedDate = existing.lotwConfirmedDate ?? fetched.lotwConfirmedDate
+        }
+
+        // LoTW-specific: update confirmation status
+        if fetched.source == .lotw {
+            if fetched.lotwConfirmed {
+                existing.lotwConfirmed = true
+                existing.lotwConfirmedDate = existing.lotwConfirmedDate ?? fetched.lotwConfirmedDate
+            }
         }
 
         // Update or create ServicePresence
@@ -155,6 +166,7 @@ extension SyncService {
                 qrzLogId: merged.qrzLogId ?? other.qrzLogId,
                 qrzConfirmed: merged.qrzConfirmed || other.qrzConfirmed,
                 lotwConfirmedDate: merged.lotwConfirmedDate ?? other.lotwConfirmedDate,
+                lotwConfirmed: merged.lotwConfirmed || other.lotwConfirmed,
                 source: merged.source
             )
         }
@@ -188,7 +200,8 @@ extension SyncService {
             sotaRef: fetched.sotaRef,
             qrzLogId: fetched.qrzLogId,
             qrzConfirmed: fetched.qrzConfirmed,
-            lotwConfirmedDate: fetched.lotwConfirmedDate
+            lotwConfirmedDate: fetched.lotwConfirmedDate,
+            lotwConfirmed: fetched.lotwConfirmed
         )
     }
 }
