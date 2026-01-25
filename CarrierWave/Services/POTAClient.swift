@@ -212,7 +212,9 @@ actor POTAClient {
 
     /// Get all unique park references from QSOs (excludes nil and empty)
     static func groupQSOsByPark(_ qsos: [QSO]) -> [String: [QSO]] {
-        Dictionary(grouping: qsos.filter { $0.parkReference?.isEmpty == false }) { $0.parkReference! }
+        Dictionary(grouping: qsos.filter { $0.parkReference?.isEmpty == false }) {
+            $0.parkReference!
+        }
     }
 
     func uploadActivation(parkReference: String, qsos: [QSO]) async throws -> POTAUploadResult {
@@ -232,16 +234,22 @@ actor POTAClient {
         let parkQSOs = qsos.filter { $0.parkReference?.uppercased() == normalizedParkRef }
         guard !parkQSOs.isEmpty else {
             await debugLog.info("No QSOs to upload for park \(normalizedParkRef)", service: .pota)
-            return POTAUploadResult(success: true, qsosAccepted: 0, message: "No QSOs for this park")
+            return POTAUploadResult(
+                success: true, qsosAccepted: 0, message: "No QSOs for this park"
+            )
         }
 
-        guard let requestData = await buildUploadRequest(
-            parkReference: normalizedParkRef, qsos: qsos, token: token
-        ) else {
+        guard
+            let requestData = await buildUploadRequest(
+                parkReference: normalizedParkRef, qsos: qsos, token: token
+            )
+        else {
             throw POTAError.uploadFailed("Failed to build request")
         }
 
-        await debugLog.info("Uploading \(parkQSOs.count) QSOs to park \(normalizedParkRef)", service: .pota)
+        await debugLog.info(
+            "Uploading \(parkQSOs.count) QSOs to park \(normalizedParkRef)", service: .pota
+        )
         await debugLog.debug(
             "POST /adif - location=\(requestData.location), ref=\(normalizedParkRef), file=\(requestData.filename)",
             service: .pota
@@ -281,12 +289,16 @@ actor POTAClient {
         let parkQSOs = qsos.filter { $0.parkReference?.uppercased() == normalizedParkRef }
         guard !parkQSOs.isEmpty else {
             await debugLog.info("No QSOs to upload for park \(normalizedParkRef)", service: .pota)
-            return POTAUploadResult(success: true, qsosAccepted: 0, message: "No QSOs for this park")
+            return POTAUploadResult(
+                success: true, qsosAccepted: 0, message: "No QSOs for this park"
+            )
         }
 
-        guard let requestData = await buildUploadRequest(
-            parkReference: normalizedParkRef, qsos: qsos, token: token
-        ) else {
+        guard
+            let requestData = await buildUploadRequest(
+                parkReference: normalizedParkRef, qsos: qsos, token: token
+            )
+        else {
             throw POTAError.uploadFailed("Failed to build request")
         }
 
@@ -295,7 +307,9 @@ actor POTAClient {
             requestData: requestData, modelContext: modelContext
         )
 
-        await debugLog.info("Uploading \(requestData.qsoCount) QSOs to park \(normalizedParkRef)", service: .pota)
+        await debugLog.info(
+            "Uploading \(requestData.qsoCount) QSOs to park \(normalizedParkRef)", service: .pota
+        )
         await debugLog.debug(
             "POST /adif - location=\(requestData.location), ref=\(normalizedParkRef), file=\(requestData.filename)",
             service: .pota
@@ -326,7 +340,7 @@ actor POTAClient {
         }
 
         guard httpResponse.statusCode == 200 else {
-            if httpResponse.statusCode == 401 {
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 throw POTAError.notAuthenticated
             }
             let body = String(data: data, encoding: .utf8) ?? ""
@@ -366,7 +380,7 @@ actor POTAClient {
         }
 
         guard httpResponse.statusCode == 200 else {
-            if httpResponse.statusCode == 401 {
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 throw POTAError.notAuthenticated
             }
             let body = String(data: data, encoding: .utf8) ?? ""
@@ -400,7 +414,9 @@ actor POTAClient {
         var allFetched: [POTAFetchedQSO] = []
 
         for activation in activations {
-            let qsos = try await fetchAllActivationQSOs(reference: activation.reference, date: activation.date)
+            let qsos = try await fetchAllActivationQSOs(
+                reference: activation.reference, date: activation.date
+            )
             for qso in qsos {
                 if let fetched = convertToFetchedQSO(qso, activation: activation) {
                     allFetched.append(fetched)
@@ -438,11 +454,13 @@ actor POTAClient {
         await debugLog.debug("Jobs response: \(httpResponse.statusCode)", service: .pota)
 
         guard httpResponse.statusCode == 200 else {
-            if httpResponse.statusCode == 401 {
+            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 throw POTAError.notAuthenticated
             }
             let body = String(data: data, encoding: .utf8) ?? ""
-            await debugLog.error("Jobs fetch failed: \(httpResponse.statusCode) - \(body)", service: .pota)
+            await debugLog.error(
+                "Jobs fetch failed: \(httpResponse.statusCode) - \(body)", service: .pota
+            )
             throw POTAError.fetchFailed("HTTP \(httpResponse.statusCode): \(body)")
         }
 
@@ -453,7 +471,9 @@ actor POTAClient {
 
     // MARK: Private
 
-    private func convertToFetchedQSO(_ qso: POTARemoteQSO, activation: POTARemoteActivation) -> POTAFetchedQSO? {
+    private func convertToFetchedQSO(
+        _ qso: POTARemoteQSO, activation: POTARemoteActivation
+    ) -> POTAFetchedQSO? {
         guard let band = qso.band, let mode = qso.mode else {
             return nil
         }
