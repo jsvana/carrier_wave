@@ -185,6 +185,13 @@ struct DashboardView: View {
                 .buttonStyle(.plain)
 
                 NavigationLink {
+                    StatDetailView(category: .qsls, items: stats.items(for: .qsls))
+                } label: {
+                    StatBox(title: "QSLs", value: "\(stats.confirmedQSLs)", icon: "checkmark.seal")
+                }
+                .buttonStyle(.plain)
+
+                NavigationLink {
                     StatDetailView(category: .entities, items: stats.items(for: .entities))
                 } label: {
                     StatBox(title: "DXCC Entities", value: "\(stats.uniqueEntities)", icon: "globe")
@@ -202,15 +209,6 @@ struct DashboardView: View {
                     StatDetailView(category: .bands, items: stats.items(for: .bands))
                 } label: {
                     StatBox(title: "Bands", value: "\(stats.uniqueBands)", icon: "waveform")
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink {
-                    StatDetailView(category: .modes, items: stats.items(for: .modes))
-                } label: {
-                    StatBox(
-                        title: "Modes", value: "\(stats.uniqueModes)", icon: "dot.radiowaves.right"
-                    )
                 }
                 .buttonStyle(.plain)
 

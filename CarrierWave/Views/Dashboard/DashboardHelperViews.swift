@@ -22,8 +22,8 @@ struct QSOStatistics {
         Set(qsos.map(\.band)).count
     }
 
-    var uniqueModes: Int {
-        Set(qsos.map(\.mode)).count
+    var confirmedQSLs: Int {
+        qsos.filter(\.lotwConfirmed).count
     }
 
     var uniqueParks: Int {
@@ -63,14 +63,14 @@ struct QSOStatistics {
 
     func items(for category: StatCategoryType) -> [StatCategoryItem] {
         switch category {
+        case .qsls:
+            groupedByQSL()
         case .entities:
             groupedByEntity()
         case .grids:
             groupedByGrid()
         case .bands:
             groupedByBand()
-        case .modes:
-            groupedByMode()
         case .parks:
             groupedByPark()
         }
@@ -115,12 +115,16 @@ struct QSOStatistics {
         }
     }
 
-    private func groupedByMode() -> [StatCategoryItem] {
-        let grouped = Dictionary(grouping: qsos) { $0.mode }
-        return grouped.map { mode, qsos in
-            StatCategoryItem(
-                identifier: mode,
-                description: DescriptionLookup.modeDescription(for: mode),
+    private func groupedByQSL() -> [StatCategoryItem] {
+        let confirmed = qsos.filter(\.lotwConfirmed)
+        // Group by DXCC entity for confirmed QSLs
+        let withEntity = confirmed.filter { $0.dxccEntity != nil }
+        let grouped = Dictionary(grouping: withEntity) { $0.dxccEntity!.number }
+        return grouped.map { entityNumber, qsos in
+            let entity = qsos.first?.dxccEntity
+            return StatCategoryItem(
+                identifier: entity?.name ?? "Unknown",
+                description: "DXCC #\(entityNumber) - \(qsos.count) confirmed",
                 qsos: qsos
             )
         }
