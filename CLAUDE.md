@@ -153,6 +153,26 @@ Carrier Wave is a SwiftUI/SwiftData iOS app for amateur radio QSO (contact) logg
 - Store credentials in Keychain, never in SwiftData
 - Tests use in-memory SwiftData containers
 
+## Linting & Formatting
+
+Uses SwiftLint (`.swiftlint.yml`) and SwiftFormat (`.swiftformat`).
+
+**Key limits:**
+- Line length: 120 (warning), 200 (error)
+- File length: 500 (warning), 1000 (error)
+- Function body: 50 lines (warning), 100 (error)
+- Type body: 300 lines (warning), 500 (error)
+- Cyclomatic complexity: 15 (warning), 25 (error)
+
+**Formatting rules:**
+- 4-space indentation, no tabs
+- LF line endings
+- Trailing commas allowed
+- `else` on same line as closing brace
+- Spaces around operators and ranges
+- Remove explicit `self` where possible
+- Imports sorted, testable imports at bottom
+
 ## Getting Started
 
 See [docs/SETUP.md](docs/SETUP.md) for device builds and additional commands.
