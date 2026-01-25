@@ -87,7 +87,7 @@ extension DashboardView {
                 .buttonStyle(.bordered)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
         .padding()
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -181,7 +181,7 @@ extension DashboardView {
                 .buttonStyle(.bordered)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
         .padding()
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -308,7 +308,7 @@ extension DashboardView {
                 }
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity, minHeight: 130, alignment: .topLeading)
         .padding()
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 12))

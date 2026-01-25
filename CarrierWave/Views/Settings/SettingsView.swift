@@ -169,16 +169,6 @@ struct SettingsMainView: View {
                 }
 
                 Section {
-                    Button("Clear All QSOs", role: .destructive) {
-                        showingClearAllConfirmation = true
-                    }
-                } header: {
-                    Text("Data")
-                } footer: {
-                    Text("Permanently delete all QSOs from this device")
-                }
-
-                Section {
                     Toggle("Debug Mode", isOn: $debugMode)
 
                     if debugMode {
@@ -188,6 +178,10 @@ struct SettingsMainView: View {
                             SyncDebugView()
                         } label: {
                             Label("Sync Debug Log", systemImage: "doc.text.magnifyingglass")
+                        }
+
+                        Button("Clear All QSOs", role: .destructive) {
+                            showingClearAllConfirmation = true
                         }
                     }
                 } header: {
