@@ -12,7 +12,9 @@ enum KeychainError: Error {
 
 // MARK: - KeychainHelper
 
-struct KeychainHelper {
+/// Thread-safe keychain access helper.
+/// Keychain APIs are thread-safe at the OS level, so this type is safe to use from any context.
+struct KeychainHelper: Sendable {
     // MARK: Lifecycle
 
     private init() {}
@@ -103,7 +105,7 @@ struct KeychainHelper {
 
 /// Keychain keys for each service
 extension KeychainHelper {
-    enum Keys {
+    enum Keys: Sendable {
         // QRZ - token-based auth (new)
         static let qrzApiKey = "qrz.api.key"
         static let qrzCallsign = "qrz.callsign"
@@ -131,5 +133,8 @@ extension KeychainHelper {
 
         /// HAMRS
         static let hamrsApiKey = "hamrs.api.key"
+
+        /// Challenges
+        static let challengesAuthToken = "challenges.auth.token"
     }
 }

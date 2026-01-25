@@ -108,12 +108,21 @@ struct SettingsMainView: View {
                     } label: {
                         Label("iCloud Folder", systemImage: "icloud")
                     }
+
+                    // Challenges
+                    NavigationLink {
+                        ChallengesSettingsView()
+                    } label: {
+                        Label("Challenges", systemImage: "flag.2.crossed")
+                    }
                 } header: {
                     Text("Sync Sources")
                 }
 
                 Section {
-                    Stepper("Time window: \(dedupeTimeWindow) min", value: $dedupeTimeWindow, in: 1 ... 15)
+                    Stepper(
+                        "Time window: \(dedupeTimeWindow) min", value: $dedupeTimeWindow, in: 1 ... 15
+                    )
 
                     Button {
                         Task { await runDeduplication() }
@@ -132,7 +141,9 @@ struct SettingsMainView: View {
                 } header: {
                     Text("Deduplication")
                 } footer: {
-                    Text("Find QSOs with same callsign, band, and mode within \(dedupeTimeWindow) min and merge.")
+                    Text(
+                        "Find QSOs with same callsign, band, and mode within \(dedupeTimeWindow) min and merge."
+                    )
                 }
 
                 Section {
