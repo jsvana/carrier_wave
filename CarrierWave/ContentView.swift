@@ -6,6 +6,7 @@ import SwiftUI
 enum AppTab: Hashable {
     case dashboard
     case logs
+    case challenges
     case potaUploads
     case settings
 }
@@ -42,6 +43,12 @@ struct ContentView: View {
                 }
                 .tag(AppTab.logs)
 
+            ChallengesView()
+                .tabItem {
+                    Label("Challenges", systemImage: "flag.2.crossed")
+                }
+                .tag(AppTab.challenges)
+
             if let potaClient {
                 POTAUploadsView(potaClient: potaClient, potaAuth: potaAuthService)
                     .tabItem {
@@ -73,6 +80,18 @@ struct ContentView: View {
                 // Handle import - for now just print
                 print("Received ADIF file: \(url.lastPathComponent)")
             }
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .didReceiveChallengeInvite)
+        ) { notification in
+            guard let userInfo = notification.userInfo,
+                  userInfo["source"] is String,
+                  userInfo["challengeId"] is UUID
+            else {
+                return
+            }
+            // Navigate to challenges tab
+            selectedTab = .challenges
         }
     }
 

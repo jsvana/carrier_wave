@@ -15,6 +15,10 @@ struct CarrierWaveApp: App {
             UploadDestination.self,
             POTAUploadAttempt.self,
             ActivationMetadata.self,
+            ChallengeSource.self,
+            ChallengeDefinition.self,
+            ChallengeParticipation.self,
+            LeaderboardCache.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
@@ -37,7 +41,7 @@ struct CarrierWaveApp: App {
         WindowGroup {
             ContentView()
                 .onOpenURL { url in
-                    handleADIFFile(url)
+                    handleURL(url)
                 }
         }
         .modelContainer(sharedModelContainer)
@@ -45,14 +49,58 @@ struct CarrierWaveApp: App {
 
     // MARK: Private
 
-    private func handleADIFFile(_ url: URL) {
+    private func handleURL(_ url: URL) {
+        // Check if it's a challenge invite link
+        if url.scheme == "carrierwave", url.host == "challenge" {
+            handleChallengeURL(url)
+            return
+        }
+
+        // Otherwise treat as ADIF file
         NotificationCenter.default.post(
             name: .didReceiveADIFFile,
             object: url
+        )
+    }
+
+    private func handleChallengeURL(_ url: URL) {
+        // Parse carrierwave://challenge/join?source=...&id=...&token=...
+        guard url.path == "/join" else {
+            return
+        }
+
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let queryItems = components?.queryItems ?? []
+
+        var params: [String: String] = [:]
+        for item in queryItems {
+            if let value = item.value {
+                params[item.name] = value
+            }
+        }
+
+        guard let source = params["source"],
+              let idString = params["id"],
+              let challengeId = UUID(uuidString: idString)
+        else {
+            return
+        }
+
+        let token = params["token"]
+
+        NotificationCenter.default.post(
+            name: .didReceiveChallengeInvite,
+            object: nil,
+            userInfo: [
+                "source": source,
+                "challengeId": challengeId,
+                "token": token as Any,
+            ]
         )
     }
 }
 
 extension Notification.Name {
     static let didReceiveADIFFile = Notification.Name("didReceiveADIFFile")
+    static let didReceiveChallengeInvite = Notification.Name("didReceiveChallengeInvite")
 }
