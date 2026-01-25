@@ -22,7 +22,7 @@ final class ChallengeParticipation {
         self.challengeDefinition = challengeDefinition
         self.userId = userId
         self.joinedAt = joinedAt
-        self.status = status
+        statusRawValue = status.rawValue
         self.currentTier = currentTier
         self.completedAt = completedAt
         self.progressData = progressData
@@ -31,11 +31,12 @@ final class ChallengeParticipation {
 
     // MARK: Internal
 
-    var id: UUID
+    var id = UUID()
     var challengeDefinition: ChallengeDefinition?
-    var userId: String
-    var joinedAt: Date
-    var status: ParticipationStatus
+    var userId = ""
+    var joinedAt = Date()
+    var statusRawValue = ParticipationStatus.active.rawValue
+
     var currentTier: String?
     var completedAt: Date?
 
@@ -45,9 +46,20 @@ final class ChallengeParticipation {
     /// Server-assigned participation ID for sync
     var serverParticipationId: UUID?
 
+    /// Whether historical QSOs are allowed for this participation
+    var historicalAllowed: Bool = false
+
+    /// Current rank on server leaderboard
+    var serverRank: Int?
+
     // Sync tracking
     var lastSyncedAt: Date?
     var needsSync: Bool = false
+
+    var status: ParticipationStatus {
+        get { ParticipationStatus(rawValue: statusRawValue) ?? .active }
+        set { statusRawValue = newValue.rawValue }
+    }
 
     // MARK: - Progress Access
 

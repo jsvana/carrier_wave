@@ -35,9 +35,9 @@ final class ChallengesSyncService: ObservableObject {
 
     /// Fetch the official challenge source (creates if needed)
     func getOrCreateOfficialSource() throws -> ChallengeSource {
-        let officialType = ChallengeSourceType.official
+        let officialRaw = ChallengeSourceType.official.rawValue
         let descriptor = FetchDescriptor<ChallengeSource>(
-            predicate: #Predicate { $0.type == officialType }
+            predicate: #Predicate { $0.typeRawValue == officialRaw }
         )
 
         if let existing = try modelContext.fetch(descriptor).first {
@@ -46,7 +46,7 @@ final class ChallengesSyncService: ObservableObject {
 
         let official = ChallengeSource(
             type: .official,
-            url: "https://challenges.carrierwave.app/api",
+            url: "https://challenges.example.com",
             name: "Carrier Wave Official"
         )
         modelContext.insert(official)
@@ -108,7 +108,7 @@ final class ChallengesSyncService: ObservableObject {
 
     /// Refresh challenges from a specific source
     func refreshChallenges(from source: ChallengeSource) async throws {
-        let dtos = try await client.fetchChallenges(from: source.url)
+        let listData = try await client.fetchChallenges(from: source.url, active: true)
 
         // Fetch existing challenges for this source
         let sourceId = source.id
@@ -118,11 +118,18 @@ final class ChallengesSyncService: ObservableObject {
         let existing = try modelContext.fetch(descriptor)
         let existingById = Dictionary(uniqueKeysWithValues: existing.map { ($0.id, $0) })
 
-        for dto in dtos {
+        // Fetch full details for each challenge in the list
+        for listItem in listData.challenges {
+            let dto = try await client.fetchChallenge(id: listItem.id, from: source.url)
+
             if let existing = existingById[dto.id] {
                 // Update existing if version changed
                 if dto.version > existing.version {
-                    try updateChallengeDefinition(existing, from: dto)
+                    try existing.update(from: dto)
+                    // Re-evaluate progress for all participations
+                    for participation in existing.participations {
+                        progressEngine.reevaluateAllQSOs(for: participation)
+                    }
                 }
             } else {
                 // Create new
@@ -138,30 +145,35 @@ final class ChallengesSyncService: ObservableObject {
     // MARK: - Participation
 
     /// Join a challenge
-    func joinChallenge(_ definition: ChallengeDefinition, token: String? = nil) async throws {
+    func joinChallenge(_ definition: ChallengeDefinition, inviteToken: String? = nil) async throws {
         guard let sourceURL = definition.source?.url else {
             throw ChallengesError.invalidServerURL
+        }
+
+        let callsign = UserDefaults.standard.string(forKey: "userCallsign") ?? ""
+        guard !callsign.isEmpty else {
+            throw ChallengesError.notAuthenticated
         }
 
         let response = try await client.joinChallenge(
             id: definition.id,
             sourceURL: sourceURL,
-            token: token
+            callsign: callsign,
+            inviteToken: inviteToken
         )
-
-        guard let callsign = await client.getCallsign() else {
-            throw ChallengesError.notAuthenticated
-        }
 
         let participation = ChallengeParticipation.join(
             challenge: definition,
             userId: callsign,
             serverParticipationId: response.participationId
         )
+        participation.historicalAllowed = response.historicalAllowed
         modelContext.insert(participation)
 
-        // Evaluate historical QSOs
-        progressEngine.evaluateHistoricalQSOs(for: participation)
+        // Evaluate historical QSOs if allowed
+        if response.historicalAllowed {
+            progressEngine.evaluateHistoricalQSOs(for: participation)
+        }
 
         try modelContext.save()
 
@@ -189,16 +201,22 @@ final class ChallengesSyncService: ObservableObject {
     func reportProgress(_ participation: ChallengeParticipation) async throws {
         guard let definition = participation.challengeDefinition,
               let sourceURL = definition.source?.url,
-              let serverParticipationId = participation.serverParticipationId
+              participation.serverParticipationId != nil
         else {
             return
         }
 
+        let localProgress = participation.progress
+        let report = ProgressReportRequest(
+            completedGoals: localProgress.completedGoals,
+            currentValue: localProgress.currentValue,
+            qualifyingQsoCount: localProgress.qualifyingQSOIds.count,
+            lastQsoDate: localProgress.lastUpdated
+        )
         let response = try await client.reportProgress(
-            participationId: serverParticipationId,
-            progress: participation.progress,
-            sourceURL: sourceURL,
-            challengeId: definition.id
+            challengeId: definition.id,
+            report: report,
+            sourceURL: sourceURL
         )
 
         if response.accepted {
@@ -206,9 +224,20 @@ final class ChallengesSyncService: ObservableObject {
             participation.needsSync = false
         }
 
-        // If server returned different progress, update local
-        if let serverProgress = response.serverProgress {
-            participation.progress = serverProgress
+        // Update local progress with server values
+        let serverProgress = response.serverProgress
+        participation.progress = ChallengeProgress(
+            completedGoals: serverProgress.completedGoals,
+            currentValue: serverProgress.currentValue,
+            percentage: serverProgress.percentage,
+            score: serverProgress.score,
+            qualifyingQSOIds: localProgress.qualifyingQSOIds,
+            lastUpdated: Date()
+        )
+
+        // Update rank if provided
+        if let rank = serverProgress.rank {
+            participation.serverRank = rank
         }
 
         try modelContext.save()
@@ -216,9 +245,9 @@ final class ChallengesSyncService: ObservableObject {
 
     /// Sync all participations that need sync
     func syncAllProgress() async throws {
-        let activeStatus = ParticipationStatus.active
+        let activeRaw = ParticipationStatus.active.rawValue
         let descriptor = FetchDescriptor<ChallengeParticipation>(
-            predicate: #Predicate { $0.needsSync && $0.status == activeStatus }
+            predicate: #Predicate { $0.needsSync && $0.statusRawValue == activeRaw }
         )
         let participations = try modelContext.fetch(descriptor)
 
@@ -240,7 +269,7 @@ final class ChallengesSyncService: ObservableObject {
             throw ChallengesError.invalidServerURL
         }
 
-        let response = try await client.fetchLeaderboard(
+        let leaderboardData = try await client.fetchLeaderboard(
             challengeId: definition.id,
             sourceURL: sourceURL
         )
@@ -252,25 +281,15 @@ final class ChallengesSyncService: ObservableObject {
         )
 
         if let cache = try modelContext.fetch(cacheDescriptor).first {
-            cache.update(from: response)
+            cache.update(from: leaderboardData)
         } else {
-            let cache = LeaderboardCache.from(response: response)
+            let cache = LeaderboardCache.from(challengeId: challengeId, data: leaderboardData)
             modelContext.insert(cache)
         }
 
         try modelContext.save()
 
-        // Mark current user's entry
-        var entries = response.entries
-        if let callsign = await client.getCallsign() {
-            entries = entries.map { entry in
-                var updated = entry
-                updated.isCurrentUser = entry.callsign.uppercased() == callsign.uppercased()
-                return updated
-            }
-        }
-
-        return entries
+        return leaderboardData.leaderboard
     }
 
     /// Get cached leaderboard (returns nil if cache is stale)
@@ -320,9 +339,9 @@ final class ChallengesSyncService: ObservableObject {
 
     /// Fetch all active participations
     func fetchActiveParticipations() throws -> [ChallengeParticipation] {
-        let activeStatus = ParticipationStatus.active
+        let activeRaw = ParticipationStatus.active.rawValue
         let descriptor = FetchDescriptor<ChallengeParticipation>(
-            predicate: #Predicate { $0.status == activeStatus },
+            predicate: #Predicate { $0.statusRawValue == activeRaw },
             sortBy: [SortDescriptor(\.joinedAt, order: .reverse)]
         )
         return try modelContext.fetch(descriptor)
@@ -330,31 +349,11 @@ final class ChallengesSyncService: ObservableObject {
 
     /// Fetch all completed participations
     func fetchCompletedParticipations() throws -> [ChallengeParticipation] {
-        let completedStatus = ParticipationStatus.completed
+        let completedRaw = ParticipationStatus.completed.rawValue
         let descriptor = FetchDescriptor<ChallengeParticipation>(
-            predicate: #Predicate { $0.status == completedStatus },
+            predicate: #Predicate { $0.statusRawValue == completedRaw },
             sortBy: [SortDescriptor(\.completedAt, order: .reverse)]
         )
         return try modelContext.fetch(descriptor)
-    }
-
-    // MARK: Private
-
-    /// Update an existing challenge definition
-    private func updateChallengeDefinition(
-        _ definition: ChallengeDefinition,
-        from dto: ChallengeDefinitionDTO
-    ) throws {
-        definition.version = dto.version
-        definition.name = dto.metadata.name
-        definition.descriptionText = dto.metadata.description
-        definition.author = dto.metadata.author
-        definition.updatedAt = dto.metadata.updatedAt
-        definition.configurationData = try JSONEncoder().encode(dto.configuration)
-
-        // Re-evaluate progress for all participations
-        for participation in definition.participations {
-            progressEngine.reevaluateAllQSOs(for: participation)
-        }
     }
 }

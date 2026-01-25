@@ -206,10 +206,8 @@ struct LeaderboardEntry: Codable, Identifiable, Equatable {
     var rank: Int
     var callsign: String
     var score: Int
-    var progress: Double
     var currentTier: String?
     var completedAt: Date?
-    var isCurrentUser: Bool
 
     var id: String { callsign }
 }
@@ -228,55 +226,206 @@ struct ChallengeConfiguration: Codable, Equatable {
     var inviteConfig: InviteConfig?
 }
 
-// MARK: - ChallengeListResponse
+// MARK: - APIResponse
 
-struct ChallengeListResponse: Codable {
-    var challenges: [ChallengeDefinitionDTO]
+struct APIResponse<T: Codable>: Codable {
+    var data: T
+}
+
+// MARK: - APIError
+
+struct APIError: Codable {
+    var code: String
+    var message: String
+    var details: [String: String]?
+}
+
+// MARK: - APIErrorResponse
+
+struct APIErrorResponse: Codable {
+    var error: APIError
+}
+
+// MARK: - ChallengeListData
+
+struct ChallengeListData: Codable {
+    var challenges: [ChallengeListItemDTO]
+    var total: Int
+    var limit: Int
+    var offset: Int
+}
+
+// MARK: - ChallengeListItemDTO
+
+struct ChallengeListItemDTO: Codable, Identifiable {
+    var id: UUID
+    var name: String
+    var description: String
+    var category: ChallengeCategory
+    var type: ChallengeType
+    var participantCount: Int
+    var isActive: Bool
+}
+
+// MARK: - ChallengeCategory
+
+enum ChallengeCategory: String, Codable, CaseIterable {
+    case award
+    case event
+    case club
+    case personal
+    case other
 }
 
 // MARK: - ChallengeDefinitionDTO
 
 struct ChallengeDefinitionDTO: Codable, Identifiable {
     var id: UUID
-    var sourceURL: String
     var version: Int
-    var metadata: ChallengeMetadata
+    var name: String
+    var description: String
+    var author: String
+    var category: ChallengeCategory
     var type: ChallengeType
-    var configuration: ChallengeConfiguration
+    var configuration: ChallengeConfigurationDTO
+    var badges: [ChallengeBadgeDTO]?
+    var isActive: Bool
+    var createdAt: Date
+    var updatedAt: Date
 }
 
-// MARK: - LeaderboardResponse
+// MARK: - ChallengeConfigurationDTO
 
-struct LeaderboardResponse: Codable {
-    var challengeId: UUID
-    var entries: [LeaderboardEntry]
+struct ChallengeConfigurationDTO: Codable, Equatable {
+    var goals: ChallengeGoalsDTO
+    var tiers: [ChallengeTierDTO]?
+    var qualificationCriteria: QualificationCriteriaDTO
+    var scoring: ScoringConfigDTO
+    var historicalQsosAllowed: Bool
+}
+
+// MARK: - ChallengeGoalsDTO
+
+struct ChallengeGoalsDTO: Codable, Equatable {
+    var type: String
+    var items: [ChallengeGoalItemDTO]?
+    var target: Int?
+    var unit: String?
+}
+
+// MARK: - ChallengeGoalItemDTO
+
+struct ChallengeGoalItemDTO: Codable, Identifiable, Equatable {
+    var id: String
+    var name: String
+}
+
+// MARK: - ChallengeTierDTO
+
+struct ChallengeTierDTO: Codable, Identifiable, Equatable {
+    var id: String
+    var name: String
+    var threshold: Int
+}
+
+// MARK: - QualificationCriteriaDTO
+
+struct QualificationCriteriaDTO: Codable, Equatable {
+    var bands: [String]?
+    var modes: [String]?
+    var requiredFields: [String]?
+    var dateRange: DateRangeDTO?
+    var matchRules: [MatchRuleDTO]?
+}
+
+// MARK: - DateRangeDTO
+
+struct DateRangeDTO: Codable, Equatable {
+    var start: Date
+    var end: Date
+}
+
+// MARK: - MatchRuleDTO
+
+struct MatchRuleDTO: Codable, Equatable {
+    var qsoField: String
+    var goalField: String
+}
+
+// MARK: - ScoringConfigDTO
+
+struct ScoringConfigDTO: Codable, Equatable {
+    var method: String
+    var displayFormat: String?
+}
+
+// MARK: - ChallengeBadgeDTO
+
+struct ChallengeBadgeDTO: Codable, Identifiable, Equatable {
+    var id: String
+    var name: String
+    var tierId: String?
+}
+
+// MARK: - LeaderboardData
+
+struct LeaderboardData: Codable {
+    var leaderboard: [LeaderboardEntry]
+    var total: Int
+    var userPosition: LeaderboardUserPosition?
     var lastUpdated: Date
+}
+
+// MARK: - LeaderboardUserPosition
+
+struct LeaderboardUserPosition: Codable, Equatable {
+    var rank: Int
+    var callsign: String
+    var score: Int
 }
 
 // MARK: - JoinChallengeRequest
 
 struct JoinChallengeRequest: Codable {
     var callsign: String
-    var token: String?
+    var deviceName: String
+    var inviteToken: String?
 }
 
-// MARK: - JoinChallengeResponse
+// MARK: - JoinChallengeData
 
-struct JoinChallengeResponse: Codable {
+struct JoinChallengeData: Codable {
     var participationId: UUID
+    var deviceToken: String
     var joinedAt: Date
+    var status: String
+    var historicalAllowed: Bool
 }
 
 // MARK: - ProgressReportRequest
 
 struct ProgressReportRequest: Codable {
-    var participationId: UUID
-    var progress: ChallengeProgress
+    var completedGoals: [String]
+    var currentValue: Int
+    var qualifyingQsoCount: Int
+    var lastQsoDate: Date?
 }
 
-// MARK: - ProgressReportResponse
+// MARK: - ServerProgress
 
-struct ProgressReportResponse: Codable {
+struct ServerProgress: Codable, Equatable {
+    var completedGoals: [String]
+    var currentValue: Int
+    var percentage: Double
+    var score: Int
+    var rank: Int?
+    var currentTier: String?
+}
+
+// MARK: - ProgressReportData
+
+struct ProgressReportData: Codable {
     var accepted: Bool
-    var serverProgress: ChallengeProgress?
+    var serverProgress: ServerProgress
+    var newBadges: [String]?
 }

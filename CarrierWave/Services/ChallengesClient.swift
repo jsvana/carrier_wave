@@ -1,11 +1,15 @@
 import Foundation
 
+#if canImport(UIKit)
+    import UIKit
+#endif
+
 // MARK: - ChallengesClient
 
 actor ChallengesClient {
     // MARK: Lifecycle
 
-    init(baseURL: String = "https://challenges.carrierwave.app/api") {
+    init(baseURL: String = "https://challenges.example.com") {
         self.baseURL = baseURL
     }
 
@@ -36,48 +40,72 @@ actor ChallengesClient {
         try? keychain.delete(for: KeychainHelper.Keys.challengesAuthToken)
     }
 
-    func saveCallsign(_ callsign: String) throws {
-        try keychain.save(callsign, for: KeychainHelper.Keys.challengesCallsign)
-    }
-
-    func getCallsign() -> String? {
-        try? keychain.readString(for: KeychainHelper.Keys.challengesCallsign)
-    }
-
     func logout() {
         clearAuthToken()
-        try? keychain.delete(for: KeychainHelper.Keys.challengesCallsign)
     }
 
     // MARK: - Challenge Sources
 
-    /// Fetch challenges from a source URL
-    func fetchChallenges(from sourceURL: String) async throws -> [ChallengeDefinitionDTO] {
-        let url = try buildURL(sourceURL, path: "/challenges")
-        let request = try buildRequest(url: url, method: "GET")
+    /// Fetch challenges with optional filters
+    func fetchChallenges(
+        from sourceURL: String,
+        category: ChallengeCategory? = nil,
+        type: ChallengeType? = nil,
+        active: Bool? = nil,
+        limit: Int? = nil,
+        offset: Int? = nil
+    ) async throws -> ChallengeListData {
+        var components = URLComponents(string: sourceURL + "/v1/challenges")
+        var queryItems: [URLQueryItem] = []
 
+        if let category {
+            queryItems.append(URLQueryItem(name: "category", value: category.rawValue))
+        }
+        if let type {
+            queryItems.append(URLQueryItem(name: "type", value: type.rawValue))
+        }
+        if let active {
+            queryItems.append(URLQueryItem(name: "active", value: String(active)))
+        }
+        if let limit {
+            queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
+        }
+        if let offset {
+            queryItems.append(URLQueryItem(name: "offset", value: String(offset)))
+        }
+
+        if !queryItems.isEmpty {
+            components?.queryItems = queryItems
+        }
+
+        guard let url = components?.url else {
+            throw ChallengesError.invalidServerURL
+        }
+
+        let request = try buildRequest(url: url, method: "GET")
         let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
 
-        let listResponse = try JSONDecoder.challengesDecoder.decode(
-            ChallengeListResponse.self,
+        let apiResponse = try JSONDecoder.challengesDecoder.decode(
+            APIResponse<ChallengeListData>.self,
             from: data
         )
-        return listResponse.challenges
+        return apiResponse.data
     }
 
     /// Fetch a single challenge definition
     func fetchChallenge(id: UUID, from sourceURL: String) async throws -> ChallengeDefinitionDTO {
-        let url = try buildURL(sourceURL, path: "/challenges/\(id.uuidString)")
+        let url = try buildURL(sourceURL, path: "/v1/challenges/\(id.uuidString)")
         let request = try buildRequest(url: url, method: "GET")
 
         let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
 
-        return try JSONDecoder.challengesDecoder.decode(
-            ChallengeDefinitionDTO.self,
+        let apiResponse = try JSONDecoder.challengesDecoder.decode(
+            APIResponse<ChallengeDefinitionDTO>.self,
             from: data
         )
+        return apiResponse.data
     }
 
     // MARK: - Participation
@@ -86,52 +114,39 @@ actor ChallengesClient {
     func joinChallenge(
         id: UUID,
         sourceURL: String,
-        token: String? = nil
-    ) async throws -> JoinChallengeResponse {
-        let authToken = try getAuthToken()
-        guard let callsign = getCallsign() else {
-            throw ChallengesError.notAuthenticated
-        }
+        callsign: String,
+        inviteToken: String? = nil
+    ) async throws -> JoinChallengeData {
+        let url = try buildURL(sourceURL, path: "/v1/challenges/\(id.uuidString)/join")
+        var request = try buildRequest(url: url, method: "POST")
 
-        let url = try buildURL(sourceURL, path: "/challenges/\(id.uuidString)/join")
-        var request = try buildRequest(url: url, method: "POST", authToken: authToken)
-
-        let joinRequest = JoinChallengeRequest(callsign: callsign, token: token)
+        let joinRequest = JoinChallengeRequest(
+            callsign: callsign,
+            deviceName: deviceName,
+            inviteToken: inviteToken
+        )
         request.httpBody = try JSONEncoder().encode(joinRequest)
 
         let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
 
-        // Handle specific error cases
-        if let httpResponse = response as? HTTPURLResponse {
-            switch httpResponse.statusCode {
-            case 200,
-                 201:
-                break
-            case 404:
-                throw ChallengesError.challengeNotFound
-            case 409:
-                throw ChallengesError.alreadyJoined
-            case 410:
-                throw ChallengesError.inviteExpired
-            case 429:
-                throw ChallengesError.inviteFull
-            default:
-                try validateResponse(response, data: data)
-            }
-        }
-
-        return try JSONDecoder.challengesDecoder.decode(
-            JoinChallengeResponse.self,
+        let apiResponse = try JSONDecoder.challengesDecoder.decode(
+            APIResponse<JoinChallengeData>.self,
             from: data
         )
+
+        // Save the device token for future authenticated requests
+        try saveAuthToken(apiResponse.data.deviceToken)
+
+        return apiResponse.data
     }
 
     /// Leave a challenge
     func leaveChallenge(id: UUID, sourceURL: String) async throws {
         let authToken = try getAuthToken()
 
-        let url = try buildURL(sourceURL, path: "/challenges/\(id.uuidString)/leave")
-        let request = try buildRequest(url: url, method: "POST", authToken: authToken)
+        let url = try buildURL(sourceURL, path: "/v1/challenges/\(id.uuidString)/leave")
+        let request = try buildRequest(url: url, method: "DELETE", authToken: authToken)
 
         let (data, response) = try await performRequest(request)
 
@@ -140,8 +155,6 @@ actor ChallengesClient {
             case 200,
                  204:
                 return
-            case 404:
-                throw ChallengesError.notParticipating
             default:
                 try validateResponse(response, data: data)
             }
@@ -150,29 +163,44 @@ actor ChallengesClient {
 
     /// Report progress to server
     func reportProgress(
-        participationId: UUID,
-        progress: ChallengeProgress,
-        sourceURL: String,
-        challengeId: UUID
-    ) async throws -> ProgressReportResponse {
+        challengeId: UUID,
+        report: ProgressReportRequest,
+        sourceURL: String
+    ) async throws -> ProgressReportData {
         let authToken = try getAuthToken()
 
-        let url = try buildURL(sourceURL, path: "/challenges/\(challengeId.uuidString)/progress")
+        let url = try buildURL(sourceURL, path: "/v1/challenges/\(challengeId.uuidString)/progress")
         var request = try buildRequest(url: url, method: "POST", authToken: authToken)
-
-        let reportRequest = ProgressReportRequest(
-            participationId: participationId,
-            progress: progress
-        )
-        request.httpBody = try JSONEncoder().encode(reportRequest)
+        request.httpBody = try JSONEncoder.challengesEncoder.encode(report)
 
         let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
 
-        return try JSONDecoder.challengesDecoder.decode(
-            ProgressReportResponse.self,
+        let apiResponse = try JSONDecoder.challengesDecoder.decode(
+            APIResponse<ProgressReportData>.self,
             from: data
         )
+        return apiResponse.data
+    }
+
+    /// Get current progress for authenticated user
+    func getProgress(
+        challengeId: UUID,
+        sourceURL: String
+    ) async throws -> ServerProgress {
+        let authToken = try getAuthToken()
+
+        let url = try buildURL(sourceURL, path: "/v1/challenges/\(challengeId.uuidString)/progress")
+        let request = try buildRequest(url: url, method: "GET", authToken: authToken)
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        let apiResponse = try JSONDecoder.challengesDecoder.decode(
+            APIResponse<ServerProgress>.self,
+            from: data
+        )
+        return apiResponse.data
     }
 
     // MARK: - Leaderboards
@@ -180,52 +208,79 @@ actor ChallengesClient {
     /// Fetch leaderboard for a challenge
     func fetchLeaderboard(
         challengeId: UUID,
-        sourceURL: String
-    ) async throws -> LeaderboardResponse {
-        let url = try buildURL(sourceURL, path: "/challenges/\(challengeId.uuidString)/leaderboard")
+        sourceURL: String,
+        limit: Int? = nil,
+        offset: Int? = nil,
+        around: String? = nil
+    ) async throws -> LeaderboardData {
+        var components = URLComponents(
+            string: sourceURL + "/v1/challenges/\(challengeId.uuidString)/leaderboard"
+        )
+        var queryItems: [URLQueryItem] = []
+
+        if let limit {
+            queryItems.append(URLQueryItem(name: "limit", value: String(limit)))
+        }
+        if let offset {
+            queryItems.append(URLQueryItem(name: "offset", value: String(offset)))
+        }
+        if let around {
+            queryItems.append(URLQueryItem(name: "around", value: around))
+        }
+
+        if !queryItems.isEmpty {
+            components?.queryItems = queryItems
+        }
+
+        guard let url = components?.url else {
+            throw ChallengesError.invalidServerURL
+        }
+
+        let request = try buildRequest(url: url, method: "GET")
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        let apiResponse = try JSONDecoder.challengesDecoder.decode(
+            APIResponse<LeaderboardData>.self,
+            from: data
+        )
+        return apiResponse.data
+    }
+
+    // MARK: - Health Check
+
+    /// Check server health
+    func healthCheck(sourceURL: String) async throws -> Bool {
+        let url = try buildURL(sourceURL, path: "/v1/health")
         let request = try buildRequest(url: url, method: "GET")
 
         let (data, response) = try await performRequest(request)
         try validateResponse(response, data: data)
 
-        return try JSONDecoder.challengesDecoder.decode(
-            LeaderboardResponse.self,
-            from: data
-        )
-    }
-
-    // MARK: - Invite Links
-
-    /// Validate an invite token
-    func validateInvite(token: String, sourceURL: String) async throws -> ChallengeDefinitionDTO {
-        let url = try buildURL(sourceURL, path: "/invites/\(token)")
-        let request = try buildRequest(url: url, method: "GET")
-
-        let (data, response) = try await performRequest(request)
-
-        if let httpResponse = response as? HTTPURLResponse {
-            switch httpResponse.statusCode {
-            case 200:
-                break
-            case 404:
-                throw ChallengesError.invalidInviteToken
-            case 410:
-                throw ChallengesError.inviteExpired
-            default:
-                try validateResponse(response, data: data)
-            }
+        struct HealthResponse: Codable {
+            var status: String
+            var version: String
         }
 
-        return try JSONDecoder.challengesDecoder.decode(
-            ChallengeDefinitionDTO.self,
+        let healthResponse = try JSONDecoder.challengesDecoder.decode(
+            HealthResponse.self,
             from: data
         )
+        return healthResponse.status == "ok"
     }
 
     // MARK: Private
 
     private let baseURL: String
     private let userAgent = "CarrierWave/1.0"
+
+    private var deviceName: String {
+        #if canImport(UIKit)
+            return UIDevice.current.name
+        #else
+            return "Unknown Device"
+        #endif
+    }
 
     // MARK: - Request Building
 
@@ -268,10 +323,31 @@ actor ChallengesClient {
         }
 
         guard (200 ... 299).contains(httpResponse.statusCode) else {
+            // Try to parse API error response
+            if let errorResponse = try? JSONDecoder.challengesDecoder.decode(
+                APIErrorResponse.self,
+                from: data
+            ) {
+                throw ChallengesError.from(
+                    apiCode: errorResponse.error.code,
+                    message: errorResponse.error.message
+                )
+            }
+
             let message = String(data: data, encoding: .utf8)
             throw ChallengesError.serverError(httpResponse.statusCode, message)
         }
     }
+}
+
+// MARK: - JSON Encoder Extension
+
+extension JSONEncoder {
+    static let challengesEncoder: JSONEncoder = {
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        return encoder
+    }()
 }
 
 // MARK: - JSON Decoder Extension
@@ -282,11 +358,4 @@ extension JSONDecoder {
         decoder.dateDecodingStrategy = .iso8601
         return decoder
     }()
-}
-
-// MARK: - Keychain Keys Extension
-
-extension KeychainHelper.Keys {
-    static let challengesAuthToken = "challenges.auth.token"
-    static let challengesCallsign = "challenges.callsign"
 }

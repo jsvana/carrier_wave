@@ -173,7 +173,11 @@ struct ChallengeDetailView: View {
 
                 NavigationLink {
                     if let definition {
-                        LeaderboardView(definition: definition, entries: leaderboardEntries)
+                        LeaderboardView(
+                            definition: definition,
+                            entries: leaderboardEntries,
+                            currentUserCallsign: participation.userId
+                        )
                     }
                 } label: {
                     Text("View All")
@@ -188,7 +192,11 @@ struct ChallengeDetailView: View {
                     .padding(.vertical, 8)
             } else {
                 ForEach(leaderboardEntries.prefix(5)) { entry in
-                    LeaderboardEntryRow(entry: entry, compact: true)
+                    LeaderboardEntryRow(
+                        entry: entry,
+                        currentUserCallsign: participation.userId,
+                        compact: true
+                    )
                 }
             }
         }

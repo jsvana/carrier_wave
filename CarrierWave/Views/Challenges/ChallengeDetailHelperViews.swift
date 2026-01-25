@@ -32,6 +32,7 @@ struct LeaderboardEntryRow: View {
     // MARK: Internal
 
     let entry: LeaderboardEntry
+    var currentUserCallsign: String?
     var compact: Bool = false
 
     var body: some View {
@@ -46,9 +47,9 @@ struct LeaderboardEntryRow: View {
             // Callsign
             Text(entry.callsign)
                 .font(compact ? .subheadline : .body)
-                .fontWeight(entry.isCurrentUser ? .bold : .regular)
+                .fontWeight(isCurrentUser ? .bold : .regular)
 
-            if entry.isCurrentUser {
+            if isCurrentUser {
                 Text("(You)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
@@ -61,21 +62,22 @@ struct LeaderboardEntryRow: View {
                 Text("\(entry.score)")
                     .font(compact ? .subheadline : .body)
                     .fontWeight(.medium)
-
-                if !compact {
-                    Text(String(format: "%.1f%%", entry.progress))
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
             }
         }
         .padding(.vertical, compact ? 4 : 8)
         .padding(.horizontal, compact ? 0 : 12)
-        .background(entry.isCurrentUser ? Color.accentColor.opacity(0.1) : Color.clear)
+        .background(isCurrentUser ? Color.accentColor.opacity(0.1) : Color.clear)
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
     // MARK: Private
+
+    private var isCurrentUser: Bool {
+        guard let currentUserCallsign else {
+            return false
+        }
+        return entry.callsign.uppercased() == currentUserCallsign.uppercased()
+    }
 
     private var rankColor: Color {
         switch entry.rank {

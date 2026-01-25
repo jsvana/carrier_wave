@@ -21,10 +21,10 @@ final class LeaderboardCache {
 
     // MARK: Internal
 
-    var id: UUID
-    var challengeId: UUID
-    var entriesData: Data
-    var lastUpdated: Date
+    var id = UUID()
+    var challengeId = UUID()
+    var entriesData = Data()
+    var lastUpdated = Date()
 
     // MARK: - Entries Access
 
@@ -68,16 +68,16 @@ final class LeaderboardCache {
 
 extension LeaderboardCache {
     /// Create from API response
-    static func from(response: LeaderboardResponse) -> LeaderboardCache {
-        let cache = LeaderboardCache(challengeId: response.challengeId)
-        cache.entries = response.entries
-        cache.lastUpdated = response.lastUpdated
+    static func from(challengeId: UUID, data: LeaderboardData) -> LeaderboardCache {
+        let cache = LeaderboardCache(challengeId: challengeId)
+        cache.entries = data.leaderboard
+        cache.lastUpdated = data.lastUpdated
         return cache
     }
 
     /// Update from API response
-    func update(from response: LeaderboardResponse) {
-        entries = response.entries
-        lastUpdated = response.lastUpdated
+    func update(from data: LeaderboardData) {
+        entries = data.leaderboard
+        lastUpdated = data.lastUpdated
     }
 }

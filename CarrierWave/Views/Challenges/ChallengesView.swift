@@ -318,16 +318,16 @@ struct InviteJoinSheet: View {
     private func challengePreview(_ dto: ChallengeDefinitionDTO) -> some View {
         VStack(spacing: 20) {
             VStack(spacing: 8) {
-                Text(dto.metadata.name)
+                Text(dto.name)
                     .font(.title2)
                     .fontWeight(.bold)
 
-                Text(dto.metadata.author)
+                Text(dto.author)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
 
-            Text(dto.metadata.description)
+            Text(dto.description)
                 .font(.body)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(.secondary)
@@ -335,9 +335,9 @@ struct InviteJoinSheet: View {
             HStack(spacing: 16) {
                 ChallengeTypeBadge(type: dto.type)
 
-                if !dto.configuration.goals.isEmpty {
+                if let items = dto.configuration.goals.items, !items.isEmpty {
                     Label(
-                        "\(dto.configuration.goals.count) items",
+                        "\(items.count) items",
                         systemImage: "square.grid.2x2"
                     )
                     .font(.caption)
@@ -406,7 +406,7 @@ struct InviteJoinSheet: View {
                 let newSource = ChallengeSource(
                     type: .invite,
                     url: invite.sourceURL,
-                    name: "Invite: \(dto.metadata.name)"
+                    name: "Invite: \(dto.name)"
                 )
                 modelContext.insert(newSource)
                 source = newSource
@@ -417,7 +417,7 @@ struct InviteJoinSheet: View {
             modelContext.insert(definition)
 
             // Join via the sync service
-            try await syncService.joinChallenge(definition, token: invite.token)
+            try await syncService.joinChallenge(definition, inviteToken: invite.token)
 
             onComplete(true)
         } catch {

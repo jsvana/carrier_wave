@@ -15,7 +15,7 @@ final class ChallengeSource {
         lastError: String? = nil
     ) {
         self.id = id
-        self.type = type
+        typeRawValue = type.rawValue
         self.url = url
         self.name = name
         self.isEnabled = isEnabled
@@ -25,16 +25,22 @@ final class ChallengeSource {
 
     // MARK: Internal
 
-    var id: UUID
-    var type: ChallengeSourceType
-    var url: String
-    var name: String
-    var isEnabled: Bool
+    var id = UUID()
+    var typeRawValue = ChallengeSourceType.community.rawValue
+
+    var url = ""
+    var name = ""
+    var isEnabled = true
     var lastFetched: Date?
     var lastError: String?
 
     @Relationship(deleteRule: .cascade, inverse: \ChallengeDefinition.source)
     var challenges: [ChallengeDefinition] = []
+
+    var type: ChallengeSourceType {
+        get { ChallengeSourceType(rawValue: typeRawValue) ?? .community }
+        set { typeRawValue = newValue.rawValue }
+    }
 
     /// Whether this is the official Carrier Wave source
     var isOfficial: Bool {

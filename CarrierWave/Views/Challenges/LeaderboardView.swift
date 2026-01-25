@@ -10,6 +10,7 @@ struct LeaderboardView: View {
 
     let definition: ChallengeDefinition
     let entries: [LeaderboardEntry]
+    var currentUserCallsign: String?
 
     var displayedEntries: [LeaderboardEntry] {
         liveEntries.isEmpty ? entries : liveEntries
@@ -25,7 +26,7 @@ struct LeaderboardView: View {
                 )
             } else {
                 ForEach(displayedEntries) { entry in
-                    LeaderboardRow(entry: entry)
+                    LeaderboardRow(entry: entry, currentUserCallsign: currentUserCallsign)
                 }
             }
         }
@@ -95,6 +96,7 @@ struct LeaderboardRow: View {
     // MARK: Internal
 
     let entry: LeaderboardEntry
+    var currentUserCallsign: String?
 
     var body: some View {
         HStack(spacing: 16) {
@@ -118,9 +120,9 @@ struct LeaderboardRow: View {
                 HStack {
                     Text(entry.callsign)
                         .font(.body)
-                        .fontWeight(entry.isCurrentUser ? .bold : .regular)
+                        .fontWeight(isCurrentUser ? .bold : .regular)
 
-                    if entry.isCurrentUser {
+                    if isCurrentUser {
                         Text("You")
                             .font(.caption)
                             .padding(.horizontal, 6)
@@ -139,21 +141,24 @@ struct LeaderboardRow: View {
 
             Spacer()
 
-            // Score and progress
+            // Score
             VStack(alignment: .trailing, spacing: 4) {
                 Text("\(entry.score)")
                     .font(.headline)
-
-                Text(String(format: "%.1f%%", entry.progress))
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 4)
-        .listRowBackground(entry.isCurrentUser ? Color.accentColor.opacity(0.1) : nil)
+        .listRowBackground(isCurrentUser ? Color.accentColor.opacity(0.1) : nil)
     }
 
     // MARK: Private
+
+    private var isCurrentUser: Bool {
+        guard let currentUserCallsign else {
+            return false
+        }
+        return entry.callsign.uppercased() == currentUserCallsign.uppercased()
+    }
 
     private var medalColor: Color {
         switch entry.rank {
@@ -183,28 +188,22 @@ struct LeaderboardRow: View {
                     rank: 1,
                     callsign: "W1AW",
                     score: 48,
-                    progress: 96,
                     currentTier: "Expert",
-                    completedAt: nil,
-                    isCurrentUser: false
+                    completedAt: nil
                 ),
                 LeaderboardEntry(
                     rank: 2,
                     callsign: "K2ABC",
                     score: 45,
-                    progress: 90,
                     currentTier: "Advanced",
-                    completedAt: nil,
-                    isCurrentUser: true
+                    completedAt: nil
                 ),
                 LeaderboardEntry(
                     rank: 3,
                     callsign: "N3XYZ",
                     score: 42,
-                    progress: 84,
                     currentTier: "Advanced",
-                    completedAt: nil,
-                    isCurrentUser: false
+                    completedAt: nil
                 ),
             ]
         )
