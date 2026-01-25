@@ -1,0 +1,101 @@
+import SwiftUI
+
+struct AttributionsView: View {
+    var body: some View {
+        List {
+            Section {
+                Text(
+                    "Carrier Wave relies on these amazing amateur radio services. Thank you to the teams behind them!"
+                )
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            }
+
+            Section {
+                serviceRow(
+                    name: "QRZ.com",
+                    description: "The world's largest online ham radio community and logbook service",
+                    url: "https://www.qrz.com"
+                )
+
+                serviceRow(
+                    name: "Parks on the Air",
+                    description: "Promoting portable amateur radio operations from parks worldwide",
+                    url: "https://pota.app"
+                )
+
+                serviceRow(
+                    name: "Ham2K LoFi",
+                    description: "Cloud sync and backup for amateur radio logs",
+                    url: "https://ham2k.com"
+                )
+
+                serviceRow(
+                    name: "HAMRS",
+                    description: "Simple, fast logging for amateur radio operators",
+                    url: "https://hamrs.app"
+                )
+            } header: {
+                Text("Ham Radio Services")
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Built with Apple Technologies")
+                        .font(.headline)
+
+                    Text(
+                        "Carrier Wave is built entirely with Apple's native frameworks, including SwiftUI, SwiftData, and Combine."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("Frameworks")
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Made with care for the amateur radio community.")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    Text("73 de the Carrier Wave team")
+                        .font(.subheadline)
+                        .italic()
+                }
+                .padding(.vertical, 4)
+            }
+        }
+        .navigationTitle("Attributions")
+    }
+
+    private func serviceRow(name: String, description: String, url: String) -> some View {
+        Link(destination: URL(string: url)!) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(name)
+                        .font(.headline)
+                        .foregroundStyle(.primary)
+
+                    Text(description)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                Image(systemName: "arrow.up.right.square")
+                    .foregroundStyle(.secondary)
+            }
+            .contentShape(Rectangle())
+        }
+    }
+}
+
+#Preview {
+    NavigationStack {
+        AttributionsView()
+    }
+}

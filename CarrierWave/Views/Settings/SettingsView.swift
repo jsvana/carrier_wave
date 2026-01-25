@@ -187,6 +187,12 @@ struct SettingsMainView: View {
                         Text("1.0.0")
                             .foregroundStyle(.secondary)
                     }
+
+                    NavigationLink {
+                        AttributionsView()
+                    } label: {
+                        Label("Attributions", systemImage: "heart")
+                    }
                 } header: {
                     Text("About")
                 }
