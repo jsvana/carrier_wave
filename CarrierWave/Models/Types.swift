@@ -9,6 +9,7 @@ enum ImportSource: String, Codable {
     case qrz
     case pota
     case hamrs
+    case lotw
 }
 
 // MARK: - ServiceType
@@ -18,6 +19,7 @@ enum ServiceType: String, Codable, CaseIterable {
     case pota
     case lofi
     case hamrs
+    case lotw
 
     // MARK: Internal
 
@@ -27,15 +29,19 @@ enum ServiceType: String, Codable, CaseIterable {
         case .pota: "POTA"
         case .lofi: "LoFi"
         case .hamrs: "HAMRS"
+        case .lotw: "LoTW"
         }
     }
 
     var supportsUpload: Bool {
         switch self {
         case .qrz,
-             .pota: true
+             .pota:
+            true
         case .lofi,
-             .hamrs: false
+             .hamrs,
+             .lotw:
+            false
         }
     }
 
@@ -46,6 +52,7 @@ enum ServiceType: String, Codable, CaseIterable {
         case .pota: .pota
         case .lofi: .lofi
         case .hamrs: .hamrs
+        case .lotw: .lotw
         }
     }
 }
