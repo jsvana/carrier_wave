@@ -115,23 +115,14 @@ class SyncService: ObservableObject {
 
         // PHASE 1: Download from all sources in parallel
         let downloadResults = await downloadFromAllSources()
-
-        var allFetched: [FetchedQSO] = []
-        for (service, fetchResult) in downloadResults {
-            switch fetchResult {
-            case let .success(qsos):
-                result.downloaded[service] = qsos.count
-                allFetched.append(contentsOf: qsos)
-            case let .failure(error):
-                result.errors.append("\(service.displayName) download: \(error.localizedDescription)")
-            }
-        }
+        let allFetched = collectDownloadResults(downloadResults, into: &result)
 
         // PHASE 2: Process and deduplicate
         syncPhase = .processing
         let processResult = try processDownloadedQSOs(allFetched)
         result.newQSOs = processResult.created
         result.mergedQSOs = processResult.merged
+        notifyNewQSOsIfNeeded(count: processResult.created)
 
         // PHASE 2.5: Reconcile QRZ presence against what QRZ actually returned
         let qrzDownloadedKeys = Set(allFetched.filter { $0.source == .qrz }.map(\.deduplicationKey))
@@ -142,20 +133,7 @@ class SyncService: ObservableObject {
         try modelContext.save()
 
         // PHASE 3: Upload to all destinations in parallel (unless read-only mode)
-        if isReadOnlyMode {
-            debugLog.info("Read-only mode enabled, skipping uploads")
-        } else {
-            let uploadResults = await uploadToAllDestinations()
-
-            for (service, uploadResult) in uploadResults {
-                switch uploadResult {
-                case let .success(count):
-                    result.uploaded[service] = count
-                case let .failure(error):
-                    result.errors.append("\(service.displayName) upload: \(error.localizedDescription)")
-                }
-            }
-        }
+        await performUploadsIfEnabled(into: &result, debugLog: debugLog)
 
         try modelContext.save()
         return result
@@ -317,7 +295,8 @@ class SyncService: ObservableObject {
                 result.downloaded[service] = qsos.count
                 allFetched.append(contentsOf: qsos)
             case let .failure(error):
-                result.errors.append("\(service.displayName) download: \(error.localizedDescription)")
+                result.errors.append(
+                    "\(service.displayName) download: \(error.localizedDescription)")
             }
         }
 
@@ -331,6 +310,58 @@ class SyncService: ObservableObject {
 
         // Skip upload phase
         return result
+    }
+
+    // MARK: Private
+
+    private func collectDownloadResults(
+        _ downloadResults: [ServiceType: Result<[FetchedQSO], Error>],
+        into result: inout SyncResult
+    ) -> [FetchedQSO] {
+        var allFetched: [FetchedQSO] = []
+        for (service, fetchResult) in downloadResults {
+            switch fetchResult {
+            case let .success(qsos):
+                result.downloaded[service] = qsos.count
+                allFetched.append(contentsOf: qsos)
+            case let .failure(error):
+                result.errors.append(
+                    "\(service.displayName) download: \(error.localizedDescription)")
+            }
+        }
+        return allFetched
+    }
+
+    private func notifyNewQSOsIfNeeded(count: Int) {
+        guard count > 0 else {
+            return
+        }
+        NotificationCenter.default.post(
+            name: .didSyncQSOs,
+            object: nil,
+            userInfo: ["newQSOCount": count]
+        )
+    }
+
+    private func performUploadsIfEnabled(
+        into result: inout SyncResult,
+        debugLog: SyncDebugLog
+    ) async {
+        if isReadOnlyMode {
+            debugLog.info("Read-only mode enabled, skipping uploads")
+            return
+        }
+
+        let uploadResults = await uploadToAllDestinations()
+        for (service, uploadResult) in uploadResults {
+            switch uploadResult {
+            case let .success(count):
+                result.uploaded[service] = count
+            case let .failure(error):
+                result.errors.append(
+                    "\(service.displayName) upload: \(error.localizedDescription)")
+            }
+        }
     }
 }
 

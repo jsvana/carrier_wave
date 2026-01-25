@@ -135,16 +135,11 @@ actor ChallengesClient {
             from: data
         )
 
-        // Save the device token for future authenticated requests
-        try saveAuthToken(apiResponse.data.deviceToken)
-
         return apiResponse.data
     }
 
     /// Leave a challenge
-    func leaveChallenge(id: UUID, sourceURL: String) async throws {
-        let authToken = try getAuthToken()
-
+    func leaveChallenge(id: UUID, sourceURL: String, authToken: String) async throws {
         let url = try buildURL(sourceURL, path: "/v1/challenges/\(id.uuidString)/leave")
         let request = try buildRequest(url: url, method: "DELETE", authToken: authToken)
 
@@ -165,10 +160,9 @@ actor ChallengesClient {
     func reportProgress(
         challengeId: UUID,
         report: ProgressReportRequest,
-        sourceURL: String
+        sourceURL: String,
+        authToken: String
     ) async throws -> ProgressReportData {
-        let authToken = try getAuthToken()
-
         let url = try buildURL(sourceURL, path: "/v1/challenges/\(challengeId.uuidString)/progress")
         var request = try buildRequest(url: url, method: "POST", authToken: authToken)
         request.httpBody = try JSONEncoder.challengesEncoder.encode(report)
@@ -186,10 +180,9 @@ actor ChallengesClient {
     /// Get current progress for authenticated user
     func getProgress(
         challengeId: UUID,
-        sourceURL: String
+        sourceURL: String,
+        authToken: String
     ) async throws -> ServerProgress {
-        let authToken = try getAuthToken()
-
         let url = try buildURL(sourceURL, path: "/v1/challenges/\(challengeId.uuidString)/progress")
         let request = try buildRequest(url: url, method: "GET", authToken: authToken)
 
@@ -242,6 +235,31 @@ actor ChallengesClient {
 
         let apiResponse = try JSONDecoder.challengesDecoder.decode(
             APIResponse<LeaderboardData>.self,
+            from: data
+        )
+        return apiResponse.data
+    }
+
+    // MARK: - Participant Challenges
+
+    /// Fetch all challenges a callsign has joined
+    func fetchParticipatingChallenges(
+        callsign: String,
+        sourceURL: String,
+        authToken: String
+    ) async throws -> [ParticipatingChallengeDTO] {
+        let encodedCallsign =
+            callsign.addingPercentEncoding(
+                withAllowedCharacters: .urlPathAllowed
+            ) ?? callsign
+        let url = try buildURL(sourceURL, path: "/v1/participants/\(encodedCallsign)/challenges")
+        let request = try buildRequest(url: url, method: "GET", authToken: authToken)
+
+        let (data, response) = try await performRequest(request)
+        try validateResponse(response, data: data)
+
+        let apiResponse = try JSONDecoder.challengesDecoder.decode(
+            APIResponse<[ParticipatingChallengeDTO]>.self,
             from: data
         )
         return apiResponse.data

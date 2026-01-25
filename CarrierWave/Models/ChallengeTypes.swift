@@ -429,3 +429,15 @@ struct ProgressReportData: Codable {
     var serverProgress: ServerProgress
     var newBadges: [String]?
 }
+
+// MARK: - ParticipatingChallengeDTO
+
+struct ParticipatingChallengeDTO: Codable, Identifiable {
+    var participationId: UUID
+    var challengeId: UUID
+    var challengeName: String
+    var joinedAt: Date
+    var status: String
+
+    var id: UUID { participationId }
+}

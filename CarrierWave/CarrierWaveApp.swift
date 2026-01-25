@@ -103,4 +103,5 @@ struct CarrierWaveApp: App {
 extension Notification.Name {
     static let didReceiveADIFFile = Notification.Name("didReceiveADIFFile")
     static let didReceiveChallengeInvite = Notification.Name("didReceiveChallengeInvite")
+    static let didSyncQSOs = Notification.Name("didSyncQSOs")
 }

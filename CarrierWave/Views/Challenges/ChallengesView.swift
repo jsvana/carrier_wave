@@ -72,6 +72,11 @@ struct ChallengesView: View {
             ) { notification in
                 handleInviteNotification(notification)
             }
+            .onReceive(
+                NotificationCenter.default.publisher(for: .didSyncQSOs)
+            ) { _ in
+                Task { await evaluateNewQSOs() }
+            }
         }
     }
 
@@ -204,10 +209,34 @@ struct ChallengesView: View {
         defer { isRefreshing = false }
 
         do {
-            try await syncService.refreshChallenges()
+            // Force update to ensure local data matches server (source of truth)
+            try await syncService.refreshChallenges(forceUpdate: true)
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
+        }
+    }
+
+    private func evaluateNewQSOs() async {
+        guard let syncService else {
+            return
+        }
+
+        // Fetch all QSOs and evaluate against active challenges
+        // The progress engine will handle deduplication internally
+        let descriptor = FetchDescriptor<QSO>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+
+        do {
+            let recentQSOs = try modelContext.fetch(descriptor)
+            // Evaluate only the most recent QSOs (last 100) for performance
+            for qso in recentQSOs.prefix(100) {
+                syncService.progressEngine.evaluateQSO(qso, notificationsEnabled: false)
+            }
+            try modelContext.save()
+        } catch {
+            // Silently fail - this is a background operation
         }
     }
 }

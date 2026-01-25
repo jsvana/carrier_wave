@@ -47,7 +47,7 @@ clean:
 
 # Lint Swift files
 lint:
-	swiftlint lint --strict
+	swiftlint lint --strict 2>&1 | rg -v "Linting"
 
 # Format Swift files
 format:

@@ -73,9 +73,6 @@ struct BrowseChallengesView: View {
     @State private var errorMessage: String?
     @State private var showingError = false
 
-    /// For joining
-    @State private var joiningChallengeId: UUID?
-
     // MARK: - Source Selector
 
     private var sourceSelector: some View {
@@ -109,11 +106,15 @@ struct BrowseChallengesView: View {
                 emptyState
             } else {
                 ForEach(displayedChallenges) { challenge in
-                    ChallengePreviewCard(
-                        challenge: challenge,
-                        isJoining: joiningChallengeId == challenge.id,
-                        onJoin: { joinChallenge(challenge) }
-                    )
+                    NavigationLink {
+                        ChallengePreviewDetailView(
+                            challenge: challenge,
+                            syncService: syncService
+                        )
+                    } label: {
+                        ChallengePreviewCard(challenge: challenge)
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
@@ -167,31 +168,11 @@ struct BrowseChallengesView: View {
         defer { isRefreshing = false }
 
         do {
-            try await syncService.refreshChallenges()
+            // Force update to ensure local data matches server (source of truth)
+            try await syncService.refreshChallenges(forceUpdate: true)
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
-        }
-    }
-
-    private func joinChallenge(_ challenge: ChallengeDefinition) {
-        guard let syncService else {
-            return
-        }
-
-        joiningChallengeId = challenge.id
-
-        Task {
-            defer { joiningChallengeId = nil }
-
-            do {
-                try await syncService.joinChallenge(challenge)
-            } catch ChallengesError.alreadyJoined {
-                // Ignore - already joined
-            } catch {
-                errorMessage = error.localizedDescription
-                showingError = true
-            }
         }
     }
 }
@@ -227,13 +208,13 @@ struct SourcePill: View {
 
 struct ChallengePreviewCard: View {
     let challenge: ChallengeDefinition
-    let isJoining: Bool
-    let onJoin: () -> Void
 
     @Query var participations: [ChallengeParticipation]
 
     var isJoined: Bool {
-        participations.contains { $0.challengeDefinition?.id == challenge.id }
+        participations.contains {
+            $0.challengeDefinition?.id == challenge.id && $0.status != .left
+        }
     }
 
     var body: some View {
@@ -280,25 +261,15 @@ struct ChallengePreviewCard: View {
 
                 Spacer()
 
-                // Join button
+                // Status indicator
                 if isJoined {
                     Label("Joined", systemImage: "checkmark")
                         .font(.subheadline)
                         .foregroundStyle(.green)
                 } else {
-                    Button {
-                        onJoin()
-                    } label: {
-                        if isJoining {
-                            ProgressView()
-                                .scaleEffect(0.8)
-                        } else {
-                            Text("Join")
-                                .fontWeight(.medium)
-                        }
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .disabled(isJoining)
+                    Image(systemName: "chevron.right")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
                 }
             }
         }

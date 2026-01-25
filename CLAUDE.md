@@ -73,7 +73,8 @@
 | `FetchedQSO.swift` | Intermediate QSO representation during fetch |
 | `ChallengesClient.swift` | Challenges API client |
 | `ChallengesError.swift` | Challenges-specific errors |
-| `ChallengesSyncService.swift` | Challenge data synchronization |
+| `ChallengesSyncService.swift` | Challenge data synchronization (sources, fetching) |
+| `ChallengesSyncService+Participation.swift` | Challenge participation, progress sync, leaderboards |
 | `ChallengeProgressEngine.swift` | Challenge progress calculation |
 | `ChallengeQSOMatcher.swift` | Match QSOs to challenge criteria |
 
@@ -104,7 +105,8 @@
 |------|---------|
 | `ChallengesView.swift` | Main challenges tab |
 | `BrowseChallengesView.swift` | Browse available challenges |
-| `ChallengeDetailView.swift` | Single challenge detail view |
+| `ChallengeDetailView.swift` | Single challenge detail view (for joined challenges) |
+| `ChallengePreviewDetailView.swift` | Challenge preview before joining |
 | `ChallengeDetailHelperViews.swift` | Challenge detail components |
 | `ChallengeProgressCard.swift` | Progress visualization card |
 | `LeaderboardView.swift` | Challenge leaderboard display |

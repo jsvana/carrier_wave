@@ -46,6 +46,9 @@ final class ChallengeParticipation {
     /// Server-assigned participation ID for sync
     var serverParticipationId: UUID?
 
+    /// Device-specific auth token for this participation (from join response)
+    var deviceToken: String?
+
     /// Whether historical QSOs are allowed for this participation
     var historicalAllowed: Bool = false
 
