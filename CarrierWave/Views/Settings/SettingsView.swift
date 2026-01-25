@@ -21,9 +21,13 @@ struct SettingsMainView: View {
     private let lofiClient = LoFiClient()
     private let qrzClient = QRZClient()
     private let hamrsClient = HAMRSClient()
+    private let lotwClient = LoTWClient()
 
     @State private var qrzIsConfigured = false
     @State private var qrzCallsign: String?
+
+    @State private var lotwIsConfigured = false
+    @State private var lotwUsername: String?
 
     var body: some View {
         NavigationStack {
@@ -96,6 +100,24 @@ struct SettingsMainView: View {
                             Label("HAMRS Pro", systemImage: "rectangle.stack")
                             Spacer()
                             if hamrsClient.isConfigured {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .foregroundStyle(.green)
+                            }
+                        }
+                    }
+
+                    // LoTW
+                    NavigationLink {
+                        LoTWSettingsView()
+                    } label: {
+                        HStack {
+                            Label("LoTW", systemImage: "envelope.badge.shield.half.filled")
+                            Spacer()
+                            if lotwIsConfigured {
+                                if let username = lotwUsername {
+                                    Text(username)
+                                        .foregroundStyle(.secondary)
+                                }
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
                             }
@@ -276,6 +298,13 @@ struct SettingsMainView: View {
     private func loadServiceStatus() async {
         qrzIsConfigured = await qrzClient.hasApiKey()
         qrzCallsign = await qrzClient.getCallsign()
+
+        lotwIsConfigured = await lotwClient.hasCredentials()
+        if lotwIsConfigured {
+            if let creds = try? await lotwClient.getCredentials() {
+                lotwUsername = creds.username
+            }
+        }
     }
 }
 
