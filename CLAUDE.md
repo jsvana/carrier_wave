@@ -55,6 +55,8 @@
 | `LoFiClient.swift` | Ham2K LoFi sync client |
 | `LoFiClient+Helpers.swift` | LoFi helper methods |
 | `LoFiModels.swift` | LoFi API response models |
+| `LoTWClient.swift` | LoTW API client (download-only, username/password auth) |
+| `LoTWError.swift` | LoTW-specific errors |
 | `HAMRSClient.swift` | HAMRS sync client |
 | `HAMRSModels.swift` | HAMRS API models |
 | `HAMRSError.swift` | HAMRS-specific errors |
@@ -118,6 +120,7 @@
 | `ServiceSettingsViews.swift` | QRZ/POTA/LoFi auth configuration |
 | `CloudSettingsViews.swift` | iCloud sync settings |
 | `HAMRSSettingsView.swift` | HAMRS connection settings |
+| `LoTWSettingsView.swift` | LoTW login configuration |
 | `ChallengesSettingsView.swift` | Challenges feature settings |
 | `POTAAuthWebView.swift` | POTA OAuth WebView |
 | `SyncDebugView.swift` | Sync debugging interface |
