@@ -74,6 +74,7 @@ class SyncService: ObservableObject {
         var errors: [String]
         var newQSOs: Int
         var mergedQSOs: Int
+        var potaMaintenanceSkipped: Bool
     }
 
     /// Modes that represent activation metadata, not actual QSOs (from Ham2K PoLo)
@@ -113,7 +114,8 @@ class SyncService: ObservableObject {
         }
 
         var result = SyncResult(
-            downloaded: [:], uploaded: [:], errors: [], newQSOs: 0, mergedQSOs: 0
+            downloaded: [:], uploaded: [:], errors: [], newQSOs: 0, mergedQSOs: 0,
+            potaMaintenanceSkipped: false
         )
 
         // PHASE 1: Download from all sources in parallel
@@ -312,7 +314,8 @@ class SyncService: ObservableObject {
         }
 
         var result = SyncResult(
-            downloaded: [:], uploaded: [:], errors: [], newQSOs: 0, mergedQSOs: 0
+            downloaded: [:], uploaded: [:], errors: [], newQSOs: 0, mergedQSOs: 0,
+            potaMaintenanceSkipped: false
         )
 
         // PHASE 1: Download from all sources in parallel
