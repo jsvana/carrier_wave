@@ -26,7 +26,6 @@ struct ChallengesView: View {
                 }
                 .padding()
             }
-            .navigationTitle("Challenges")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button {

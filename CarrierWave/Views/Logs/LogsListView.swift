@@ -1,50 +1,48 @@
 import SwiftData
 import SwiftUI
 
-// MARK: - LogsListView
+// MARK: - LogsListContentView
 
-struct LogsListView: View {
+/// Content-only view for embedding in LogsContainerView
+struct LogsListContentView: View {
     // MARK: Internal
 
     var body: some View {
-        NavigationStack {
-            List {
-                ForEach(filteredQSOs) { qso in
-                    QSORow(qso: qso)
-                }
-                .onDelete(perform: deleteQSOs)
+        List {
+            ForEach(filteredQSOs) { qso in
+                QSORow(qso: qso)
             }
-            .searchable(text: $searchText, prompt: "Search callsigns or parks")
-            .navigationTitle("QSOs")
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Menu {
-                        Menu("Band") {
-                            Button("All") { selectedBand = nil }
-                            ForEach(availableBands, id: \.self) { band in
-                                Button(band) { selectedBand = band }
-                            }
+            .onDelete(perform: deleteQSOs)
+        }
+        .searchable(text: $searchText, prompt: "Search callsigns or parks")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Menu("Band") {
+                        Button("All") { selectedBand = nil }
+                        ForEach(availableBands, id: \.self) { band in
+                            Button(band) { selectedBand = band }
                         }
-
-                        Menu("Mode") {
-                            Button("All") { selectedMode = nil }
-                            ForEach(availableModes, id: \.self) { mode in
-                                Button(mode) { selectedMode = mode }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "line.3.horizontal.decrease.circle")
                     }
+
+                    Menu("Mode") {
+                        Button("All") { selectedMode = nil }
+                        ForEach(availableModes, id: \.self) { mode in
+                            Button(mode) { selectedMode = mode }
+                        }
+                    }
+                } label: {
+                    Image(systemName: "line.3.horizontal.decrease.circle")
                 }
             }
-            .overlay {
-                if qsos.isEmpty {
-                    ContentUnavailableView(
-                        "No QSOs",
-                        systemImage: "antenna.radiowaves.left.and.right",
-                        description: Text("Import ADIF files or sync from LoFi to see your QSOs")
-                    )
-                }
+        }
+        .overlay {
+            if qsos.isEmpty {
+                ContentUnavailableView(
+                    "No QSOs",
+                    systemImage: "antenna.radiowaves.left.and.right",
+                    description: Text("Import ADIF files or sync from LoFi to see your QSOs")
+                )
             }
         }
     }
@@ -60,9 +58,9 @@ struct LogsListView: View {
 
     private var filteredQSOs: [QSO] {
         qsos.filter { qso in
-            let matchesSearch = searchText.isEmpty ||
-                qso.callsign.localizedCaseInsensitiveContains(searchText) ||
-                (qso.parkReference?.localizedCaseInsensitiveContains(searchText) ?? false)
+            let matchesSearch =
+                searchText.isEmpty || qso.callsign.localizedCaseInsensitiveContains(searchText)
+                    || (qso.parkReference?.localizedCaseInsensitiveContains(searchText) ?? false)
 
             let matchesBand = selectedBand == nil || qso.band == selectedBand
             let matchesMode = selectedMode == nil || qso.mode == selectedMode

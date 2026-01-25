@@ -6,12 +6,53 @@
 import SwiftData
 import SwiftUI
 
-struct POTAUploadsView: View {
-    @Environment(\.modelContext) private var modelContext
-    @Query(sort: \POTAUploadAttempt.timestamp, order: .reverse) private var attempts: [POTAUploadAttempt]
+// MARK: - POTAUploadsContentView
+
+/// Content-only view for embedding in LogsContainerView
+struct POTAUploadsContentView: View {
+    // MARK: Internal
 
     let potaClient: POTAClient
     let potaAuth: POTAAuthService
+
+    var body: some View {
+        Group {
+            if !isAuthenticated {
+                notAuthenticatedView
+            } else if entries.isEmpty, !isLoading {
+                emptyStateView
+            } else {
+                timelineList
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if isAuthenticated {
+                    Button {
+                        Task { await fetchJobs() }
+                    } label: {
+                        if isLoading {
+                            ProgressView()
+                        } else {
+                            Image(systemName: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(isLoading)
+                }
+            }
+        }
+        .onAppear {
+            if isAuthenticated, jobs.isEmpty {
+                Task { await fetchJobs() }
+            }
+        }
+    }
+
+    // MARK: Private
+
+    @Environment(\.modelContext) private var modelContext
+    @Query(sort: \POTAUploadAttempt.timestamp, order: .reverse) private var attempts:
+        [POTAUploadAttempt]
 
     @State private var jobs: [POTAJob] = []
     @State private var isLoading = false
@@ -24,42 +65,6 @@ struct POTAUploadsView: View {
 
     private var isAuthenticated: Bool {
         potaAuth.isAuthenticated
-    }
-
-    var body: some View {
-        NavigationStack {
-            Group {
-                if !isAuthenticated {
-                    notAuthenticatedView
-                } else if entries.isEmpty, !isLoading {
-                    emptyStateView
-                } else {
-                    timelineList
-                }
-            }
-            .navigationTitle("POTA Uploads")
-            .toolbar {
-                ToolbarItem(placement: .primaryAction) {
-                    if isAuthenticated {
-                        Button {
-                            Task { await fetchJobs() }
-                        } label: {
-                            if isLoading {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "arrow.clockwise")
-                            }
-                        }
-                        .disabled(isLoading)
-                    }
-                }
-            }
-            .onAppear {
-                if isAuthenticated, jobs.isEmpty {
-                    Task { await fetchJobs() }
-                }
-            }
-        }
     }
 
     @ViewBuilder
@@ -169,8 +174,8 @@ struct POTAUploadsView: View {
     private func correlateJobsWithAttempts() {
         for attempt in attempts where attempt.correlatedJobId == nil {
             if let matchingJob = jobs.first(where: { job in
-                job.reference.uppercased() == attempt.parkReference.uppercased() &&
-                    abs(job.submitted.timeIntervalSince(attempt.timestamp)) < 300
+                job.reference.uppercased() == attempt.parkReference.uppercased()
+                    && abs(job.submitted.timeIntervalSince(attempt.timestamp)) < 300
             }) {
                 attempt.correlatedJobId = matchingJob.jobId
             }

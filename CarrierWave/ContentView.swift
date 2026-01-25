@@ -7,7 +7,6 @@ enum AppTab: Hashable {
     case dashboard
     case logs
     case challenges
-    case potaUploads
     case settings
 }
 
@@ -37,9 +36,9 @@ struct ContentView: View {
                     .tag(AppTab.dashboard)
             }
 
-            LogsListView()
+            LogsContainerView(potaClient: potaClient, potaAuth: potaAuthService)
                 .tabItem {
-                    Label("QSOs", systemImage: "list.bullet")
+                    Label("Logs", systemImage: "list.bullet")
                 }
                 .tag(AppTab.logs)
 
@@ -48,14 +47,6 @@ struct ContentView: View {
                     Label("Challenges", systemImage: "flag.2.crossed")
                 }
                 .tag(AppTab.challenges)
-
-            if let potaClient {
-                POTAUploadsView(potaClient: potaClient, potaAuth: potaAuthService)
-                    .tabItem {
-                        Label("POTA Uploads", systemImage: "arrow.up.doc")
-                    }
-                    .tag(AppTab.potaUploads)
-            }
 
             SettingsMainView(potaAuth: potaAuthService)
                 .tabItem {

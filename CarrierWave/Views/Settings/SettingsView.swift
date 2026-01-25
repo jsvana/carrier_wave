@@ -197,7 +197,6 @@ struct SettingsMainView: View {
                     Text("About")
                 }
             }
-            .navigationTitle("Settings")
             .task {
                 await loadServiceStatus()
             }

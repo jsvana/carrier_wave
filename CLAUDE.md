@@ -90,12 +90,13 @@
 ### Views - Logs (`CarrierWave/Views/Logs/`)
 | File | Purpose |
 |------|---------|
-| `LogsListView.swift` | Searchable/filterable QSO list |
+| `LogsContainerView.swift` | Container with segmented picker for QSOs and POTA Uploads |
+| `LogsListView.swift` | Searchable/filterable QSO list content |
 
 ### Views - POTA Uploads (`CarrierWave/Views/POTAUploads/`)
 | File | Purpose |
 |------|---------|
-| `POTAUploadsView.swift` | POTA upload management tab |
+| `POTAUploadsView.swift` | POTA upload timeline content view |
 | `POTALogEntryRow.swift` | Individual POTA log entry display |
 
 ### Views - Challenges (`CarrierWave/Views/Challenges/`)
