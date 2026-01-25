@@ -21,13 +21,14 @@ struct LogsContainerView: View {
 
     var body: some View {
         NavigationStack {
-            selectedContent
-                .navigationTitle("Logs")
-                .toolbar {
-                    ToolbarItem(placement: .principal) {
-                        segmentedPicker
-                    }
+            VStack(spacing: 0) {
+                if availableSegments.count > 1 {
+                    segmentedPicker
+                        .padding(.horizontal)
+                        .padding(.vertical, 8)
                 }
+                selectedContent
+            }
         }
     }
 

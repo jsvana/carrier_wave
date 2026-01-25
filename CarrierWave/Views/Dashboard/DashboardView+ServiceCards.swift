@@ -17,6 +17,7 @@ extension DashboardView {
                 if lofiClient.isConfigured, lofiClient.isLinked {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
+                        .accessibilityLabel("Connected")
                     if let callsign = lofiClient.getCallsign() {
                         Text(callsign)
                             .font(.caption)
@@ -25,6 +26,7 @@ extension DashboardView {
                 } else if lofiClient.isConfigured {
                     Image(systemName: "clock")
                         .foregroundStyle(.orange)
+                        .accessibilityLabel("Pending connection")
                     Text("Pending")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -107,6 +109,7 @@ extension DashboardView {
                 if qrzIsConfigured {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
+                        .accessibilityLabel("Connected")
                     if let callsign = qrzCallsign {
                         Text(callsign)
                             .font(.caption)
@@ -220,6 +223,7 @@ extension DashboardView {
                 if potaAuth.isAuthenticated {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
+                        .accessibilityLabel("Logged in")
                     if let callsign = potaAuth.currentToken?.callsign {
                         Text(callsign)
                             .font(.caption)

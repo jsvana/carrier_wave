@@ -38,6 +38,7 @@ struct ChallengesView: View {
                         }
                     }
                     .disabled(isRefreshing)
+                    .accessibilityLabel("Refresh challenges")
                 }
             }
             .onAppear {

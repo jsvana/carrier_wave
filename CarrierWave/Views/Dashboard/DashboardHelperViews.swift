@@ -228,6 +228,11 @@ struct ActivityGrid: View {
                                 RoundedRectangle(cornerRadius: 2)
                                     .fill(colorFor(count: count))
                                     .frame(width: cellSize, height: cellSize)
+                                    .accessibilityLabel(
+                                        "\(tooltipDateFormatter.string(from: date)): "
+                                            + "\(count) QSO\(count == 1 ? "" : "s")"
+                                    )
+                                    .accessibilityHint("Tap to show details")
                                     .onTapGesture {
                                         if selectedDate == date {
                                             selectedDate = nil
@@ -275,6 +280,8 @@ struct ActivityGrid: View {
                 .frame(width: gridWidth, height: 14, alignment: .topLeading)
             }
         }
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Activity grid showing QSOs over the past \(columns) weeks")
     }
 
     // MARK: Private

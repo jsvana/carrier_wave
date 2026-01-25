@@ -17,6 +17,7 @@ extension DashboardView {
                 if hamrsClient.isConfigured {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
+                        .accessibilityLabel("Connected")
                     Text("Connected")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -103,6 +104,7 @@ extension DashboardView {
                 if isConfigured {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
+                        .accessibilityLabel("Connected")
                     Text("Connected")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -193,6 +195,7 @@ extension DashboardView {
                 if iCloudMonitor.iCloudContainerURL != nil {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
+                        .accessibilityLabel("Available")
                 } else {
                     Text("Not available")
                         .font(.caption)

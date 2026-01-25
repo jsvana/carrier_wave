@@ -47,6 +47,7 @@ struct SettingsMainView: View {
                                 }
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
+                                    .accessibilityLabel("Connected")
                             }
                         }
                     }
@@ -65,6 +66,7 @@ struct SettingsMainView: View {
                                 }
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
+                                    .accessibilityLabel("Logged in")
                             }
                         }
                     }
@@ -84,9 +86,11 @@ struct SettingsMainView: View {
                                 if lofiClient.isLinked {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundStyle(.green)
+                                        .accessibilityLabel("Connected")
                                 } else {
                                     Image(systemName: "clock")
                                         .foregroundStyle(.orange)
+                                        .accessibilityLabel("Pending connection")
                                 }
                             }
                         }
@@ -102,6 +106,7 @@ struct SettingsMainView: View {
                             if hamrsClient.isConfigured {
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
+                                    .accessibilityLabel("Connected")
                             }
                         }
                     }
@@ -120,6 +125,7 @@ struct SettingsMainView: View {
                                 }
                                 Image(systemName: "checkmark.circle.fill")
                                     .foregroundStyle(.green)
+                                    .accessibilityLabel("Connected")
                             }
                         }
                     }

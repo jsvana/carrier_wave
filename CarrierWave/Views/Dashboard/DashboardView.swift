@@ -117,6 +117,7 @@ struct DashboardView: View {
                                 }
                             }
                             .disabled(isSyncing)
+                            .accessibilityLabel("Download only")
                         }
 
                         Button {
@@ -129,6 +130,7 @@ struct DashboardView: View {
                             }
                         }
                         .disabled(isSyncing)
+                        .accessibilityLabel("Sync all services")
                     }
                 }
             }
