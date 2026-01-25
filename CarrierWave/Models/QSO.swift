@@ -31,7 +31,8 @@ final class QSO {
         sotaRef: String? = nil,
         qrzLogId: String? = nil,
         qrzConfirmed: Bool = false,
-        lotwConfirmedDate: Date? = nil
+        lotwConfirmedDate: Date? = nil,
+        lotwConfirmed: Bool = false
     ) {
         self.id = id
         self.callsign = callsign
@@ -59,6 +60,7 @@ final class QSO {
         self.qrzLogId = qrzLogId
         self.qrzConfirmed = qrzConfirmed
         self.lotwConfirmedDate = lotwConfirmedDate
+        self.lotwConfirmed = lotwConfirmed
     }
 
     // MARK: Internal
@@ -93,6 +95,7 @@ final class QSO {
     var qrzLogId: String?
     var qrzConfirmed: Bool = false
     var lotwConfirmedDate: Date?
+    var lotwConfirmed: Bool = false
 
     @Relationship(deleteRule: .cascade, inverse: \ServicePresence.qso)
     var servicePresence: [ServicePresence] = []
