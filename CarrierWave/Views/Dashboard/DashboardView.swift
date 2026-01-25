@@ -38,7 +38,9 @@ struct DashboardView: View {
             let withLofiPresence = allPresence.filter { $0.serviceType == .lofi }.count
             let withLofiPresent = allPresence.filter { $0.serviceType == .lofi && $0.isPresent }
                 .count
-            print("[Dashboard] LoFi: total=\(total), presence=\(withLofiPresence), isPresent=\(withLofiPresent)")
+            print(
+                "[Dashboard] LoFi: total=\(total), presence=\(withLofiPresence), isPresent=\(withLofiPresent)"
+            )
         }
         return count
     }
@@ -97,7 +99,6 @@ struct DashboardView: View {
             .task {
                 await loadQRZConfig()
             }
-            .navigationTitle("Full Duplex")
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: 12) {
