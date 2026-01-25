@@ -195,6 +195,11 @@ class SyncService: ObservableObject {
             syncPhase = nil
         }
 
+        // Check maintenance window
+        if POTAClient.isInMaintenanceWindow() {
+            throw POTAError.maintenanceWindow
+        }
+
         var downloaded = 0
         var uploaded = 0
 
