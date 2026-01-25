@@ -158,6 +158,8 @@ struct DrilldownRow: View {
 struct GoalListView: View {
     // MARK: Internal
 
+    @Environment(\.modelContext) var modelContext
+
     let participation: ChallengeParticipation
     let showCompleted: Bool
 
@@ -185,14 +187,44 @@ struct GoalListView: View {
 
     var body: some View {
         List {
+            if showCompleted {
+                Section {
+                    Button {
+                        Task {
+                            await loadFirstQSOs()
+                        }
+                    } label: {
+                        HStack {
+                            if isLoading {
+                                ProgressView()
+                                    .padding(.trailing, 4)
+                            }
+                            Text(firstQSOByGoal.isEmpty ? "Load First QSOs" : "Reload First QSOs")
+                        }
+                    }
+                    .disabled(isLoading)
+                }
+            }
+
             ForEach(filteredGoals) { goal in
                 HStack {
-                    VStack(alignment: .leading) {
+                    VStack(alignment: .leading, spacing: 4) {
                         Text(goal.name)
                             .font(.body)
                         Text(goal.id)
                             .font(.caption)
                             .foregroundStyle(.secondary)
+
+                        if showCompleted, let qso = firstQSOByGoal[goal.id] {
+                            HStack(spacing: 4) {
+                                Text(qso.callsign)
+                                    .fontWeight(.medium)
+                                Text("on")
+                                Text(qso.timestamp, style: .date)
+                            }
+                            .font(.caption)
+                            .foregroundStyle(.blue)
+                        }
                     }
 
                     Spacer()
@@ -211,6 +243,46 @@ struct GoalListView: View {
     // MARK: Private
 
     @State private var searchText = ""
+    @State private var firstQSOByGoal: [String: QSO] = [:]
+    @State private var isLoading = false
+
+    @MainActor
+    private func loadFirstQSOs() async {
+        guard let definition = participation.challengeDefinition else {
+            return
+        }
+
+        isLoading = true
+        defer { isLoading = false }
+
+        // Yield to allow UI to update with spinner
+        await Task.yield()
+
+        let qualifyingIds = participation.progress.qualifyingQSOIds
+        let descriptor = FetchDescriptor<QSO>(
+            sortBy: [SortDescriptor(\.timestamp, order: .forward)]
+        )
+
+        do {
+            let allQSOs = try modelContext.fetch(descriptor)
+            let qualifyingIdSet = Set(qualifyingIds)
+            let qualifyingQSOs = allQSOs.filter { qualifyingIdSet.contains($0.id) }
+
+            var result: [String: QSO] = [:]
+            for qso in qualifyingQSOs {
+                let matchedGoals = ChallengeQSOMatcher.findMatchedGoals(
+                    qso: qso,
+                    definition: definition
+                )
+                for goalId in matchedGoals where result[goalId] == nil {
+                    result[goalId] = qso
+                }
+            }
+            firstQSOByGoal = result
+        } catch {
+            print("Failed to load QSOs: \(error)")
+        }
+    }
 }
 
 // MARK: - QualifyingQSOsView

@@ -66,6 +66,7 @@ struct ChallengeDetailView: View {
     @State private var isLoadingLeaderboard = false
     @State private var showingLeaveConfirmation = false
     @State private var isLeaving = false
+    @State private var isReevaluating = false
     @State private var errorMessage: String?
     @State private var showingError = false
     @State private var pollingTask: Task<Void, Never>?
@@ -265,29 +266,53 @@ struct ChallengeDetailView: View {
     // MARK: - Actions Section
 
     private var actionsSection: some View {
-        Button(role: .destructive) {
-            showingLeaveConfirmation = true
-        } label: {
-            HStack {
-                if isLeaving {
-                    ProgressView().tint(.white)
-                } else {
-                    Image(systemName: "xmark.circle")
+        VStack(spacing: 12) {
+            Button {
+                Task { await reevaluateProgress() }
+            } label: {
+                HStack {
+                    if isReevaluating {
+                        ProgressView()
+                            .padding(.trailing, 4)
+                    } else {
+                        Image(systemName: "arrow.clockwise")
+                    }
+                    Text("Re-evaluate QSOs")
                 }
-                Text("Leave Challenge")
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.blue.opacity(0.1))
+                .foregroundStyle(.blue)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
             }
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(Color.red.opacity(0.1))
-            .foregroundStyle(.red)
-            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .disabled(isReevaluating)
+
+            Button(role: .destructive) {
+                showingLeaveConfirmation = true
+            } label: {
+                HStack {
+                    if isLeaving {
+                        ProgressView().tint(.white)
+                    } else {
+                        Image(systemName: "xmark.circle")
+                    }
+                    Text("Leave Challenge")
+                }
+                .frame(maxWidth: .infinity)
+                .padding()
+                .background(Color.red.opacity(0.1))
+                .foregroundStyle(.red)
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+            }
+            .disabled(isLeaving)
         }
-        .disabled(isLeaving)
     }
+}
 
-    // MARK: - Polling
+// MARK: - ChallengeDetailView Actions
 
-    private func startPolling() {
+extension ChallengeDetailView {
+    func startPolling() {
         pollingTask = Task {
             while !Task.isCancelled {
                 await fetchLeaderboard()
@@ -296,12 +321,12 @@ struct ChallengeDetailView: View {
         }
     }
 
-    private func stopPolling() {
+    func stopPolling() {
         pollingTask?.cancel()
         pollingTask = nil
     }
 
-    private func fetchLeaderboard() async {
+    func fetchLeaderboard() async {
         guard let syncService, let definition else {
             return
         }
@@ -316,7 +341,7 @@ struct ChallengeDetailView: View {
         }
     }
 
-    private func leaveChallenge() async {
+    func leaveChallenge() async {
         guard let syncService else {
             return
         }
@@ -327,6 +352,24 @@ struct ChallengeDetailView: View {
         do {
             try await syncService.leaveChallenge(participation)
             dismiss()
+        } catch {
+            errorMessage = error.localizedDescription
+            showingError = true
+        }
+    }
+
+    func reevaluateProgress() async {
+        guard let syncService else {
+            return
+        }
+
+        isReevaluating = true
+        defer { isReevaluating = false }
+
+        syncService.progressEngine.reevaluateAllQSOs(for: participation)
+
+        do {
+            try modelContext.save()
         } catch {
             errorMessage = error.localizedDescription
             showingError = true

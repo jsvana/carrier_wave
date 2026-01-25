@@ -211,6 +211,13 @@ struct ChallengesView: View {
         do {
             // Force update to ensure local data matches server (source of truth)
             try await syncService.refreshChallenges(forceUpdate: true)
+
+            // Re-evaluate all QSOs against active participations
+            // This ensures DXCC lookups and other progress calculations are current
+            for participation in activeParticipations {
+                syncService.progressEngine.reevaluateAllQSOs(for: participation)
+            }
+            try modelContext.save()
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
