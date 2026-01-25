@@ -1,6 +1,8 @@
 import SwiftUI
 
 struct AttributionsView: View {
+    // MARK: Internal
+
     var body: some View {
         List {
             Section {
@@ -14,7 +16,8 @@ struct AttributionsView: View {
             Section {
                 serviceRow(
                     name: "QRZ.com",
-                    description: "The world's largest online ham radio community and logbook service",
+                    description:
+                    "The world's largest online ham radio community and logbook service",
                     url: "https://www.qrz.com"
                 )
 
@@ -45,7 +48,10 @@ struct AttributionsView: View {
                         .font(.headline)
 
                     Text(
-                        "Carrier Wave is built entirely with Apple's native frameworks, including SwiftUI, SwiftData, and Combine."
+                        """
+                        Carrier Wave is built entirely with Apple's native frameworks, including SwiftUI, \
+                        SwiftData, and Combine.
+                        """
                     )
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -70,6 +76,8 @@ struct AttributionsView: View {
         }
         .navigationTitle("Attributions")
     }
+
+    // MARK: Private
 
     private func serviceRow(name: String, description: String, url: String) -> some View {
         Link(destination: URL(string: url)!) {
