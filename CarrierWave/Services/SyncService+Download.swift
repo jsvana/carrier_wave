@@ -35,6 +35,13 @@ extension SyncService {
                 }
             }
 
+            // LoTW download
+            if await lotwClient.hasCredentials() {
+                group.addTask {
+                    await self.downloadFromLoTW(timeout: timeout)
+                }
+            }
+
             var results: [ServiceType: Result<[FetchedQSO], Error>] = [:]
             for await (service, result) in group {
                 results[service] = result
@@ -43,7 +50,9 @@ extension SyncService {
         }
     }
 
-    private func downloadFromQRZ(timeout: TimeInterval) async -> (ServiceType, Result<[FetchedQSO], Error>) {
+    private func downloadFromQRZ(timeout: TimeInterval) async -> (
+        ServiceType, Result<[FetchedQSO], Error>
+    ) {
         await MainActor.run { self.syncPhase = .downloading(service: .qrz) }
         let debugLog = SyncDebugLog.shared
         debugLog.info("Starting QRZ download", service: .qrz)
@@ -67,7 +76,9 @@ extension SyncService {
         }
     }
 
-    private func downloadFromPOTA(timeout: TimeInterval) async -> (ServiceType, Result<[FetchedQSO], Error>) {
+    private func downloadFromPOTA(timeout: TimeInterval) async -> (
+        ServiceType, Result<[FetchedQSO], Error>
+    ) {
         await MainActor.run { self.syncPhase = .downloading(service: .pota) }
         let debugLog = SyncDebugLog.shared
         debugLog.info("Starting POTA download", service: .pota)
@@ -91,7 +102,9 @@ extension SyncService {
         }
     }
 
-    private func downloadFromLoFi(timeout: TimeInterval) async -> (ServiceType, Result<[FetchedQSO], Error>) {
+    private func downloadFromLoFi(timeout: TimeInterval) async -> (
+        ServiceType, Result<[FetchedQSO], Error>
+    ) {
         await MainActor.run { self.syncPhase = .downloading(service: .lofi) }
         let debugLog = SyncDebugLog.shared
         debugLog.info("Starting LoFi download", service: .lofi)
@@ -157,7 +170,9 @@ extension SyncService {
         }
     }
 
-    private func downloadFromHAMRS(timeout: TimeInterval) async -> (ServiceType, Result<[FetchedQSO], Error>) {
+    private func downloadFromHAMRS(timeout: TimeInterval) async -> (
+        ServiceType, Result<[FetchedQSO], Error>
+    ) {
         await MainActor.run { self.syncPhase = .downloading(service: .hamrs) }
         let debugLog = SyncDebugLog.shared
         debugLog.info("Starting HAMRS download", service: .hamrs)
@@ -202,6 +217,43 @@ extension SyncService {
         } catch {
             debugLog.error("HAMRS download failed: \(error.localizedDescription)", service: .hamrs)
             return (.hamrs, .failure(error))
+        }
+    }
+
+    private func downloadFromLoTW(timeout: TimeInterval) async -> (
+        ServiceType, Result<[FetchedQSO], Error>
+    ) {
+        await MainActor.run { self.syncPhase = .downloading(service: .lotw) }
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Starting LoTW download", service: .lotw)
+        do {
+            let qslSince = await lotwClient.getLastQSLDate()
+            let response = try await withTimeout(seconds: timeout, service: .lotw) {
+                try await self.lotwClient.fetchQSOs(qslSince: qslSince)
+            }
+            debugLog.info("Downloaded \(response.qsos.count) QSOs from LoTW", service: .lotw)
+
+            let fetched = response.qsos.map { FetchedQSO.fromLoTW($0) }
+
+            // Save timestamps for incremental sync
+            if let lastQSL = response.lastQSL {
+                try await lotwClient.saveLastQSLDate(lastQSL)
+            }
+            if let lastQSORx = response.lastQSORx {
+                try await lotwClient.saveLastQSORxDate(lastQSORx)
+            }
+
+            for (index, qso) in response.qsos.prefix(5).enumerated() {
+                debugLog.logRawQSO(
+                    service: .lotw,
+                    rawJSON: qso.rawADIF,
+                    parsedFields: fetched[index].debugFields
+                )
+            }
+            return (.lotw, .success(fetched))
+        } catch {
+            debugLog.error("LoTW download failed: \(error.localizedDescription)", service: .lotw)
+            return (.lotw, .failure(error))
         }
     }
 }

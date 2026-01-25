@@ -48,7 +48,8 @@ class SyncService: ObservableObject {
     init(
         modelContext: ModelContext, potaAuthService: POTAAuthService,
         lofiClient: LoFiClient = LoFiClient(),
-        hamrsClient: HAMRSClient = HAMRSClient()
+        hamrsClient: HAMRSClient = HAMRSClient(),
+        lotwClient: LoTWClient = LoTWClient()
     ) {
         self.modelContext = modelContext
         qrzClient = QRZClient()
@@ -56,6 +57,7 @@ class SyncService: ObservableObject {
         potaClient = POTAClient(authService: potaAuthService)
         self.lofiClient = lofiClient
         self.hamrsClient = hamrsClient
+        self.lotwClient = lotwClient
     }
 
     // MARK: Internal
@@ -87,6 +89,7 @@ class SyncService: ObservableObject {
     let potaAuthService: POTAAuthService
     let lofiClient: LoFiClient
     let hamrsClient: HAMRSClient
+    let lotwClient: LoTWClient
 
     /// Timeout for individual service sync operations (in seconds)
     let syncTimeoutSeconds: TimeInterval = 60
@@ -265,6 +268,36 @@ class SyncService: ObservableObject {
         let processResult = try processDownloadedQSOs(fetched)
         try modelContext.save()
 
+        return processResult.created
+    }
+
+    /// Sync only with LoTW (download only)
+    func syncLoTW() async throws -> Int {
+        isSyncing = true
+        defer {
+            isSyncing = false
+            syncPhase = nil
+        }
+
+        syncPhase = .downloading(service: .lotw)
+        let qslSince = await lotwClient.getLastQSLDate()
+        let response = try await withTimeout(seconds: syncTimeoutSeconds, service: .lotw) {
+            try await self.lotwClient.fetchQSOs(qslSince: qslSince)
+        }
+        let fetched = response.qsos.map { FetchedQSO.fromLoTW($0) }
+
+        syncPhase = .processing
+        let processResult = try processDownloadedQSOs(fetched)
+
+        // Save timestamps for incremental sync
+        if let lastQSL = response.lastQSL {
+            try await lotwClient.saveLastQSLDate(lastQSL)
+        }
+        if let lastQSORx = response.lastQSORx {
+            try await lotwClient.saveLastQSORxDate(lastQSORx)
+        }
+
+        try modelContext.save()
         return processResult.created
     }
 
