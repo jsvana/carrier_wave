@@ -4,11 +4,14 @@ import SwiftData
 // MARK: - SyncService Upload Methods
 
 extension SyncService {
-    func uploadToAllDestinations() async -> [ServiceType: Result<Int, Error>] {
+    func uploadToAllDestinations() async -> (
+        results: [ServiceType: Result<Int, Error>], potaMaintenanceSkipped: Bool
+    ) {
         let qsosNeedingUpload = try? fetchQSOsNeedingUpload()
         let timeout = syncTimeoutSeconds
+        var potaMaintenanceSkipped = false
 
-        return await withTaskGroup(of: (ServiceType, Result<Int, Error>).self) { group in
+        let results = await withTaskGroup(of: (ServiceType, Result<Int, Error>).self) { group in
             // QRZ upload
             if await qrzClient.hasApiKey() {
                 let qrzQSOs = qsosNeedingUpload?.filter { $0.needsUpload(to: .qrz) } ?? []
@@ -19,14 +22,19 @@ extension SyncService {
                 }
             }
 
-            // POTA upload
+            // POTA upload (skip during maintenance window)
             if potaAuthService.isAuthenticated {
-                let potaQSOs = qsosNeedingUpload?.filter {
-                    $0.needsUpload(to: .pota) && $0.parkReference?.isEmpty == false
-                } ?? []
-                if !potaQSOs.isEmpty {
-                    group.addTask {
-                        await self.uploadPOTABatch(qsos: potaQSOs, timeout: timeout)
+                if POTAClient.isInMaintenanceWindow() {
+                    potaMaintenanceSkipped = true
+                } else {
+                    let potaQSOs =
+                        qsosNeedingUpload?.filter {
+                            $0.needsUpload(to: .pota) && $0.parkReference?.isEmpty == false
+                        } ?? []
+                    if !potaQSOs.isEmpty {
+                        group.addTask {
+                            await self.uploadPOTABatch(qsos: potaQSOs, timeout: timeout)
+                        }
                     }
                 }
             }
@@ -37,9 +45,13 @@ extension SyncService {
             }
             return results
         }
+
+        return (results: results, potaMaintenanceSkipped: potaMaintenanceSkipped)
     }
 
-    private func uploadQRZBatch(qsos: [QSO], timeout: TimeInterval) async -> (ServiceType, Result<Int, Error>) {
+    private func uploadQRZBatch(qsos: [QSO], timeout: TimeInterval) async -> (
+        ServiceType, Result<Int, Error>
+    ) {
         await MainActor.run { self.syncPhase = .uploading(service: .qrz) }
         do {
             let count = try await withTimeout(seconds: timeout, service: .qrz) {
@@ -51,7 +63,9 @@ extension SyncService {
         }
     }
 
-    private func uploadPOTABatch(qsos: [QSO], timeout: TimeInterval) async -> (ServiceType, Result<Int, Error>) {
+    private func uploadPOTABatch(qsos: [QSO], timeout: TimeInterval) async -> (
+        ServiceType, Result<Int, Error>
+    ) {
         await MainActor.run { self.syncPhase = .uploading(service: .pota) }
         do {
             let count = try await withTimeout(seconds: timeout, service: .pota) {
