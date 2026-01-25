@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document specifies the API for challenge distribution and participation. Both the official FullDuplex challenge server and community servers should implement this API.
+This document specifies the API for challenge distribution and participation. Both the official Carrier Wave challenge server and community servers should implement this API.
 
 **Base URL**: `https://challenges.fullduplex.app/v1` (official) or custom (community)
 
@@ -331,7 +331,7 @@ The core JSON schema for challenge definitions.
         },
         "commentTemplate": {
           "type": "string",
-          "description": "Template for alert comment, e.g., 'FullDuplex WAS: Need {state}'"
+          "description": "Template for alert comment, e.g., 'Carrier Wave WAS: Need {state}'"
         }
       }
     }
@@ -371,7 +371,7 @@ GET /challenges
       "metadata": {
         "name": "Worked All States",
         "description": "Work all 50 US states",
-        "author": "FullDuplex Official",
+        "author": "Carrier Wave Official",
         "category": "award"
       },
       "type": "collection",
@@ -703,7 +703,7 @@ Rate limit headers:
   "metadata": {
     "name": "Worked All States",
     "description": "Work all 50 US states on any band and mode",
-    "author": "FullDuplex Official",
+    "author": "Carrier Wave Official",
     "category": "award",
     "tags": ["award", "usa", "states"]
   },
@@ -743,7 +743,7 @@ Rate limit headers:
     "supported": true,
     "alertType": "state",
     "spotSources": ["rbn", "cluster"],
-    "commentTemplate": "FullDuplex WAS: Need {state}"
+    "commentTemplate": "Carrier Wave WAS: Need {state}"
   }
 }
 ```
@@ -757,7 +757,7 @@ Rate limit headers:
   "metadata": {
     "name": "POTA Kilo Hunter",
     "description": "Make 1000 park-to-park contacts as a hunter",
-    "author": "FullDuplex Official",
+    "author": "Carrier Wave Official",
     "category": "award",
     "tags": ["pota", "hunter", "milestone"]
   },
@@ -798,7 +798,7 @@ Rate limit headers:
     "supported": true,
     "alertType": "park",
     "spotSources": ["pota"],
-    "commentTemplate": "FullDuplex POTA Hunter"
+    "commentTemplate": "Carrier Wave POTA Hunter"
   }
 }
 ```

@@ -1,5 +1,5 @@
 import XCTest
-@testable import FullDuplex
+@testable import CarrierWave
 
 // MARK: - LoFiClientTests
 
@@ -10,7 +10,7 @@ final class LoFiClientTests: XCTestCase {
             "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test",
             "client": {
                 "uuid": "client-uuid-123",
-                "name": "FullDuplex"
+                "name": "CarrierWave"
             },
             "account": {
                 "uuid": "account-uuid-456",
@@ -35,7 +35,7 @@ final class LoFiClientTests: XCTestCase {
 
         XCTAssertEqual(response.token, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test")
         XCTAssertEqual(response.client.uuid, "client-uuid-123")
-        XCTAssertEqual(response.client.name, "FullDuplex")
+        XCTAssertEqual(response.client.name, "CarrierWave")
         XCTAssertEqual(response.account.call, "W1AW")
         XCTAssertEqual(response.account.name, "Test User")
         XCTAssertEqual(response.meta.flags.suggestedSyncBatchSize, 50)

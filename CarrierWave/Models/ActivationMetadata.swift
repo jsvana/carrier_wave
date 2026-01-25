@@ -1,6 +1,6 @@
 //
 //  ActivationMetadata.swift
-//  FullDuplex
+//  CarrierWave
 //
 
 import Foundation

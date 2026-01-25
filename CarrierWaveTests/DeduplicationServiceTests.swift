@@ -1,6 +1,6 @@
 import SwiftData
 import XCTest
-@testable import FullDuplex
+@testable import CarrierWave
 
 final class DeduplicationServiceTests: XCTestCase {
     var modelContainer: ModelContainer!

@@ -1,12 +1,12 @@
-# SwiftLint configuration for FullDuplex
+# SwiftLint configuration for Carrier Wave
 
 included:
-  - FullDuplex
-  - FullDuplexTests
-  - FullDuplexUITests
+  - CarrierWave
+  - CarrierWaveTests
+  - CarrierWaveUITests
 
 excluded:
-  - FullDuplex.xcodeproj
+  - CarrierWave.xcodeproj
   - .build
 
 # Rules configuration

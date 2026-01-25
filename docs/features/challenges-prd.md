@@ -2,7 +2,7 @@
 
 ## Overview
 
-Challenges enable FullDuplex users to track progress toward ham radio activities and awards (DXCC, WAS, POTA, etc.) with optional social/competitive elements including leaderboards and time-limited competitions.
+Challenges enable Carrier Wave users to track progress toward ham radio activities and awards (DXCC, WAS, POTA, etc.) with optional social/competitive elements including leaderboards and time-limited competitions.
 
 ## Problem Statement
 
@@ -181,7 +181,7 @@ Challenge authors define how participants are ranked:
 
 | Source Type | Trust Level | Management |
 |-------------|-------------|------------|
-| **Official** | Trusted | Hosted by FullDuplex, curated quality |
+| **Official** | Trusted | Hosted by Carrier Wave, curated quality |
 | **Community** | User-added | Users add URLs to community sources |
 | **Invite Link** | Implicit trust | Join specific challenge via link |
 

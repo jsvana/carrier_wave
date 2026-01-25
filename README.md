@@ -1,4 +1,4 @@
-# FullDuplex
+# Carrier Wave
 
 An iOS app for amateur radio QSO (contact) logging with cloud synchronization to QRZ.com, Parks on the Air (POTA), and Ham2K LoFi.
 
@@ -19,11 +19,11 @@ An iOS app for amateur radio QSO (contact) logging with cloud synchronization to
 
 ```bash
 # Build for simulator
-xcodebuild -project FullDuplex.xcodeproj -scheme FullDuplex \
+xcodebuild -project CarrierWave.xcodeproj -scheme CarrierWave \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' build
 
 # Run tests
-xcodebuild -project FullDuplex.xcodeproj -scheme FullDuplex \
+xcodebuild -project CarrierWave.xcodeproj -scheme CarrierWave \
   -destination 'platform=iOS Simulator,name=iPhone 17 Pro' test
 ```
 
@@ -34,7 +34,7 @@ Built with SwiftUI and SwiftData. No external dependencies.
 ### Project Structure
 
 ```
-FullDuplex/
+CarrierWave/
 ├── Models/          # QSO, sync records, POTA models
 ├── Services/        # API clients (QRZ, POTA, LoFi), sync orchestration
 ├── Views/           # Dashboard, logs list, settings, POTA uploads

@@ -1,4 +1,4 @@
-# FullDuplex
+# Carrier Wave
 
 > **IMPORTANT:** For general project context, read this file and linked docs.
 > Only explore source files when actively implementing, planning, or debugging.
@@ -11,7 +11,7 @@ When you need to verify changes compile or tests pass, ask the user to run the a
 
 ## Overview
 
-FullDuplex is a SwiftUI/SwiftData iOS app for amateur radio QSO (contact) logging with cloud sync to QRZ, POTA, and Ham2K LoFi.
+Carrier Wave is a SwiftUI/SwiftData iOS app for amateur radio QSO (contact) logging with cloud sync to QRZ, POTA, and Ham2K LoFi.
 
 ## Quick Reference
 

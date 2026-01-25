@@ -15,14 +15,14 @@ See [challenges-prd.md](challenges-prd.md) for product requirements.
 │                         Challenge Sources                           │
 ├─────────────────┬─────────────────────┬─────────────────────────────┤
 │  Official API   │  Community Sources  │      Invite Links           │
-│  (FullDuplex)   │  (User-added URLs)  │  (Challenge-specific)       │
+│  (Carrier Wave)   │  (User-added URLs)  │  (Challenge-specific)       │
 └────────┬────────┴──────────┬──────────┴──────────────┬──────────────┘
          │                   │                         │
          └───────────────────┴─────────────────────────┘
                              │
                              ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│                       FullDuplex iOS App                            │
+│                       Carrier Wave iOS App                            │
 ├─────────────────────────────────────────────────────────────────────┤
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐                  │
 │  │  Challenge  │  │  Progress   │  │ Leaderboard │                  │
@@ -382,7 +382,7 @@ AlertTemplate
 ├── spotSources: [SpotSource]
 ├── bands: [Band]?
 ├── modes: [Mode]?
-└── comment: String                      // e.g., "FullDuplex: WAS - Need {state}"
+└── comment: String                      // e.g., "Carrier Wave: WAS - Need {state}"
 ```
 
 ---
@@ -432,7 +432,7 @@ Separate web application for creating and managing challenge definitions.
                               ▼
 ┌─────────────────────────────────────────────────────────────┐
 │                   Challenge Server                          │
-│  (Can be official FullDuplex server or self-hosted)         │
+│  (Can be official Carrier Wave server or self-hosted)         │
 ├─────────────────────────────────────────────────────────────┤
 │  • Hosts challenge definitions                              │
 │  • Tracks participation                                     │

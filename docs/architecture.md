@@ -2,7 +2,7 @@
 
 ## Data Models
 
-Located in `FullDuplex/Models/`:
+Located in `CarrierWave/Models/`:
 
 | Model | Purpose |
 |-------|---------|
@@ -13,7 +13,7 @@ Located in `FullDuplex/Models/`:
 
 ## Services
 
-Located in `FullDuplex/Services/`. All API clients use `actor` for thread safety.
+Located in `CarrierWave/Services/`. All API clients use `actor` for thread safety.
 
 | Service | Purpose |
 |---------|---------|
@@ -46,7 +46,7 @@ Dashboard stats use `QSOStatistics` struct with `items(for:)` method to group QS
 ## File Organization
 
 ```
-FullDuplex/
+CarrierWave/
 ├── Models/           # SwiftData models
 ├── Services/         # API clients, sync logic
 ├── Views/

@@ -1,12 +1,12 @@
 //
 //  ADIFParserTests.swift
-//  FullDuplexTests
+//  CarrierWaveTests
 //
 //  Created by Jay Vana on 1/20/26.
 //
 
 import XCTest
-@testable import FullDuplex
+@testable import CarrierWave
 
 final class ADIFParserTests: XCTestCase {
     func testParseSimpleRecord() throws {

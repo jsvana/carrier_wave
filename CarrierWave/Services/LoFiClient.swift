@@ -49,8 +49,8 @@ actor LoFiClient {
     // MARK: Internal (for extension access)
 
     let baseURL = "https://lofi.ham2k.net"
-    let clientName = "FullDuplex"
-    let appName = "FullDuplex"
+    let clientName = "CarrierWave"
+    let appName = "CarrierWave"
     nonisolated let keychain = KeychainHelper.shared
     let session: URLSession
 

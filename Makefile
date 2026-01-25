@@ -2,12 +2,12 @@
 
 DEVICE_NAME := theseus
 BUNDLE_ID := com.jsvana.FullDuplex
-PROJECT := FullDuplex.xcodeproj
-SCHEME := FullDuplex
+PROJECT := CarrierWave.xcodeproj
+SCHEME := CarrierWave
 SIMULATOR := iPhone 17 Pro
 
 # Find the most recent DerivedData directory for this project
-DERIVED_DATA = $(shell ls -td ~/Library/Developer/Xcode/DerivedData/FullDuplex-* 2>/dev/null | head -n1)
+DERIVED_DATA = $(shell ls -td ~/Library/Developer/Xcode/DerivedData/CarrierWave-* 2>/dev/null | head -n1)
 
 # Build for simulator (default)
 build:
@@ -31,7 +31,7 @@ devices:
 # Install app on device (requires build-device first)
 install:
 	xcrun devicectl device install app --device $(DEVICE_NAME) \
-		"$(DERIVED_DATA)/Build/Products/Debug-iphoneos/FullDuplex.app"
+		"$(DERIVED_DATA)/Build/Products/Debug-iphoneos/CarrierWave.app"
 
 # Launch app on device
 launch:
@@ -43,7 +43,7 @@ deploy: build-device install launch
 # Clean build artifacts
 clean:
 	xcodebuild -project $(PROJECT) -scheme $(SCHEME) clean
-	rm -rf ~/Library/Developer/Xcode/DerivedData/FullDuplex-*
+	rm -rf ~/Library/Developer/Xcode/DerivedData/CarrierWave-*
 
 # Lint Swift files
 lint:

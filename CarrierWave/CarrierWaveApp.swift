@@ -2,10 +2,10 @@ import SwiftData
 import SwiftUI
 import UniformTypeIdentifiers
 
-// MARK: - FullDuplexApp
+// MARK: - CarrierWaveApp
 
 @main
-struct FullDuplexApp: App {
+struct CarrierWaveApp: App {
     // MARK: Internal
 
     var sharedModelContainer: ModelContainer = {

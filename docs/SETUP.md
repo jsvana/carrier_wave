@@ -29,7 +29,7 @@ make deploy
 
 ### 1. iCloud Entitlements
 
-In Xcode, select the FullDuplex target, go to "Signing & Capabilities", and add:
+In Xcode, select the CarrierWave target, go to "Signing & Capabilities", and add:
 
 1. **iCloud** capability
    - Check "iCloud Documents"

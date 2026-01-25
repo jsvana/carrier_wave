@@ -12,37 +12,37 @@
 			containerPortal = CF8DD1A52F2098940021A936 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = CF8DD1AC2F2098940021A936;
-			remoteInfo = FullDuplex;
+			remoteInfo = CarrierWave;
 		};
 		CF8DD1C72F2098950021A936 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = CF8DD1A52F2098940021A936 /* Project object */;
 			proxyType = 1;
 			remoteGlobalIDString = CF8DD1AC2F2098940021A936;
-			remoteInfo = FullDuplex;
+			remoteInfo = CarrierWave;
 		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		CF8DD1AD2F2098940021A936 /* FullDuplex.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = FullDuplex.app; sourceTree = BUILT_PRODUCTS_DIR; };
-		CF8DD1BC2F2098950021A936 /* FullDuplexTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FullDuplexTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
-		CF8DD1C62F2098950021A936 /* FullDuplexUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = FullDuplexUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CF8DD1AD2F2098940021A936 /* CarrierWave.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = CarrierWave.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CF8DD1BC2F2098950021A936 /* CarrierWaveTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CarrierWaveTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		CF8DD1C62F2098950021A936 /* CarrierWaveUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CarrierWaveUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		CF8DD1AF2F2098940021A936 /* FullDuplex */ = {
+		CF8DD1AF2F2098940021A936 /* CarrierWave */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = FullDuplex;
+			path = CarrierWave;
 			sourceTree = "<group>";
 		};
-		CF8DD1BF2F2098950021A936 /* FullDuplexTests */ = {
+		CF8DD1BF2F2098950021A936 /* CarrierWaveTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = FullDuplexTests;
+			path = CarrierWaveTests;
 			sourceTree = "<group>";
 		};
-		CF8DD1C92F2098950021A936 /* FullDuplexUITests */ = {
+		CF8DD1C92F2098950021A936 /* CarrierWaveUITests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
-			path = FullDuplexUITests;
+			path = CarrierWaveUITests;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -75,9 +75,9 @@
 		CF8DD1A42F2098940021A936 = {
 			isa = PBXGroup;
 			children = (
-				CF8DD1AF2F2098940021A936 /* FullDuplex */,
-				CF8DD1BF2F2098950021A936 /* FullDuplexTests */,
-				CF8DD1C92F2098950021A936 /* FullDuplexUITests */,
+				CF8DD1AF2F2098940021A936 /* CarrierWave */,
+				CF8DD1BF2F2098950021A936 /* CarrierWaveTests */,
+				CF8DD1C92F2098950021A936 /* CarrierWaveUITests */,
 				CF8DD1AE2F2098940021A936 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -85,9 +85,9 @@
 		CF8DD1AE2F2098940021A936 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				CF8DD1AD2F2098940021A936 /* FullDuplex.app */,
-				CF8DD1BC2F2098950021A936 /* FullDuplexTests.xctest */,
-				CF8DD1C62F2098950021A936 /* FullDuplexUITests.xctest */,
+				CF8DD1AD2F2098940021A936 /* CarrierWave.app */,
+				CF8DD1BC2F2098950021A936 /* CarrierWaveTests.xctest */,
+				CF8DD1C62F2098950021A936 /* CarrierWaveUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -95,9 +95,9 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
-		CF8DD1AC2F2098940021A936 /* FullDuplex */ = {
+		CF8DD1AC2F2098940021A936 /* CarrierWave */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = CF8DD1D02F2098950021A936 /* Build configuration list for PBXNativeTarget "FullDuplex" */;
+			buildConfigurationList = CF8DD1D02F2098950021A936 /* Build configuration list for PBXNativeTarget "CarrierWave" */;
 			buildPhases = (
 				CF8DD1A92F2098940021A936 /* Sources */,
 				CF8DD1AA2F2098940021A936 /* Frameworks */,
@@ -108,18 +108,18 @@
 			dependencies = (
 			);
 			fileSystemSynchronizedGroups = (
-				CF8DD1AF2F2098940021A936 /* FullDuplex */,
+				CF8DD1AF2F2098940021A936 /* CarrierWave */,
 			);
-			name = FullDuplex;
+			name = CarrierWave;
 			packageProductDependencies = (
 			);
-			productName = FullDuplex;
-			productReference = CF8DD1AD2F2098940021A936 /* FullDuplex.app */;
+			productName = CarrierWave;
+			productReference = CF8DD1AD2F2098940021A936 /* CarrierWave.app */;
 			productType = "com.apple.product-type.application";
 		};
-		CF8DD1BB2F2098950021A936 /* FullDuplexTests */ = {
+		CF8DD1BB2F2098950021A936 /* CarrierWaveTests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = CF8DD1D32F2098950021A936 /* Build configuration list for PBXNativeTarget "FullDuplexTests" */;
+			buildConfigurationList = CF8DD1D32F2098950021A936 /* Build configuration list for PBXNativeTarget "CarrierWaveTests" */;
 			buildPhases = (
 				CF8DD1B82F2098950021A936 /* Sources */,
 				CF8DD1B92F2098950021A936 /* Frameworks */,
@@ -131,18 +131,18 @@
 				CF8DD1BE2F2098950021A936 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				CF8DD1BF2F2098950021A936 /* FullDuplexTests */,
+				CF8DD1BF2F2098950021A936 /* CarrierWaveTests */,
 			);
-			name = FullDuplexTests;
+			name = CarrierWaveTests;
 			packageProductDependencies = (
 			);
-			productName = FullDuplexTests;
-			productReference = CF8DD1BC2F2098950021A936 /* FullDuplexTests.xctest */;
+			productName = CarrierWaveTests;
+			productReference = CF8DD1BC2F2098950021A936 /* CarrierWaveTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
-		CF8DD1C52F2098950021A936 /* FullDuplexUITests */ = {
+		CF8DD1C52F2098950021A936 /* CarrierWaveUITests */ = {
 			isa = PBXNativeTarget;
-			buildConfigurationList = CF8DD1D62F2098950021A936 /* Build configuration list for PBXNativeTarget "FullDuplexUITests" */;
+			buildConfigurationList = CF8DD1D62F2098950021A936 /* Build configuration list for PBXNativeTarget "CarrierWaveUITests" */;
 			buildPhases = (
 				CF8DD1C22F2098950021A936 /* Sources */,
 				CF8DD1C32F2098950021A936 /* Frameworks */,
@@ -154,13 +154,13 @@
 				CF8DD1C82F2098950021A936 /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
-				CF8DD1C92F2098950021A936 /* FullDuplexUITests */,
+				CF8DD1C92F2098950021A936 /* CarrierWaveUITests */,
 			);
-			name = FullDuplexUITests;
+			name = CarrierWaveUITests;
 			packageProductDependencies = (
 			);
-			productName = FullDuplexUITests;
-			productReference = CF8DD1C62F2098950021A936 /* FullDuplexUITests.xctest */;
+			productName = CarrierWaveUITests;
+			productReference = CF8DD1C62F2098950021A936 /* CarrierWaveUITests.xctest */;
 			productType = "com.apple.product-type.bundle.ui-testing";
 		};
 /* End PBXNativeTarget section */
@@ -186,7 +186,7 @@
 					};
 				};
 			};
-			buildConfigurationList = CF8DD1A82F2098940021A936 /* Build configuration list for PBXProject "FullDuplex" */;
+			buildConfigurationList = CF8DD1A82F2098940021A936 /* Build configuration list for PBXProject "CarrierWave" */;
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -200,9 +200,9 @@
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
-				CF8DD1AC2F2098940021A936 /* FullDuplex */,
-				CF8DD1BB2F2098950021A936 /* FullDuplexTests */,
-				CF8DD1C52F2098950021A936 /* FullDuplexUITests */,
+				CF8DD1AC2F2098940021A936 /* CarrierWave */,
+				CF8DD1BB2F2098950021A936 /* CarrierWaveTests */,
+				CF8DD1C52F2098950021A936 /* CarrierWaveUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -258,12 +258,12 @@
 /* Begin PBXTargetDependency section */
 		CF8DD1BE2F2098950021A936 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = CF8DD1AC2F2098940021A936 /* FullDuplex */;
+			target = CF8DD1AC2F2098940021A936 /* CarrierWave */;
 			targetProxy = CF8DD1BD2F2098950021A936 /* PBXContainerItemProxy */;
 		};
 		CF8DD1C82F2098950021A936 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
-			target = CF8DD1AC2F2098940021A936 /* FullDuplex */;
+			target = CF8DD1AC2F2098940021A936 /* CarrierWave */;
 			targetProxy = CF8DD1C72F2098950021A936 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
@@ -472,7 +472,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FullDuplex.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FullDuplex";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CarrierWave.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CarrierWave";
 			};
 			name = Debug;
 		};
@@ -494,7 +494,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/FullDuplex.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/FullDuplex";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/CarrierWave.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/CarrierWave";
 			};
 			name = Release;
 		};
@@ -514,7 +514,7 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = FullDuplex;
+				TEST_TARGET_NAME = CarrierWave;
 			};
 			name = Debug;
 		};
@@ -534,14 +534,14 @@
 				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
-				TEST_TARGET_NAME = FullDuplex;
+				TEST_TARGET_NAME = CarrierWave;
 			};
 			name = Release;
 		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
-		CF8DD1A82F2098940021A936 /* Build configuration list for PBXProject "FullDuplex" */ = {
+		CF8DD1A82F2098940021A936 /* Build configuration list for PBXProject "CarrierWave" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				CF8DD1CE2F2098950021A936 /* Debug */,
@@ -550,7 +550,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		CF8DD1D02F2098950021A936 /* Build configuration list for PBXNativeTarget "FullDuplex" */ = {
+		CF8DD1D02F2098950021A936 /* Build configuration list for PBXNativeTarget "CarrierWave" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				CF8DD1D12F2098950021A936 /* Debug */,
@@ -559,7 +559,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		CF8DD1D32F2098950021A936 /* Build configuration list for PBXNativeTarget "FullDuplexTests" */ = {
+		CF8DD1D32F2098950021A936 /* Build configuration list for PBXNativeTarget "CarrierWaveTests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				CF8DD1D42F2098950021A936 /* Debug */,
@@ -568,7 +568,7 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		CF8DD1D62F2098950021A936 /* Build configuration list for PBXNativeTarget "FullDuplexUITests" */ = {
+		CF8DD1D62F2098950021A936 /* Build configuration list for PBXNativeTarget "CarrierWaveUITests" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				CF8DD1D72F2098950021A936 /* Debug */,

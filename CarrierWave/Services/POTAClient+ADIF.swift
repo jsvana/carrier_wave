@@ -30,7 +30,7 @@ extension POTAClient {
 
         lines.append("ADIF for \(activator): POTA \(parkReference) on \(dateStr)")
         lines.append(formatField("ADIF_VER", "3.1.5"))
-        lines.append(formatField("PROGRAMID", "FullDuplex"))
+        lines.append(formatField("PROGRAMID", "CarrierWave"))
 
         let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
         lines.append(formatField("PROGRAMVERSION", version))

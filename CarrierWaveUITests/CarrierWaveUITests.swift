@@ -1,13 +1,13 @@
 //
-//  FullDuplexUITests.swift
-//  FullDuplexUITests
+//  CarrierWaveUITests.swift
+//  CarrierWaveUITests
 //
 //  Created by Jay Vana on 1/20/26.
 //
 
 import XCTest
 
-final class FullDuplexUITests: XCTestCase {
+final class CarrierWaveUITests: XCTestCase {
     override func setUpWithError() throws {
         // Put setup code here. This method is called before the invocation of each test method in the class.
 

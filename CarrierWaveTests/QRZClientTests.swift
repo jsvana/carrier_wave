@@ -1,5 +1,5 @@
 import XCTest
-@testable import FullDuplex
+@testable import CarrierWave
 
 final class QRZClientTests: XCTestCase {
     func testParseLoginResponse() throws {

@@ -1,13 +1,13 @@
 //
-//  FullDuplexUITestsLaunchTests.swift
-//  FullDuplexUITests
+//  CarrierWaveUITestsLaunchTests.swift
+//  CarrierWaveUITests
 //
 //  Created by Jay Vana on 1/20/26.
 //
 
 import XCTest
 
-final class FullDuplexUITestsLaunchTests: XCTestCase {
+final class CarrierWaveUITestsLaunchTests: XCTestCase {
     override static var runsForEachTargetApplicationUIConfiguration: Bool {
         true
     }

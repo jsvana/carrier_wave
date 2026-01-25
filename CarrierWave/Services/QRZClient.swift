@@ -76,7 +76,7 @@ actor QRZClient {
 
     let baseURL = "https://logbook.qrz.com/api"
     nonisolated let keychain = KeychainHelper.shared
-    let userAgent = "FullDuplex/1.0"
+    let userAgent = "CarrierWave/1.0"
 
     // MARK: - Response Parsing
 
