@@ -31,6 +31,7 @@ struct FetchedQSO {
     let qrzLogId: String?
     let qrzConfirmed: Bool
     let lotwConfirmedDate: Date?
+    let lotwConfirmed: Bool
 
     /// Source tracking
     let source: ServiceType
@@ -125,6 +126,7 @@ extension FetchedQSO {
             qrzLogId: qrz.qrzLogId,
             qrzConfirmed: qrz.qrzConfirmed,
             lotwConfirmedDate: qrz.lotwConfirmedDate,
+            lotwConfirmed: false,
             source: .qrz
         )
     }
@@ -155,6 +157,7 @@ extension FetchedQSO {
             qrzLogId: nil,
             qrzConfirmed: false,
             lotwConfirmedDate: nil,
+            lotwConfirmed: false,
             source: .pota
         )
     }
@@ -194,6 +197,7 @@ extension FetchedQSO {
             qrzLogId: nil,
             qrzConfirmed: false,
             lotwConfirmedDate: nil,
+            lotwConfirmed: false,
             source: .lofi
         )
     }
@@ -232,7 +236,39 @@ extension FetchedQSO {
             qrzLogId: nil,
             qrzConfirmed: false,
             lotwConfirmedDate: nil,
+            lotwConfirmed: false,
             source: .hamrs
+        )
+    }
+
+    /// Create from LoTW fetched QSO
+    static func fromLoTW(_ lotw: LoTWFetchedQSO) -> FetchedQSO {
+        FetchedQSO(
+            callsign: lotw.callsign,
+            band: lotw.band,
+            mode: lotw.mode,
+            frequency: lotw.frequency,
+            timestamp: lotw.timestamp,
+            rstSent: lotw.rstSent,
+            rstReceived: lotw.rstReceived,
+            myCallsign: lotw.myCallsign ?? "",
+            myGrid: lotw.myGrid,
+            theirGrid: lotw.theirGrid,
+            parkReference: nil,
+            theirParkReference: nil,
+            notes: nil,
+            rawADIF: lotw.rawADIF,
+            name: nil,
+            qth: nil,
+            state: lotw.state,
+            country: lotw.country,
+            power: nil,
+            sotaRef: nil,
+            qrzLogId: nil,
+            qrzConfirmed: false,
+            lotwConfirmedDate: lotw.qslReceivedDate,
+            lotwConfirmed: lotw.qslReceived,
+            source: .lotw
         )
     }
 }
