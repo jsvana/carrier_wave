@@ -22,6 +22,9 @@ extension DashboardView {
             if !result.errors.isEmpty {
                 print("Sync errors: \(result.errors)")
             }
+            if result.potaMaintenanceSkipped {
+                potaSyncResult = "Maintenance until 0400 UTC"
+            }
         } catch {
             print("Sync error: \(error.localizedDescription)")
         }
@@ -116,6 +119,8 @@ extension DashboardView {
                 }
                 potaSyncResult = parts.joined(separator: " ")
             }
+        } catch POTAError.maintenanceWindow {
+            potaSyncResult = "Maintenance until 0400 UTC"
         } catch {
             potaSyncResult = "Error: \(error.localizedDescription)"
         }
