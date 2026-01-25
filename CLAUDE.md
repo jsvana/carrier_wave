@@ -3,6 +3,128 @@
 > **IMPORTANT:** For general project context, read this file and linked docs.
 > Only explore source files when actively implementing, planning, or debugging.
 
+## File Discovery Rules
+
+**FORBIDDEN:**
+- Scanning all `.swift` files (e.g., `Glob **/*.swift`, `Grep` across entire repo)
+- Using Task/Explore agents to "find all files" or "explore the codebase structure"
+- Any broad file discovery that reads more than 5 files at once
+
+**REQUIRED:**
+- Use the File Index below to locate files by feature/purpose
+- Read specific files by path from the index
+- When editing files, update this index if adding/removing/renaming files
+
+## File Index
+
+### Entry Points
+| File | Purpose |
+|------|---------|
+| `CarrierWave/CarrierWaveApp.swift` | App entry point, SwiftData container setup |
+| `CarrierWave/ContentView.swift` | Root TabView with AppTab enum for programmatic tab switching |
+
+### Models (`CarrierWave/Models/`)
+| File | Purpose |
+|------|---------|
+| `QSO.swift` | Core contact record (callsign, band, mode, timestamps, grid, park ref) |
+| `UploadDestination.swift` | Sync target configuration (enabled flag, last sync timestamp) |
+| `POTAJob.swift` | POTA activation job tracking |
+| `POTALogEntry.swift` | Individual POTA log entries |
+| `POTAUploadAttempt.swift` | POTA upload attempt history and status |
+| `ServicePresence.swift` | Service connection status tracking |
+| `ActivationMetadata.swift` | Activation-level metadata storage |
+| `StatCategoryItem.swift` | Individual stat item for dashboard display |
+| `StatCategoryType.swift` | Stat category enum (band, mode, DXCC, etc.) |
+| `Types.swift` | Shared type definitions |
+| `ChallengeDefinition.swift` | Challenge metadata and rules |
+| `ChallengeParticipation.swift` | User's participation in a challenge |
+| `ChallengeSource.swift` | Where challenge definitions come from |
+| `ChallengeTypes.swift` | Challenge-related enums and types |
+| `LeaderboardCache.swift` | Cached leaderboard data |
+
+### Services (`CarrierWave/Services/`)
+| File | Purpose |
+|------|---------|
+| `QRZClient.swift` | QRZ.com API client (session auth) |
+| `QRZClient+ADIF.swift` | QRZ ADIF upload extension |
+| `POTAClient.swift` | POTA API client (bearer token auth) |
+| `POTAClient+Upload.swift` | POTA multipart ADIF upload |
+| `POTAClient+ADIF.swift` | POTA ADIF formatting |
+| `POTAClient+GridLookup.swift` | POTA grid square lookup |
+| `POTAAuthService.swift` | POTA OAuth flow handling |
+| `LoFiClient.swift` | Ham2K LoFi sync client |
+| `LoFiClient+Helpers.swift` | LoFi helper methods |
+| `LoFiModels.swift` | LoFi API response models |
+| `HAMRSClient.swift` | HAMRS sync client |
+| `HAMRSModels.swift` | HAMRS API models |
+| `HAMRSError.swift` | HAMRS-specific errors |
+| `SyncService.swift` | Main sync orchestrator |
+| `SyncService+Upload.swift` | Upload logic for all services |
+| `SyncService+Download.swift` | Download/import logic |
+| `SyncService+Process.swift` | QSO processing during sync |
+| `SyncDebugLog.swift` | Sync debugging utilities |
+| `ImportService.swift` | ADIF parsing, deduplication, QSO creation |
+| `ImportService+External.swift` | External file import handling |
+| `ADIFParser.swift` | ADIF format parser |
+| `DeduplicationService.swift` | QSO deduplication logic |
+| `ICloudMonitor.swift` | iCloud sync status monitoring |
+| `DescriptionLookup.swift` | Human-readable descriptions for codes |
+| `DescriptionLookup+DXCC.swift` | DXCC entity descriptions |
+| `FetchedQSO.swift` | Intermediate QSO representation during fetch |
+| `ChallengesClient.swift` | Challenges API client |
+| `ChallengesError.swift` | Challenges-specific errors |
+| `ChallengesSyncService.swift` | Challenge data synchronization |
+| `ChallengeProgressEngine.swift` | Challenge progress calculation |
+| `ChallengeQSOMatcher.swift` | Match QSOs to challenge criteria |
+
+### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
+| File | Purpose |
+|------|---------|
+| `DashboardView.swift` | Main dashboard with stats grid |
+| `DashboardView+Actions.swift` | Dashboard action handlers |
+| `DashboardView+ServiceCards.swift` | Service status cards |
+| `DashboardHelperViews.swift` | Reusable dashboard components |
+| `StatDetailView.swift` | Drilldown view for stat categories |
+| `StatItemRow.swift` | Individual stat row with expandable QSOs |
+
+### Views - Logs (`CarrierWave/Views/Logs/`)
+| File | Purpose |
+|------|---------|
+| `LogsListView.swift` | Searchable/filterable QSO list |
+
+### Views - POTA Uploads (`CarrierWave/Views/POTAUploads/`)
+| File | Purpose |
+|------|---------|
+| `POTAUploadsView.swift` | POTA upload management tab |
+| `POTALogEntryRow.swift` | Individual POTA log entry display |
+
+### Views - Challenges (`CarrierWave/Views/Challenges/`)
+| File | Purpose |
+|------|---------|
+| `ChallengesView.swift` | Main challenges tab |
+| `BrowseChallengesView.swift` | Browse available challenges |
+| `ChallengeDetailView.swift` | Single challenge detail view |
+| `ChallengeDetailHelperViews.swift` | Challenge detail components |
+| `ChallengeProgressCard.swift` | Progress visualization card |
+| `LeaderboardView.swift` | Challenge leaderboard display |
+
+### Views - Settings (`CarrierWave/Views/Settings/`)
+| File | Purpose |
+|------|---------|
+| `SettingsView.swift` | Main settings navigation |
+| `ServiceSettingsViews.swift` | QRZ/POTA/LoFi auth configuration |
+| `CloudSettingsViews.swift` | iCloud sync settings |
+| `HAMRSSettingsView.swift` | HAMRS connection settings |
+| `ChallengesSettingsView.swift` | Challenges feature settings |
+| `POTAAuthWebView.swift` | POTA OAuth WebView |
+| `SyncDebugView.swift` | Sync debugging interface |
+| `AttributionsView.swift` | Third-party attributions |
+
+### Utilities (`CarrierWave/Utilities/`)
+| File | Purpose |
+|------|---------|
+| `KeychainHelper.swift` | Secure credential storage |
+
 ## Building and Testing
 
 **NEVER build, run tests, or use the iOS simulator yourself. Always prompt the user to do so.**
