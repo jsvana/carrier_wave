@@ -237,6 +237,17 @@ extension DashboardView {
                 if syncService.isSyncing {
                     SyncStatusOverlay(phase: syncService.syncPhase, service: .pota)
                 } else {
+                    // Maintenance window indicator
+                    if POTAClient.isInMaintenanceWindow() {
+                        HStack(spacing: 4) {
+                            Image(systemName: "wrench.and.screwdriver")
+                                .foregroundStyle(.orange)
+                            Text("Maintenance until 0400 UTC")
+                                .font(.subheadline)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+
                     // Synced QSOs
                     HStack(spacing: 4) {
                         Image(systemName: "checkmark.circle")
