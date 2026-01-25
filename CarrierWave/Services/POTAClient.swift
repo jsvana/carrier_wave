@@ -14,6 +14,7 @@ enum POTAError: Error, LocalizedError {
     case fetchFailed(String)
     case invalidParkReference
     case networkError(Error)
+    case maintenanceWindow
 
     // MARK: Internal
 
@@ -29,6 +30,8 @@ enum POTAError: Error, LocalizedError {
             "Invalid park reference format"
         case let .networkError(error):
             "Network error: \(error.localizedDescription)"
+        case .maintenanceWindow:
+            "POTA is in maintenance (0000-0400 UTC)"
         }
     }
 }
@@ -196,6 +199,16 @@ actor POTAClient {
 
     let baseURL = "https://api.pota.app"
     let authService: POTAAuthService
+
+    /// Check if current time is within POTA maintenance window (0000-0400 UTC daily)
+    static func isInMaintenanceWindow(at date: Date = Date()) -> Bool {
+        let calendar = Calendar(identifier: .gregorian)
+        guard let utc = TimeZone(identifier: "UTC") else {
+            return false
+        }
+        let hour = calendar.dateComponents(in: utc, from: date).hour ?? 0
+        return hour >= 0 && hour < 4
+    }
 
     /// Get all unique park references from QSOs (excludes nil and empty)
     static func groupQSOsByPark(_ qsos: [QSO]) -> [String: [QSO]] {
