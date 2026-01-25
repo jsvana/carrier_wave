@@ -36,11 +36,18 @@ struct ContentView: View {
                     .tag(AppTab.dashboard)
             }
 
-            LogsContainerView(potaClient: potaClient, potaAuth: potaAuthService)
-                .tabItem {
-                    Label("Logs", systemImage: "list.bullet")
-                }
-                .tag(AppTab.logs)
+            LogsContainerView(
+                potaClient: potaClient,
+                potaAuth: potaAuthService,
+                lofiClient: lofiClient,
+                qrzClient: qrzClient,
+                hamrsClient: hamrsClient,
+                lotwClient: lotwClient
+            )
+            .tabItem {
+                Label("Logs", systemImage: "list.bullet")
+            }
+            .tag(AppTab.logs)
 
             ChallengesView()
                 .tabItem {
@@ -94,6 +101,11 @@ struct ContentView: View {
     @State private var selectedTab: AppTab = .dashboard
     @State private var syncService: SyncService?
     @State private var potaClient: POTAClient?
+
+    private let lofiClient = LoFiClient()
+    private let qrzClient = QRZClient()
+    private let hamrsClient = HAMRSClient()
+    private let lotwClient = LoTWClient()
 }
 
 #Preview {

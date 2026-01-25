@@ -85,7 +85,8 @@
 |------|---------|
 | `DashboardView.swift` | Main dashboard with stats grid |
 | `DashboardView+Actions.swift` | Dashboard action handlers |
-| `DashboardView+ServiceCards.swift` | Service status cards |
+| `DashboardView+ServiceCards.swift` | Service status cards (LoFi, QRZ, POTA) |
+| `DashboardView+ServiceCardsSecondary.swift` | Service status cards (HAMRS, LoTW, iCloud) |
 | `DashboardHelperViews.swift` | Reusable dashboard components |
 | `StatDetailView.swift` | Drilldown view for stat categories |
 | `StatItemRow.swift` | Individual stat row with expandable QSOs |

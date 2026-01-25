@@ -62,17 +62,19 @@ extension SyncService {
 
         // Create presence records for all sources that had this QSO
         let sources = Set(fetchedGroup.map(\.source))
-        for source in sources {
-            let presence = ServicePresence.downloaded(from: source, qso: newQSO)
-            modelContext.insert(presence)
-            newQSO.servicePresence.append(presence)
-        }
 
-        // Mark as needing upload to services that don't have it
-        for service in ServiceType.allCases
-            where service.supportsUpload && !sources.contains(service)
-        { // swiftlint:disable:this opening_brace
-            let presence = ServicePresence.needsUpload(to: service, qso: newQSO)
+        // Create presence record for ALL services
+        for service in ServiceType.allCases {
+            let presence = if sources.contains(service) {
+                // QSO came from this service - mark as present
+                ServicePresence.downloaded(from: service, qso: newQSO)
+            } else if service.supportsUpload {
+                // Bidirectional service without this QSO - needs upload
+                ServicePresence.needsUpload(to: service, qso: newQSO)
+            } else {
+                // Download-only service without this QSO - not present, no upload needed
+                ServicePresence(serviceType: service, isPresent: false, qso: newQSO)
+            }
             modelContext.insert(presence)
             newQSO.servicePresence.append(presence)
         }

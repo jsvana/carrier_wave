@@ -1,20 +1,50 @@
 import SwiftData
 import SwiftUI
 
+// MARK: - ServiceConfiguration
+
+/// Tracks which services are configured/authenticated
+struct ServiceConfiguration {
+    var qrz: Bool = false
+    var pota: Bool = false
+    var lofi: Bool = false
+    var hamrs: Bool = false
+    var lotw: Bool = false
+
+    func isConfigured(_ serviceType: ServiceType) -> Bool {
+        switch serviceType {
+        case .qrz: qrz
+        case .pota: pota
+        case .lofi: lofi
+        case .hamrs: hamrs
+        case .lotw: lotw
+        }
+    }
+}
+
 // MARK: - LogsListContentView
 
 /// Content-only view for embedding in LogsContainerView
 struct LogsListContentView: View {
     // MARK: Internal
 
+    let lofiClient: LoFiClient
+    let qrzClient: QRZClient
+    let hamrsClient: HAMRSClient
+    let lotwClient: LoTWClient
+    let potaAuth: POTAAuthService
+
     var body: some View {
         List {
             ForEach(filteredQSOs) { qso in
-                QSORow(qso: qso)
+                QSORow(qso: qso, serviceConfig: serviceConfig)
             }
             .onDelete(perform: deleteQSOs)
         }
         .searchable(text: $searchText, prompt: "Search callsigns or parks")
+        .task {
+            await loadServiceConfiguration()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -55,6 +85,7 @@ struct LogsListContentView: View {
     @State private var searchText = ""
     @State private var selectedBand: String?
     @State private var selectedMode: String?
+    @State private var serviceConfig = ServiceConfiguration()
 
     private var filteredQSOs: [QSO] {
         qsos.filter { qso in
@@ -83,6 +114,16 @@ struct LogsListContentView: View {
             modelContext.delete(qso)
         }
     }
+
+    private func loadServiceConfiguration() async {
+        serviceConfig = await ServiceConfiguration(
+            qrz: qrzClient.hasApiKey(),
+            pota: potaAuth.isAuthenticated,
+            lofi: lofiClient.isConfigured && lofiClient.isLinked,
+            hamrs: hamrsClient.isConfigured,
+            lotw: lotwClient.isConfigured
+        )
+    }
 }
 
 // MARK: - QSORow
@@ -91,6 +132,7 @@ struct QSORow: View {
     // MARK: Internal
 
     let qso: QSO
+    let serviceConfig: ServiceConfiguration
 
     var body: some View {
         VStack(alignment: .leading, spacing: 4) {
@@ -124,7 +166,11 @@ struct QSORow: View {
 
             HStack(spacing: 8) {
                 ForEach(sortedPresence) { presence in
-                    ServicePresenceBadge(presence: presence)
+                    ServicePresenceBadge(
+                        presence: presence,
+                        qso: qso,
+                        isServiceConfigured: serviceConfig.isConfigured(presence.serviceType)
+                    )
                 }
             }
         }
@@ -144,6 +190,8 @@ struct ServicePresenceBadge: View {
     // MARK: Internal
 
     let presence: ServicePresence
+    let qso: QSO
+    let isServiceConfigured: Bool
 
     var body: some View {
         HStack(spacing: 2) {
@@ -160,20 +208,57 @@ struct ServicePresenceBadge: View {
 
     // MARK: Private
 
-    private var iconName: String {
-        if presence.isPresent {
-            "checkmark"
-        } else if presence.needsUpload {
-            "clock"
-        } else {
-            "minus"
+    private var isBidirectional: Bool {
+        switch presence.serviceType {
+        case .qrz,
+             .pota,
+             .hamrs:
+            true
+        case .lofi,
+             .lotw:
+            false
         }
+    }
+
+    private var isConfirmed: Bool {
+        switch presence.serviceType {
+        case .lotw:
+            qso.lotwConfirmed
+        case .qrz:
+            qso.qrzConfirmed
+        default:
+            false
+        }
+    }
+
+    private var iconName: String {
+        // QSL confirmed (QRZ/LoTW only)
+        if presence.isPresent, isConfirmed {
+            return "star.fill"
+        }
+
+        // Bidirectional services: clock (not synced), arrow.down (downloaded), checkmark (fully synced)
+        if isBidirectional {
+            if presence.isPresent, !presence.needsUpload {
+                return "checkmark"
+            } else if presence.isPresent, presence.needsUpload {
+                return "arrow.down"
+            }
+        }
+
+        // Download-only services: checkmark when present
+        if presence.isPresent {
+            return "checkmark"
+        }
+
+        // Not synced - same icon for all services
+        return "clock"
     }
 
     private var backgroundColor: Color {
         if presence.isPresent {
             .green
-        } else if presence.needsUpload {
+        } else if isServiceConfigured {
             .orange
         } else {
             .gray

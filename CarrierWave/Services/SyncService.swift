@@ -280,19 +280,16 @@ class SyncService: ObservableObject {
         }
 
         syncPhase = .downloading(service: .lotw)
-        let qslSince = await lotwClient.getLastQSLDate()
+        let rxSince = await lotwClient.getLastQSORxDate()
         let response = try await withTimeout(seconds: syncTimeoutSeconds, service: .lotw) {
-            try await self.lotwClient.fetchQSOs(qslSince: qslSince)
+            try await self.lotwClient.fetchQSOs(qsoRxSince: rxSince)
         }
         let fetched = response.qsos.map { FetchedQSO.fromLoTW($0) }
 
         syncPhase = .processing
         let processResult = try processDownloadedQSOs(fetched)
 
-        // Save timestamps for incremental sync
-        if let lastQSL = response.lastQSL {
-            try await lotwClient.saveLastQSLDate(lastQSL)
-        }
+        // Save timestamp for incremental sync
         if let lastQSORx = response.lastQSORx {
             try await lotwClient.saveLastQSORxDate(lastQSORx)
         }

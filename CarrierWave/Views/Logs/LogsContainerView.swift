@@ -14,6 +14,10 @@ struct LogsContainerView: View {
 
     let potaClient: POTAClient?
     let potaAuth: POTAAuthService
+    let lofiClient: LoFiClient
+    let qrzClient: QRZClient
+    let hamrsClient: HAMRSClient
+    let lotwClient: LoTWClient
 
     var body: some View {
         NavigationStack {
@@ -53,7 +57,13 @@ struct LogsContainerView: View {
     private var selectedContent: some View {
         switch selectedSegment {
         case .qsos:
-            LogsListContentView()
+            LogsListContentView(
+                lofiClient: lofiClient,
+                qrzClient: qrzClient,
+                hamrsClient: hamrsClient,
+                lotwClient: lotwClient,
+                potaAuth: potaAuth
+            )
         case .potaUploads:
             if let potaClient {
                 POTAUploadsContentView(potaClient: potaClient, potaAuth: potaAuth)

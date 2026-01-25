@@ -22,6 +22,7 @@ struct DashboardView: View {
     let lofiClient = LoFiClient()
     let qrzClient = QRZClient()
     let hamrsClient = HAMRSClient()
+    let lotwClient = LoTWClient()
 
     /// Statistics
     var stats: QSOStatistics {
@@ -70,6 +71,9 @@ struct DashboardView: View {
     /// HAMRS state
     @State var hamrsSyncResult: String?
 
+    /// LoTW state
+    @State var lotwSyncResult: String?
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -90,8 +94,8 @@ struct DashboardView: View {
                         hamrsCard
                     }
                     HStack(spacing: 12) {
+                        lotwCard
                         icloudCard
-                        Spacer()
                     }
                 }
                 .padding()

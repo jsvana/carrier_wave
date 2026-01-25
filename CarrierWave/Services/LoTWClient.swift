@@ -37,6 +37,13 @@ actor LoTWClient {
 
     nonisolated let keychain = KeychainHelper.shared
 
+    // MARK: - Configuration
+
+    nonisolated var isConfigured: Bool {
+        (try? keychain.readString(for: KeychainHelper.Keys.lotwUsername)) != nil
+            && (try? keychain.readString(for: KeychainHelper.Keys.lotwPassword)) != nil
+    }
+
     // MARK: - Credential Management
 
     func saveCredentials(username: String, password: String) throws {
@@ -68,18 +75,6 @@ actor LoTWClient {
 
     // MARK: - Sync Timestamps
 
-    func getLastQSLDate() -> Date? {
-        guard let dateString = try? keychain.readString(for: KeychainHelper.Keys.lotwLastQSL) else {
-            return nil
-        }
-        return ISO8601DateFormatter().date(from: dateString)
-    }
-
-    func saveLastQSLDate(_ date: Date) throws {
-        let dateString = ISO8601DateFormatter().string(from: date)
-        try keychain.save(dateString, for: KeychainHelper.Keys.lotwLastQSL)
-    }
-
     func getLastQSORxDate() -> Date? {
         guard let dateString = try? keychain.readString(for: KeychainHelper.Keys.lotwLastQSORx)
         else {
@@ -95,33 +90,32 @@ actor LoTWClient {
 
     // MARK: - API Methods
 
-    func fetchQSOs(qslSince: Date? = nil, qsoRxSince: Date? = nil) async throws -> LoTWResponse {
+    func fetchQSOs(qsoRxSince: Date? = nil) async throws -> LoTWResponse {
         let credentials = try getCredentials()
 
         var components = URLComponents(string: baseURL)!
-        var queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "login", value: credentials.username),
-            URLQueryItem(name: "password", value: credentials.password),
-            URLQueryItem(name: "qso_query", value: "1"),
-            URLQueryItem(name: "qso_qsl", value: "yes"),
-            URLQueryItem(name: "qso_mydetail", value: "yes"),
-            URLQueryItem(name: "qso_qsldetail", value: "yes"),
-            URLQueryItem(name: "qso_withown", value: "yes"),
-        ]
 
         let dateFormatter = DateFormatter()
         dateFormatter.dateFormat = "yyyy-MM-dd"
         dateFormatter.timeZone = TimeZone(identifier: "UTC")
 
-        if let since = qslSince {
-            queryItems.append(
-                URLQueryItem(name: "qso_qslsince", value: dateFormatter.string(from: since)))
-        }
+        // Use provided date or default to 2000-01-01 for first sync to get all QSOs
+        let rxSinceDate =
+            qsoRxSince ?? DateComponents(
+                calendar: Calendar(identifier: .gregorian),
+                year: 2_000, month: 1, day: 1
+            ).date!
 
-        if let since = qsoRxSince {
-            queryItems.append(
-                URLQueryItem(name: "qso_qsorxsince", value: dateFormatter.string(from: since)))
-        }
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "login", value: credentials.username),
+            URLQueryItem(name: "password", value: credentials.password),
+            URLQueryItem(name: "qso_query", value: "1"),
+            URLQueryItem(name: "qso_qsl", value: "no"), // Fetch all QSOs, not just confirmed QSLs
+            URLQueryItem(name: "qso_qsorxsince", value: dateFormatter.string(from: rxSinceDate)),
+            URLQueryItem(name: "qso_mydetail", value: "yes"),
+            URLQueryItem(name: "qso_qsldetail", value: "yes"),
+            URLQueryItem(name: "qso_withown", value: "yes"),
+        ]
 
         components.queryItems = queryItems
 
@@ -210,8 +204,9 @@ actor LoTWClient {
             }
         }
 
-        // Split into records
-        let records = adif.components(separatedBy: "<EOR>")
+        // Split into records (case-insensitive - LoTW uses lowercase <eor>)
+        let records = adif.components(separatedBy: "<eor>")
+            .flatMap { $0.components(separatedBy: "<EOR>") }
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty && $0.contains("<") }
 

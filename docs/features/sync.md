@@ -1,6 +1,16 @@
 # Sync System
 
-Carrier Wave syncs QSO logs to three cloud services: QRZ.com, Parks on the Air (POTA), and Ham2K LoFi.
+Carrier Wave syncs QSO logs to multiple cloud services.
+
+## Service Sync Directions
+
+| Service | Upload | Download | Notes |
+|---------|--------|----------|-------|
+| QRZ | ✓ | ✓ | Bidirectional |
+| POTA | ✓ | ✓ | Bidirectional |
+| HAMRS | ✓ | ✓ | Bidirectional |
+| LoFi | | ✓ | Download only |
+| LoTW | | ✓ | Download only (upload requires TQSL) |
 
 ## Sync Destinations
 

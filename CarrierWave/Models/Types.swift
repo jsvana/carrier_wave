@@ -36,10 +36,10 @@ enum ServiceType: String, Codable, CaseIterable {
     var supportsUpload: Bool {
         switch self {
         case .qrz,
-             .pota:
+             .pota,
+             .hamrs:
             true
         case .lofi,
-             .hamrs,
              .lotw:
             false
         }

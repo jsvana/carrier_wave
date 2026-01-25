@@ -36,8 +36,9 @@ extension DashboardView {
 
         do {
             let result = try await syncService.downloadOnly()
-            let msg = "Download-only: down=\(result.downloaded), new=\(result.newQSOs), " +
-                "merged=\(result.mergedQSOs)"
+            let msg =
+                "Download-only: down=\(result.downloaded), new=\(result.newQSOs), "
+                    + "merged=\(result.mergedQSOs)"
             print(msg)
             if !result.errors.isEmpty {
                 print("Download-only sync errors: \(result.errors)")
@@ -182,5 +183,32 @@ extension DashboardView {
     func clearHAMRSCredentials() async {
         await hamrsClient.clearCredentials()
         hamrsSyncResult = nil
+    }
+
+    func syncFromLoTW() async {
+        isSyncing = true
+        syncingService = .lotw
+        lotwSyncResult = "Syncing..."
+        defer {
+            isSyncing = false
+            syncingService = nil
+        }
+
+        do {
+            let count = try await syncService.syncLoTW()
+            lotwSyncResult = count > 0 ? "+\(count) QSLs" : "Already in sync"
+        } catch {
+            lotwSyncResult = "Error: \(error.localizedDescription)"
+        }
+    }
+
+    func clearLoTWData() async {
+        isSyncing = true
+        lotwSyncResult = "Clearing..."
+        defer { isSyncing = false }
+
+        // Clear LoTW timestamps to allow re-download
+        await lotwClient.clearCredentials()
+        lotwSyncResult = "Cleared"
     }
 }
