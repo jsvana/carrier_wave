@@ -14,8 +14,8 @@ extension SyncService {
                 }
             }
 
-            // POTA download
-            if potaAuthService.isAuthenticated {
+            // POTA download (skip during maintenance window)
+            if potaAuthService.isAuthenticated, !POTAClient.isInMaintenanceWindow() {
                 group.addTask {
                     await self.downloadFromPOTA(timeout: timeout)
                 }
