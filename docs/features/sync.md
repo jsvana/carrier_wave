@@ -24,6 +24,14 @@ Carrier Wave syncs QSO logs to three cloud services: QRZ.com, Parks on the Air (
 - **Uses**: `synced_since_millis` for incremental sync
 - **Keychain keys**: `lofi_*`
 
+### ARRL LoTW
+
+- **Auth**: Username/password via query params
+- **Download**: ADIF via `lotwreport.adi` endpoint
+- **Upload**: Not supported (requires TQSL application)
+- **Keychain keys**: `lotw_username`, `lotw_password`, `lotw_last_qsl`, `lotw_last_qso_rx`
+- **Special handling**: Provides QSL confirmation status (`lotwConfirmed`, `lotwConfirmedDate`)
+
 ## Data Flow
 
 ```
@@ -31,11 +39,11 @@ ADIF Import → ADIFParser → ImportService → QSO + SyncRecord (pending)
                                               ↓
                                          SyncService
                                               ↓
-                              ┌───────────────┼───────────────┐
-                              ↓               ↓               ↓
-                          QRZClient      POTAClient      LoFiClient
-                              ↓               ↓               ↓
-                         SyncRecord status updated to uploaded/failed
+                      ┌───────────────┬───────────────┬───────────────┬───────────────┐
+                      ↓               ↓               ↓               ↓               ↓
+                  QRZClient      POTAClient      LoFiClient      HAMRSClient     LoTWClient
+                      ↓               ↓               ↓               ↓               ↓
+                 SyncRecord status updated        (download only, no SyncRecord)
 ```
 
 ## SyncRecord States
