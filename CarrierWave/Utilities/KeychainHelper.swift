@@ -136,5 +136,11 @@ extension KeychainHelper {
 
         /// Challenges
         static let challengesAuthToken = "challenges.auth.token"
+
+        /// LoTW
+        static let lotwUsername = "lotw.username"
+        static let lotwPassword = "lotw.password"
+        static let lotwLastQSL = "lotw.last.qsl"
+        static let lotwLastQSORx = "lotw.last.qso.rx"
     }
 }
