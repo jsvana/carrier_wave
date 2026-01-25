@@ -385,7 +385,13 @@ class SyncService: ObservableObject {
             return
         }
 
-        let uploadResults = await uploadToAllDestinations()
+        let (uploadResults, potaSkipped) = await uploadToAllDestinations()
+        result.potaMaintenanceSkipped = potaSkipped
+
+        if potaSkipped {
+            debugLog.info("POTA skipped due to maintenance window (0000-0400 UTC)", service: .pota)
+        }
+
         for (service, uploadResult) in uploadResults {
             switch uploadResult {
             case let .success(count):
