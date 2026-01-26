@@ -303,9 +303,22 @@ extension DashboardView {
                     }
 
                     if let result = potaSyncResult {
-                        Text(result)
-                            .font(.caption)
-                            .foregroundStyle(.blue)
+                        if result.contains("pota.app") {
+                            // Profile incomplete - show as tappable link
+                            Link(destination: URL(string: "https://pota.app")!) {
+                                Text(result)
+                                    .font(.caption)
+                                    .foregroundStyle(.red)
+                            }
+                        } else if result.starts(with: "Error:") {
+                            Text(result)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        } else {
+                            Text(result)
+                                .font(.caption)
+                                .foregroundStyle(.blue)
+                        }
                     }
                 }
 
@@ -327,6 +340,43 @@ extension DashboardView {
                             .foregroundStyle(.blue)
                         Text("\(inPOTA) QSOs synced")
                             .font(.subheadline)
+                    }
+                }
+
+                // Pending
+                if pending > 0 {
+                    HStack(spacing: 4) {
+                        Image(systemName: "clock")
+                            .foregroundStyle(.orange)
+                        Text("\(pending) pending sync")
+                            .font(.subheadline)
+                    }
+                }
+
+                // Show error/result even when not authenticated
+                if let result = potaSyncResult {
+                    if result.contains("pota.app") {
+                        // Profile incomplete - show as tappable link
+                        Link(destination: URL(string: "https://pota.app")!) {
+                            Text(result)
+                                .font(.caption)
+                                .foregroundStyle(.red)
+                        }
+                    } else if result.starts(with: "Error:") {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundStyle(.red)
+                    }
+                }
+
+                // Debug mode: show sync button
+                if debugMode, !syncService.isSyncing {
+                    AnimatedSyncButton(
+                        title: "Sync",
+                        isAnimating: syncingService == .pota,
+                        isDisabled: isSyncing || isInMaintenance
+                    ) {
+                        Task { await performPOTASync() }
                     }
                 }
             }

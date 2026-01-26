@@ -191,6 +191,11 @@ extension POTAAuthService {
     }
 
     func extractTokenFromWebView(_ webView: WKWebView) async throws -> POTAToken {
+        // Check if we ended up on signup page - this means the account needs profile completion
+        if let url = webView.url?.absoluteString, url.contains("signup") {
+            throw POTAAuthError.profileIncomplete
+        }
+
         // Try multiple times with delay
         for _ in 0 ..< 5 {
             let result = try await webView.evaluateJavaScript(POTAAuthJavaScript.extractToken)

@@ -34,6 +34,7 @@ enum POTAAuthError: Error, LocalizedError {
     case potaRedirectTimeout
     case formFieldsNotFound
     case loginFailed(String)
+    case profileIncomplete
 
     // MARK: Internal
 
@@ -57,6 +58,8 @@ enum POTAAuthError: Error, LocalizedError {
             "Could not find login form fields. The login page may have changed."
         case let .loginFailed(message):
             "Login failed: \(message)"
+        case .profileIncomplete:
+            "Complete your POTA profile at pota.app"
         }
     }
 }
@@ -109,15 +112,23 @@ class POTAAuthService: NSObject, ObservableObject {
         return !token.isExpired
     }
 
+    /// Invalidate the current token (called when API returns 401/403)
+    /// This clears the in-memory token but keeps stored credentials for re-auth
+    func invalidateToken() {
+        currentToken = nil
+        try? keychain.delete(for: KeychainHelper.Keys.potaIdToken)
+    }
+
     func loadStoredToken() {
         do {
             let tokenData = try keychain.read(for: KeychainHelper.Keys.potaIdToken)
             let token = try JSONDecoder().decode(POTAToken.self, from: tokenData)
             if !token.isExpired {
                 currentToken = token
+            } else {
+                currentToken = nil
             }
         } catch {
-            // No stored token or expired
             currentToken = nil
         }
     }
@@ -297,9 +308,13 @@ class POTAAuthService: NSObject, ObservableObject {
 
         let callsign = claims["pota:callsign"] as? String
 
-        // Use 50 minutes from now as expiry (POTA tokens expire after ~1 hour,
-        // but we use 50 minutes to ensure we refresh before actual expiry)
-        let expiresAt = Date().addingTimeInterval(50 * 60)
+        // Extract actual expiry from JWT 'exp' claim (Unix timestamp)
+        // Fall back to 50 minutes from now if exp claim is missing
+        let expiresAt = if let exp = claims["exp"] as? TimeInterval {
+            Date(timeIntervalSince1970: exp)
+        } else {
+            Date().addingTimeInterval(50 * 60)
+        }
 
         return POTAToken(
             idToken: jwt,
