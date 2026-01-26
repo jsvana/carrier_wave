@@ -14,6 +14,7 @@ struct DashboardView: View {
     @Binding var selectedTab: AppTab
 
     @AppStorage("debugMode") var debugMode = false
+    @AppStorage("bypassPOTAMaintenance") var bypassPOTAMaintenance = false
 
     var importService: ImportService {
         ImportService(modelContext: modelContext)
@@ -74,6 +75,13 @@ struct DashboardView: View {
     /// LoTW state
     @State var lotwSyncResult: String?
 
+    // Service configuration state (refreshed on appear)
+    @State var lofiIsConfigured: Bool = false
+    @State var lofiIsLinked: Bool = false
+    @State var lofiCallsign: String?
+    @State var hamrsIsConfigured: Bool = false
+    @State var lotwIsConfigured: Bool = false
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -102,6 +110,10 @@ struct DashboardView: View {
             }
             .task {
                 await loadQRZConfig()
+                refreshServiceStatus()
+            }
+            .onAppear {
+                refreshServiceStatus()
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {

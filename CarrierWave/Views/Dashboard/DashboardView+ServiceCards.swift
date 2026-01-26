@@ -14,16 +14,16 @@ extension DashboardView {
                 Text("Ham2K LoFi")
                     .font(.headline)
                 Spacer()
-                if lofiClient.isConfigured, lofiClient.isLinked {
+                if lofiIsConfigured, lofiIsLinked {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                         .accessibilityLabel("Connected")
-                    if let callsign = lofiClient.getCallsign() {
+                    if let callsign = lofiCallsign {
                         Text(callsign)
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
-                } else if lofiClient.isConfigured {
+                } else if lofiIsConfigured {
                     Image(systemName: "clock")
                         .foregroundStyle(.orange)
                         .accessibilityLabel("Pending connection")
@@ -37,7 +37,7 @@ extension DashboardView {
                 }
             }
 
-            if lofiClient.isConfigured, lofiClient.isLinked {
+            if lofiIsConfigured, lofiIsLinked {
                 // Show sync status overlay during global sync
                 if syncService.isSyncing {
                     SyncStatusOverlay(phase: syncService.syncPhase, service: .lofi)
@@ -84,7 +84,7 @@ extension DashboardView {
                 NavigationLink {
                     LoFiSettingsView()
                 } label: {
-                    Label("Configure LoFi", systemImage: "gear")
+                    Label("Configure", systemImage: "gear")
                 }
                 .buttonStyle(.bordered)
             }
@@ -179,7 +179,7 @@ extension DashboardView {
                 Button {
                     showingQRZSetup = true
                 } label: {
-                    Label("Configure QRZ", systemImage: "gear")
+                    Label("Configure", systemImage: "gear")
                 }
                 .buttonStyle(.bordered)
             }
@@ -214,6 +214,8 @@ extension DashboardView {
     var potaCard: some View {
         let inPOTA = uploadedCount(for: .pota)
         let pending = pendingCount(for: .pota)
+        let isInMaintenance =
+            POTAClient.isInMaintenanceWindow() && !(debugMode && bypassPOTAMaintenance)
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -242,13 +244,19 @@ extension DashboardView {
                     SyncStatusOverlay(phase: syncService.syncPhase, service: .pota)
                 } else {
                     // Maintenance window indicator
-                    if POTAClient.isInMaintenanceWindow() {
+                    if isInMaintenance {
                         HStack(spacing: 4) {
                             Image(systemName: "wrench.and.screwdriver")
                                 .foregroundStyle(.orange)
-                            Text("Maintenance until 0400 UTC")
-                                .font(.subheadline)
-                                .foregroundStyle(.orange)
+                            if let remaining = POTAClient.formatMaintenanceTimeRemaining() {
+                                Text("Maintenance - \(remaining)")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.orange)
+                            } else {
+                                Text("Maintenance until 0400 UTC")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.orange)
+                            }
                         }
                     }
 
@@ -283,7 +291,7 @@ extension DashboardView {
                         AnimatedSyncButton(
                             title: "Sync",
                             isAnimating: syncingService == .pota,
-                            isDisabled: isSyncing
+                            isDisabled: isSyncing || isInMaintenance
                         ) {
                             Task { await performPOTASync() }
                         }
