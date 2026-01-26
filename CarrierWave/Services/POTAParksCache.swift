@@ -10,6 +10,19 @@ import Foundation
 struct POTAParksCacheMetadata: Codable, Sendable {
     let downloadedAt: Date
     let recordCount: Int
+
+    static func load(from url: URL) -> POTAParksCacheMetadata? {
+        guard let data = try? Data(contentsOf: url) else {
+            return nil
+        }
+        return try? JSONDecoder().decode(POTAParksCacheMetadata.self, from: data)
+    }
+
+    func save(to url: URL) {
+        if let data = try? JSONEncoder().encode(self) {
+            try? data.write(to: url)
+        }
+    }
 }
 
 // MARK: - POTAParksCacheStatus
@@ -137,12 +150,16 @@ actor POTAParksCache {
     private var parks: [String: String] = [:] // reference -> name
     private var isLoaded = false
 
-    nonisolated private var cacheDirectory: URL {
+    private var cacheDirectory: URL {
         FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
     }
 
     private var cacheFileURL: URL {
         cacheDirectory.appendingPathComponent(Self.cacheFileName)
+    }
+
+    private var metadataFileURL: URL {
+        cacheDirectory.appendingPathComponent(Self.metadataFileName)
     }
 
     private func loadFromDisk() -> Bool {
@@ -160,23 +177,16 @@ actor POTAParksCache {
         }
     }
 
-    nonisolated private func loadMetadata() -> POTAParksCacheMetadata? {
-        let url = cacheDirectory.appendingPathComponent(Self.metadataFileName)
-        guard let data = try? Data(contentsOf: url) else {
-            return nil
-        }
-        return try? JSONDecoder().decode(POTAParksCacheMetadata.self, from: data)
+    private func loadMetadata() -> POTAParksCacheMetadata? {
+        POTAParksCacheMetadata.load(from: metadataFileURL)
     }
 
-    nonisolated private func saveMetadata(recordCount: Int) {
-        let url = cacheDirectory.appendingPathComponent(Self.metadataFileName)
+    private func saveMetadata(recordCount: Int) {
         let metadata = POTAParksCacheMetadata(
             downloadedAt: Date(),
             recordCount: recordCount
         )
-        if let data = try? JSONEncoder().encode(metadata) {
-            try? data.write(to: url)
-        }
+        metadata.save(to: metadataFileURL)
     }
 
     private func downloadAndCache() async throws {
