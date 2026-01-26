@@ -335,7 +335,7 @@ final class POTAClient {
         guard httpResponse.statusCode == 200 else {
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 // Invalidate the cached token so next call will re-authenticate
-                await authService.invalidateToken()
+                authService.invalidateToken()
                 throw POTAError.notAuthenticated
             }
             let body = String(data: data, encoding: .utf8) ?? ""
