@@ -227,8 +227,27 @@ struct POTASettingsView: View {
                             Text(callsign).foregroundStyle(.secondary)
                         }
                     }
+
+                    HStack {
+                        Text("Session Expires")
+                        Spacer()
+                        Text(token.expiresAt, style: .relative)
+                            .foregroundStyle(token.isExpiringSoon() ? .orange : .secondary)
+                    }
                 } header: {
                     Text("Status")
+                } footer: {
+                    if token.isExpiringSoon() {
+                        Text("Session expiring soon. It will auto-refresh on next sync.")
+                    }
+                }
+
+                Section {
+                    NavigationLink("Login Credentials") {
+                        POTACredentialsView(authService: potaAuth)
+                    }
+                } footer: {
+                    Text("Update your saved credentials for automatic login.")
                 }
 
                 Section { Button("Logout", role: .destructive) { potaAuth.logout() } }
@@ -238,7 +257,11 @@ struct POTASettingsView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
 
-                    Button("Connect to POTA") {
+                    NavigationLink("Save Credentials & Login") {
+                        POTACredentialsView(authService: potaAuth)
+                    }
+
+                    Button("Manual Login (WebView)") {
                         showingLogin = true
                         Task {
                             do {
@@ -253,6 +276,10 @@ struct POTASettingsView: View {
                     }
                 } header: {
                     Text("Setup")
+                } footer: {
+                    Text(
+                        "Save your credentials for automatic login, or use manual login if you prefer."
+                    )
                 }
 
                 Section {

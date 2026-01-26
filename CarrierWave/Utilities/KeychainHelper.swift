@@ -122,6 +122,8 @@ extension KeychainHelper {
         // POTA
         static let potaIdToken = "pota.id.token"
         static let potaTokenExpiry = "pota.token.expiry"
+        static let potaUsername = "pota.username"
+        static let potaPassword = "pota.password"
 
         // LoFi
         static let lofiAuthToken = "lofi.auth.token"

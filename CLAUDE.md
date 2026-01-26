@@ -52,7 +52,9 @@
 | `POTAClient+Upload.swift` | POTA multipart ADIF upload |
 | `POTAClient+ADIF.swift` | POTA ADIF formatting |
 | `POTAClient+GridLookup.swift` | POTA grid square lookup |
-| `POTAAuthService.swift` | POTA OAuth flow handling |
+| `POTAAuthService.swift` | POTA OAuth flow handling (main service) |
+| `POTAAuthService+JavaScript.swift` | JavaScript helpers for POTA WebView auth |
+| `POTAAuthService+HeadlessAuth.swift` | Headless authentication with stored credentials |
 | `LoFiClient.swift` | Ham2K LoFi sync client |
 | `LoFiClient+Helpers.swift` | LoFi helper methods |
 | `LoFiModels.swift` | LoFi API response models |
@@ -125,6 +127,7 @@
 | `LoTWSettingsView.swift` | LoTW login configuration |
 | `ChallengesSettingsView.swift` | Challenges feature settings |
 | `POTAAuthWebView.swift` | POTA OAuth WebView |
+| `POTACredentialsView.swift` | POTA credentials entry for auto-login |
 | `SyncDebugView.swift` | Sync debugging interface |
 | `AttributionsView.swift` | Third-party attributions |
 

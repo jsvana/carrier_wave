@@ -9,6 +9,19 @@ import Foundation
 import SwiftUI
 import WebKit
 
+// MARK: - String+JSEscape
+
+extension String {
+    /// Escapes special characters for safe embedding in JavaScript string literals
+    var escapedForJS: String {
+        replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "'", with: "\\'")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+            .replacingOccurrences(of: "\n", with: "\\n")
+            .replacingOccurrences(of: "\r", with: "\\r")
+    }
+}
+
 // MARK: - POTAAuthError
 
 enum POTAAuthError: Error, LocalizedError {
@@ -16,6 +29,11 @@ enum POTAAuthError: Error, LocalizedError {
     case authenticationCancelled
     case networkError(Error)
     case tokenExpired
+    case noStoredCredentials
+    case cognitoRedirectTimeout
+    case potaRedirectTimeout
+    case formFieldsNotFound
+    case loginFailed(String)
 
     // MARK: Internal
 
@@ -29,6 +47,16 @@ enum POTAAuthError: Error, LocalizedError {
             "Network error: \(error.localizedDescription)"
         case .tokenExpired:
             "POTA token has expired, please re-authenticate"
+        case .noStoredCredentials:
+            "No stored credentials found. Please enter your POTA login credentials in Settings."
+        case .cognitoRedirectTimeout:
+            "Timed out waiting for login page to load."
+        case .potaRedirectTimeout:
+            "Login may have failed. Please check your credentials."
+        case .formFieldsNotFound:
+            "Could not find login form fields. The login page may have changed."
+        case let .loginFailed(message):
+            "Login failed: \(message)"
         }
     }
 }
@@ -62,9 +90,16 @@ class POTAAuthService: NSObject, ObservableObject {
 
     // MARK: Internal
 
+    static let potaAppURL = "https://pota.app"
+
     @Published var isAuthenticating = false
     @Published var currentToken: POTAToken?
     @Published private(set) var webView: WKWebView?
+
+    var authContinuation: CheckedContinuation<POTAToken, Error>?
+
+    /// Public accessor for the POTA app URL
+    var potaAppURLString: String { Self.potaAppURL }
 
     /// Check if we have a valid (non-expired) POTA authentication token
     var isAuthenticated: Bool {
@@ -109,7 +144,12 @@ class POTAAuthService: NSObject, ObservableObject {
     }
 
     func logout() {
+        // Clear token
         try? keychain.delete(for: KeychainHelper.Keys.potaIdToken)
+        // Clear stored credentials
+        try? keychain.delete(for: KeychainHelper.Keys.potaUsername)
+        try? keychain.delete(for: KeychainHelper.Keys.potaPassword)
+
         currentToken = nil
         webView = nil
 
@@ -132,87 +172,79 @@ class POTAAuthService: NSObject, ObservableObject {
             return token.idToken
         }
 
+        // Try headless refresh if credentials are stored
+        if hasStoredCredentials() {
+            do {
+                let newToken = try await authenticateWithStoredCredentials()
+                return newToken.idToken
+            } catch {
+                // Fall through to manual authentication
+            }
+        }
+
         let newToken = try await authenticate()
         return newToken.idToken
+    }
+
+    // MARK: - Headless Authentication
+
+    /// Check if stored credentials are available
+    func hasStoredCredentials() -> Bool {
+        (try? keychain.readString(for: KeychainHelper.Keys.potaUsername)) != nil
+            && (try? keychain.readString(for: KeychainHelper.Keys.potaPassword)) != nil
+    }
+
+    /// Authenticates using stored credentials without user interaction
+    func authenticateWithStoredCredentials() async throws -> POTAToken {
+        guard let username = try? keychain.readString(for: KeychainHelper.Keys.potaUsername),
+              let password = try? keychain.readString(for: KeychainHelper.Keys.potaPassword)
+        else {
+            throw POTAAuthError.noStoredCredentials
+        }
+
+        return try await performHeadlessLogin(username: username, password: password)
+    }
+
+    // MARK: - Token Management
+
+    func decodeAndSaveToken(_ jwt: String) throws -> POTAToken {
+        let token = try decodeToken(jwt)
+        try saveToken(token)
+        currentToken = token
+        return token
+    }
+
+    func extractToken() async throws -> POTAToken {
+        guard let webView else {
+            throw POTAAuthError.tokenExtractionFailed
+        }
+
+        // Try multiple times with delay
+        for _ in 0 ..< 5 {
+            let result = try await webView.evaluateJavaScript(POTAAuthJavaScript.extractToken)
+            if let token = result as? String, !token.isEmpty {
+                let potaToken = try decodeToken(token)
+                try saveToken(potaToken)
+                currentToken = potaToken
+                return potaToken
+            }
+            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
+        }
+
+        throw POTAAuthError.tokenExtractionFailed
     }
 
     // MARK: Private
 
     private let keychain = KeychainHelper.shared
-    private var authContinuation: CheckedContinuation<POTAToken, Error>?
-
-    private let potaAppURL = "https://pota.app"
-
-    /// JavaScript to extract token from cookies/localStorage
-    private let extractTokenJS = """
-    (function() {
-        // Check cookies first
-        const cookies = document.cookie.split(';');
-        for (const cookie of cookies) {
-            const trimmed = cookie.trim();
-            if (trimmed.includes('idToken=')) {
-                const eqIdx = trimmed.indexOf('=');
-                if (eqIdx > 0) {
-                    const val = trimmed.substring(eqIdx + 1);
-                    if (val && val.startsWith('eyJ')) {
-                        return val;
-                    }
-                }
-            }
-        }
-
-        // Try localStorage
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.includes('idToken')) {
-                const val = localStorage.getItem(key);
-                if (val && val.startsWith('eyJ')) {
-                    return val;
-                }
-            }
-        }
-
-        // Check sessionStorage
-        for (let i = 0; i < sessionStorage.length; i++) {
-            const key = sessionStorage.key(i);
-            if (key && key.includes('idToken')) {
-                const val = sessionStorage.getItem(key);
-                if (val && val.startsWith('eyJ')) {
-                    return val;
-                }
-            }
-        }
-
-        // Try Amplify auth data
-        for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && (key.includes('amplify') || key.includes('Cognito') || key.includes('auth'))) {
-                try {
-                    const val = localStorage.getItem(key);
-                    const parsed = JSON.parse(val);
-                    if (parsed && parsed.idToken) {
-                        return parsed.idToken;
-                    }
-                    if (parsed && parsed.signInUserSession && parsed.signInUserSession.idToken) {
-                        return parsed.signInUserSession.idToken.jwtToken;
-                    }
-                } catch (e) {}
-            }
-        }
-
-        return null;
-    })()
-    """
 
     private func setupWebView() {
         // Create a fresh non-persistent data store and clear any residual data
-        // This ensures each login attempt starts with a completely clean state
         let dataStore = WKWebsiteDataStore.nonPersistent()
         let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
 
         // Clear the non-persistent store before use to ensure no residual state
         dataStore.removeData(ofTypes: dataTypes, modifiedSince: .distantPast) { [weak self] in
-            // Dispatch back to main actor since completion handler runs on background thread
             Task { @MainActor [weak self] in
                 guard let self else {
                     return
@@ -224,7 +256,7 @@ class POTAAuthService: NSObject, ObservableObject {
                 webView = WKWebView(frame: .zero, configuration: config)
                 webView?.navigationDelegate = self
 
-                guard let url = URL(string: "\(potaAppURL)/#/login") else {
+                guard let url = URL(string: "\(Self.potaAppURL)/#/login") else {
                     authContinuation?.resume(throwing: POTAAuthError.tokenExtractionFailed)
                     return
                 }
@@ -232,26 +264,6 @@ class POTAAuthService: NSObject, ObservableObject {
                 webView?.load(URLRequest(url: url))
             }
         }
-    }
-
-    private func extractToken() async throws -> POTAToken {
-        guard let webView else {
-            throw POTAAuthError.tokenExtractionFailed
-        }
-
-        // Try multiple times with delay
-        for _ in 0 ..< 5 {
-            let result = try await webView.evaluateJavaScript(extractTokenJS)
-            if let token = result as? String, !token.isEmpty {
-                let potaToken = try decodeToken(token)
-                try saveToken(potaToken)
-                currentToken = potaToken
-                return potaToken
-            }
-            try await Task.sleep(nanoseconds: 1_000_000_000) // 1 second
-        }
-
-        throw POTAAuthError.tokenExtractionFailed
     }
 
     private func decodeToken(_ jwt: String) throws -> POTAToken {
@@ -276,12 +288,15 @@ class POTAAuthService: NSObject, ObservableObject {
             throw POTAAuthError.tokenExtractionFailed
         }
 
-        let exp = claims["exp"] as? TimeInterval ?? (Date().timeIntervalSince1970 + 3_600)
         let callsign = claims["pota:callsign"] as? String
+
+        // Use 50 minutes from now as expiry (POTA tokens expire after ~1 hour,
+        // but we use 50 minutes to ensure we refresh before actual expiry)
+        let expiresAt = Date().addingTimeInterval(50 * 60)
 
         return POTAToken(
             idToken: jwt,
-            expiresAt: Date(timeIntervalSince1970: exp),
+            expiresAt: expiresAt,
             callsign: callsign
         )
     }

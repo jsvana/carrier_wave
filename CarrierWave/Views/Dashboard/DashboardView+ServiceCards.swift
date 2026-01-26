@@ -254,6 +254,19 @@ extension DashboardView {
                 if syncService.isSyncing {
                     SyncStatusOverlay(phase: syncService.syncPhase, service: .pota)
                 } else {
+                    // Session expiry warning
+                    if let token = potaAuth.currentToken {
+                        if token.isExpiringSoon() {
+                            HStack(spacing: 4) {
+                                Image(systemName: "clock.badge.exclamationmark")
+                                    .foregroundStyle(.orange)
+                                Text("Session expires \(token.expiresAt, style: .relative)")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.orange)
+                            }
+                        }
+                    }
+
                     // Maintenance window indicator
                     if isInMaintenance {
                         HStack(spacing: 4) {
