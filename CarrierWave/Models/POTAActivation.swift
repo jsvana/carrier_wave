@@ -18,7 +18,7 @@ enum POTAActivationStatus {
         switch self {
         case .uploaded: "checkmark.circle.fill"
         case .partial: "circle.lefthalf.filled"
-        case .pending: "circle"
+        case .pending: "arrow.up.circle"
         }
     }
 
