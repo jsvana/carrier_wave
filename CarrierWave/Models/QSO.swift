@@ -32,7 +32,8 @@ final class QSO {
         qrzLogId: String? = nil,
         qrzConfirmed: Bool = false,
         lotwConfirmedDate: Date? = nil,
-        lotwConfirmed: Bool = false
+        lotwConfirmed: Bool = false,
+        dxcc: Int? = nil
     ) {
         self.id = id
         self.callsign = callsign
@@ -61,6 +62,7 @@ final class QSO {
         self.qrzConfirmed = qrzConfirmed
         self.lotwConfirmedDate = lotwConfirmedDate
         self.lotwConfirmed = lotwConfirmed
+        self.dxcc = dxcc
     }
 
     // MARK: Internal
@@ -97,6 +99,9 @@ final class QSO {
     var lotwConfirmedDate: Date?
     var lotwConfirmed: Bool = false
 
+    /// DXCC entity (from LoTW)
+    var dxcc: Int?
+
     @Relationship(deleteRule: .cascade, inverse: \ServicePresence.qso)
     var servicePresence: [ServicePresence] = []
 
@@ -129,9 +134,12 @@ final class QSO {
         return prefix
     }
 
-    /// DXCC entity for this QSO (official DXCC entity number and name)
+    /// DXCC entity for this QSO (from LoTW when available)
     var dxccEntity: DXCCEntity? {
-        DescriptionLookup.dxccEntity(for: callsign)
+        if let dxcc {
+            return DescriptionLookup.dxccEntity(forNumber: dxcc)
+        }
+        return nil
     }
 
     /// Check if this is likely a US station (for state counting)

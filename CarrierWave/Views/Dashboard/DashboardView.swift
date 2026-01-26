@@ -209,12 +209,19 @@ struct DashboardView: View {
                 }
                 .buttonStyle(.plain)
 
-                NavigationLink {
-                    StatDetailView(category: .entities, items: stats.items(for: .entities))
-                } label: {
-                    StatBox(title: "DXCC Entities", value: "\(stats.uniqueEntities)", icon: "globe")
+                if lotwIsConfigured {
+                    NavigationLink {
+                        StatDetailView(category: .entities, items: stats.items(for: .entities))
+                    } label: {
+                        StatBox(
+                            title: "DXCC Entities", value: "\(stats.uniqueEntities)", icon: "globe"
+                        )
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    StatBox(title: "DXCC Entities", value: "--", icon: "globe")
+                        .opacity(0.5)
                 }
-                .buttonStyle(.plain)
 
                 NavigationLink {
                     StatDetailView(category: .grids, items: stats.items(for: .grids))

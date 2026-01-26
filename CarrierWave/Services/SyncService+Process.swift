@@ -65,16 +65,17 @@ extension SyncService {
 
         // Create presence record for ALL services
         for service in ServiceType.allCases {
-            let presence = if sources.contains(service) {
-                // QSO came from this service - mark as present
-                ServicePresence.downloaded(from: service, qso: newQSO)
-            } else if service.supportsUpload {
-                // Bidirectional service without this QSO - needs upload
-                ServicePresence.needsUpload(to: service, qso: newQSO)
-            } else {
-                // Download-only service without this QSO - not present, no upload needed
-                ServicePresence(serviceType: service, isPresent: false, qso: newQSO)
-            }
+            let presence =
+                if sources.contains(service) {
+                    // QSO came from this service - mark as present
+                    ServicePresence.downloaded(from: service, qso: newQSO)
+                } else if service.supportsUpload {
+                    // Bidirectional service without this QSO - needs upload
+                    ServicePresence.needsUpload(to: service, qso: newQSO)
+                } else {
+                    // Download-only service without this QSO - not present, no upload needed
+                    ServicePresence(serviceType: service, isPresent: false, qso: newQSO)
+                }
             modelContext.insert(presence)
             newQSO.servicePresence.append(presence)
         }
@@ -125,12 +126,14 @@ extension SyncService {
             existing.lotwConfirmedDate = existing.lotwConfirmedDate ?? fetched.lotwConfirmedDate
         }
 
-        // LoTW-specific: update confirmation status
+        // LoTW-specific: update confirmation status and DXCC
         if fetched.source == .lotw {
             if fetched.lotwConfirmed {
                 existing.lotwConfirmed = true
                 existing.lotwConfirmedDate = existing.lotwConfirmedDate ?? fetched.lotwConfirmedDate
             }
+            // DXCC from LoTW is authoritative
+            existing.dxcc = existing.dxcc ?? fetched.dxcc
         }
 
         // Update or create ServicePresence
@@ -169,6 +172,7 @@ extension SyncService {
                 qrzConfirmed: merged.qrzConfirmed || other.qrzConfirmed,
                 lotwConfirmedDate: merged.lotwConfirmedDate ?? other.lotwConfirmedDate,
                 lotwConfirmed: merged.lotwConfirmed || other.lotwConfirmed,
+                dxcc: merged.dxcc ?? other.dxcc,
                 source: merged.source
             )
         }
@@ -203,7 +207,8 @@ extension SyncService {
             qrzLogId: fetched.qrzLogId,
             qrzConfirmed: fetched.qrzConfirmed,
             lotwConfirmedDate: fetched.lotwConfirmedDate,
-            lotwConfirmed: fetched.lotwConfirmed
+            lotwConfirmed: fetched.lotwConfirmed,
+            dxcc: fetched.dxcc
         )
     }
 }

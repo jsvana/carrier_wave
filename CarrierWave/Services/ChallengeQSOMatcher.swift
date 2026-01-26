@@ -147,9 +147,9 @@ enum ChallengeQSOMatcher {
             qso.country
         case "dxcc",
              "dxccentity":
-            qso.dxccEntity.map { String($0.number) }
+            qso.dxcc.map { String($0) }
         case "dxccname":
-            qso.dxccEntity?.name
+            qso.dxcc.flatMap { DescriptionLookup.dxccEntity(forNumber: $0)?.name }
         case "parkreference",
              "park":
             qso.parkReference

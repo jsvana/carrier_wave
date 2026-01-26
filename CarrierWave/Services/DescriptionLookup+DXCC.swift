@@ -5,36 +5,17 @@ import Foundation
 // swiftlint:disable file_length
 
 extension DescriptionLookup {
-    /// Look up DXCC entity for a callsign
-    /// Returns entity number and name, or nil if not found
-    static func dxccEntity(for callsign: String) -> DXCCEntity? {
-        let upper = callsign.uppercased()
-        // Remove any suffix after /
-        let base = upper.components(separatedBy: "/").first ?? upper
-
-        // Use the pre-built sorted prefix lookup for efficient longest-match-first
-        for (prefix, entity) in sortedPrefixLookup where base.hasPrefix(prefix) {
-            return entity
-        }
-
-        return nil
+    /// Look up DXCC entity by entity number
+    /// Returns entity with name, or nil if not found
+    static func dxccEntity(forNumber number: Int) -> DXCCEntity? {
+        numberLookup[number]
     }
 
-    /// Pre-sorted prefix lookup table (longest prefixes first)
-    /// This ensures we always match the most specific prefix
-    private static let sortedPrefixLookup: [(prefix: String, entity: DXCCEntity)] = {
-        var result: [(String, DXCCEntity)] = []
-        for (prefixes, entity) in dxccEntities {
-            for prefix in prefixes {
-                result.append((prefix, entity))
-            }
-        }
-        // Sort by prefix length descending, then alphabetically for consistency
-        result.sort { lhs, rhs in
-            if lhs.0.count != rhs.0.count {
-                return lhs.0.count > rhs.0.count
-            }
-            return lhs.0 < rhs.0
+    /// Pre-built lookup table by entity number for O(1) access
+    private static let numberLookup: [Int: DXCCEntity] = {
+        var result: [Int: DXCCEntity] = [:]
+        for (_, entity) in dxccEntities {
+            result[entity.number] = entity
         }
         return result
     }()

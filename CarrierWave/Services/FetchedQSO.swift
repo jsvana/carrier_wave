@@ -33,6 +33,9 @@ struct FetchedQSO {
     let lotwConfirmedDate: Date?
     let lotwConfirmed: Bool
 
+    /// DXCC entity (from LoTW)
+    let dxcc: Int?
+
     /// Source tracking
     let source: ServiceType
 
@@ -127,6 +130,7 @@ extension FetchedQSO {
             qrzConfirmed: qrz.qrzConfirmed,
             lotwConfirmedDate: qrz.lotwConfirmedDate,
             lotwConfirmed: false,
+            dxcc: nil,
             source: .qrz
         )
     }
@@ -158,6 +162,7 @@ extension FetchedQSO {
             qrzConfirmed: false,
             lotwConfirmedDate: nil,
             lotwConfirmed: false,
+            dxcc: nil,
             source: .pota
         )
     }
@@ -198,6 +203,7 @@ extension FetchedQSO {
             qrzConfirmed: false,
             lotwConfirmedDate: nil,
             lotwConfirmed: false,
+            dxcc: nil,
             source: .lofi
         )
     }
@@ -237,6 +243,7 @@ extension FetchedQSO {
             qrzConfirmed: false,
             lotwConfirmedDate: nil,
             lotwConfirmed: false,
+            dxcc: nil,
             source: .hamrs
         )
     }
@@ -268,6 +275,7 @@ extension FetchedQSO {
             qrzConfirmed: false,
             lotwConfirmedDate: lotw.qslReceivedDate,
             lotwConfirmed: lotw.qslReceived,
+            dxcc: lotw.dxcc,
             source: .lotw
         )
     }
