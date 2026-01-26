@@ -68,6 +68,37 @@ struct HAMRSSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            if debugMode, isConfigured {
+                Section {
+                    Button {
+                        Task { await forceRedownload() }
+                    } label: {
+                        if isRedownloading {
+                            HStack {
+                                ProgressView()
+                                    .padding(.trailing, 4)
+                                Text("Re-downloading...")
+                            }
+                        } else {
+                            Text("Force Re-download All QSOs")
+                        }
+                    }
+                    .disabled(isRedownloading)
+
+                    if let result = redownloadResult {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text(
+                        "Re-fetches all QSOs from HAMRS and updates existing records with fresh parsed values."
+                    )
+                }
+            }
         }
         .navigationTitle("HAMRS Pro")
         .alert("Error", isPresented: $showingError) {
@@ -82,9 +113,13 @@ struct HAMRSSettingsView: View {
 
     // MARK: Private
 
+    @AppStorage("debugMode") private var debugMode = false
+    @EnvironmentObject private var syncService: SyncService
     @State private var apiKey = ""
     @State private var isConfigured = false
     @State private var isValidating = false
+    @State private var isRedownloading = false
+    @State private var redownloadResult: String?
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var statusMessage = ""
@@ -121,6 +156,19 @@ struct HAMRSSettingsView: View {
             apiKey = ""
             statusMessage = ""
             await checkStatus()
+        }
+    }
+
+    private func forceRedownload() async {
+        isRedownloading = true
+        redownloadResult = nil
+        defer { isRedownloading = false }
+
+        do {
+            let result = try await syncService.forceRedownloadFromHAMRS()
+            redownloadResult = "Updated \(result.updated), Created \(result.created)"
+        } catch {
+            redownloadResult = "Error: \(error.localizedDescription)"
         }
     }
 }
