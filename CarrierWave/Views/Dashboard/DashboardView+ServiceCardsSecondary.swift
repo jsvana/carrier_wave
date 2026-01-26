@@ -14,7 +14,7 @@ extension DashboardView {
                 Text("HAMRS")
                     .font(.headline)
                 Spacer()
-                if hamrsClient.isConfigured {
+                if hamrsIsConfigured {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                         .accessibilityLabel("Connected")
@@ -28,7 +28,7 @@ extension DashboardView {
                 }
             }
 
-            if hamrsClient.isConfigured {
+            if hamrsIsConfigured {
                 // Show sync status overlay during global sync
                 if syncService.isSyncing {
                     SyncStatusOverlay(phase: syncService.syncPhase, service: .hamrs)
@@ -50,34 +50,19 @@ extension DashboardView {
 
                 // Debug mode: show individual sync button
                 if debugMode, !syncService.isSyncing {
-                    HStack {
-                        AnimatedSyncButton(
-                            title: "Sync",
-                            isAnimating: syncingService == .hamrs,
-                            isDisabled: isSyncing
-                        ) {
-                            Task { await syncFromHAMRS() }
-                        }
-
-                        Menu {
-                            Button(role: .destructive) {
-                                Task { await clearHAMRSCredentials() }
-                            } label: {
-                                Label(
-                                    "Disconnect", systemImage: "rectangle.portrait.and.arrow.right"
-                                )
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                        }
-                        .disabled(isSyncing)
+                    AnimatedSyncButton(
+                        title: "Sync",
+                        isAnimating: syncingService == .hamrs,
+                        isDisabled: isSyncing
+                    ) {
+                        Task { await syncFromHAMRS() }
                     }
                 }
             } else {
                 NavigationLink {
                     HAMRSSettingsView()
                 } label: {
-                    Label("Configure HAMRS", systemImage: "gear")
+                    Label("Configure", systemImage: "gear")
                 }
                 .buttonStyle(.bordered)
             }
@@ -94,14 +79,13 @@ extension DashboardView {
         // LoTW tracks QSOs uploaded and QSLs confirmed
         let synced = uploadedCount(for: .lotw)
         let confirmed = qsos.filter(\.lotwConfirmed).count
-        let isConfigured = lotwClient.isConfigured
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("LoTW")
                     .font(.headline)
                 Spacer()
-                if isConfigured {
+                if lotwIsConfigured {
                     Image(systemName: "checkmark.circle.fill")
                         .foregroundStyle(.green)
                         .accessibilityLabel("Connected")
@@ -115,7 +99,7 @@ extension DashboardView {
                 }
             }
 
-            if isConfigured {
+            if lotwIsConfigured {
                 // Show sync status overlay during global sync
                 if syncService.isSyncing {
                     SyncStatusOverlay(phase: syncService.syncPhase, service: .lotw)
@@ -170,7 +154,7 @@ extension DashboardView {
                 NavigationLink {
                     LoTWSettingsView()
                 } label: {
-                    Label("Configure LoTW", systemImage: "gear")
+                    Label("Configure", systemImage: "gear")
                 }
                 .buttonStyle(.bordered)
             }

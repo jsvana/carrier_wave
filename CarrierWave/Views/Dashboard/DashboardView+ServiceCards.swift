@@ -287,25 +287,12 @@ extension DashboardView {
 
                 // Debug mode: show individual sync button
                 if debugMode, !syncService.isSyncing {
-                    HStack {
-                        AnimatedSyncButton(
-                            title: "Sync",
-                            isAnimating: syncingService == .pota,
-                            isDisabled: isSyncing || isInMaintenance
-                        ) {
-                            Task { await performPOTASync() }
-                        }
-
-                        Menu {
-                            Button(role: .destructive) {
-                                potaAuth.logout()
-                            } label: {
-                                Label("Log Out", systemImage: "rectangle.portrait.and.arrow.right")
-                            }
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                        }
-                        .disabled(isSyncing)
+                    AnimatedSyncButton(
+                        title: "Sync",
+                        isAnimating: syncingService == .pota,
+                        isDisabled: isSyncing || isInMaintenance
+                    ) {
+                        Task { await performPOTASync() }
                     }
                 }
             } else {
