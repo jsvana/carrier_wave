@@ -55,10 +55,10 @@ struct POTARemoteActivation: Decodable {
         case cw
         case data
         case phone
-        case parktypeDesc = "parktype_desc"
-        case locationDesc = "location_desc"
-        case firstQso = "first_qso"
-        case lastQso = "last_qso"
+        case parktypeDesc
+        case locationDesc
+        case firstQso = "firstQSO"
+        case lastQso = "lastQSO"
     }
 
     let callsign: String

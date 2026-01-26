@@ -272,39 +272,47 @@ private struct ActivationRow: View {
     let onUploadTapped: () -> Void
 
     var body: some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text(activation.displayDate)
-                        .font(.headline)
-                    Text(activation.callsign)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+        DisclosureGroup(isExpanded: $isExpanded) {
+            ForEach(activation.qsos.sorted { $0.timestamp > $1.timestamp }) { qso in
+                POTAQSORow(qso: qso)
+            }
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    HStack {
+                        Text(activation.displayDate)
+                            .font(.headline)
+                        Text(activation.callsign)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    HStack {
+                        Image(systemName: activation.status.iconName)
+                            .foregroundStyle(statusColor)
+                        Text("\(activation.uploadedCount)/\(activation.qsoCount) QSOs uploaded")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                HStack {
-                    Image(systemName: activation.status.iconName)
-                        .foregroundStyle(statusColor)
-                    Text("\(activation.uploadedCount)/\(activation.qsoCount) QSOs uploaded")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+
+                Spacer()
+
+                if activation.hasQSOsToUpload {
+                    Button("Upload") {
+                        onUploadTapped()
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .disabled(isUploadDisabled)
                 }
             }
-
-            Spacer()
-
-            if activation.hasQSOsToUpload {
-                Button("Upload") {
-                    onUploadTapped()
-                }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.small)
-                .disabled(isUploadDisabled)
-            }
+            .padding(.vertical, 4)
         }
-        .padding(.vertical, 4)
     }
 
     // MARK: Private
+
+    @State private var isExpanded = false
 
     private var statusColor: Color {
         switch activation.status {
@@ -312,6 +320,64 @@ private struct ActivationRow: View {
         case .partial: .orange
         case .pending: .gray
         }
+    }
+}
+
+// MARK: - POTAQSORow
+
+private struct POTAQSORow: View {
+    // MARK: Internal
+
+    let qso: QSO
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(qso.callsign)
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                Text(timeString)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer()
+
+            HStack(spacing: 8) {
+                Text(qso.band)
+                    .font(.caption)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.blue.opacity(0.15))
+                    .cornerRadius(4)
+                Text(qso.mode)
+                    .font(.caption)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.green.opacity(0.15))
+                    .cornerRadius(4)
+            }
+
+            if qso.isPresentInPOTA() {
+                Image(systemName: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+                    .font(.caption)
+            } else {
+                Image(systemName: "circle")
+                    .foregroundStyle(.secondary)
+                    .font(.caption)
+            }
+        }
+        .padding(.vertical, 2)
+    }
+
+    // MARK: Private
+
+    private var timeString: String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter.string(from: qso.timestamp) + " UTC"
     }
 }
 
