@@ -249,4 +249,17 @@ final class QSO {
             servicePresence.append(newPresence)
         }
     }
+
+    /// Check if QSO is present in POTA (uploaded or downloaded from POTA)
+    func isPresentInPOTA() -> Bool {
+        // Downloaded from POTA
+        if importSource == .pota {
+            return true
+        }
+        // Has ServicePresence indicating present
+        if isPresent(in: .pota) {
+            return true
+        }
+        return false
+    }
 }

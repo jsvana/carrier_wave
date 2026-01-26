@@ -1,0 +1,159 @@
+// POTA Activation view model
+//
+// Groups QSOs by park reference, UTC date, and callsign for display
+// in the POTA Activations view. Not persisted - computed from QSOs.
+
+import Foundation
+
+// MARK: - POTAActivationStatus
+
+enum POTAActivationStatus {
+    case uploaded // All QSOs present in POTA
+    case partial // Some QSOs present
+    case pending // No QSOs present
+
+    // MARK: Internal
+
+    var iconName: String {
+        switch self {
+        case .uploaded: "checkmark.circle.fill"
+        case .partial: "circle.lefthalf.filled"
+        case .pending: "circle"
+        }
+    }
+
+    var color: String {
+        switch self {
+        case .uploaded: "green"
+        case .partial: "orange"
+        case .pending: "gray"
+        }
+    }
+}
+
+// MARK: - POTAActivation
+
+struct POTAActivation: Identifiable {
+    // MARK: Internal
+
+    let parkReference: String
+    let utcDate: Date
+    let callsign: String
+    let qsos: [QSO]
+
+    var id: String {
+        let dateString = Self.utcDateFormatter.string(from: utcDate)
+        return "\(parkReference)|\(callsign)|\(dateString)"
+    }
+
+    var utcDateString: String {
+        Self.utcDateFormatter.string(from: utcDate)
+    }
+
+    var displayDate: String {
+        Self.displayDateFormatter.string(from: utcDate)
+    }
+
+    var qsoCount: Int { qsos.count }
+
+    var uploadedCount: Int { uploadedQSOs().count }
+    var pendingCount: Int { pendingQSOs().count }
+
+    var status: POTAActivationStatus {
+        let uploaded = uploadedCount
+        if uploaded == qsoCount {
+            return .uploaded
+        } else if uploaded > 0 {
+            return .partial
+        } else {
+            return .pending
+        }
+    }
+
+    var hasQSOsToUpload: Bool { pendingCount > 0 }
+
+    // MARK: - Grouping
+
+    /// Group QSOs into activations by (parkReference, UTC date, callsign)
+    static func groupQSOs(_ qsos: [QSO]) -> [POTAActivation] {
+        let calendar = Calendar(identifier: .gregorian)
+        let utc = TimeZone(identifier: "UTC")!
+
+        // Filter to QSOs with park references
+        let parkQSOs = qsos.filter { $0.parkReference?.isEmpty == false }
+
+        // Group by (park, utcDate, callsign)
+        var groups: [String: [QSO]] = [:]
+        for qso in parkQSOs {
+            let parkRef = qso.parkReference!.uppercased()
+            let utcDate = calendar.startOfDay(for: qso.timestamp, in: utc)
+            let callsign = qso.myCallsign.uppercased()
+            let key = "\(parkRef)|\(callsign)|\(utcDateFormatter.string(from: utcDate))"
+            groups[key, default: []].append(qso)
+        }
+
+        // Convert to POTAActivation structs
+        return groups.map { key, qsos in
+            let parts = key.split(separator: "|")
+            let parkRef = String(parts[0])
+            let callsign = String(parts[1])
+            let dateStr = String(parts[2])
+            let utcDate = utcDateFormatter.date(from: dateStr) ?? Date()
+            return POTAActivation(
+                parkReference: parkRef,
+                utcDate: utcDate,
+                callsign: callsign,
+                qsos: qsos.sorted { $0.timestamp < $1.timestamp }
+            )
+        }.sorted { $0.utcDate > $1.utcDate }
+    }
+
+    /// Group activations by park reference for sectioning
+    static func groupByPark(_ activations: [POTAActivation]) -> [(
+        park: String, activations: [POTAActivation]
+    )] {
+        let grouped = Dictionary(grouping: activations) { $0.parkReference }
+        return
+            grouped
+                .map { (park: $0.key, activations: $0.value.sorted { $0.utcDate > $1.utcDate }) }
+                .sorted { $0.park < $1.park }
+    }
+
+    /// QSOs that are present in POTA (uploaded or downloaded from POTA)
+    func uploadedQSOs() -> [QSO] {
+        qsos.filter { $0.isPresentInPOTA() }
+    }
+
+    /// QSOs that need to be uploaded to POTA
+    func pendingQSOs() -> [QSO] {
+        qsos.filter { !$0.isPresentInPOTA() }
+    }
+
+    // MARK: Private
+
+    // MARK: - Date Formatters
+
+    private static let utcDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
+    private static let displayDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+}
+
+// MARK: - Calendar Extension
+
+private extension Calendar {
+    func startOfDay(for date: Date, in timeZone: TimeZone) -> Date {
+        var cal = self
+        cal.timeZone = timeZone
+        return cal.startOfDay(for: date)
+    }
+}
