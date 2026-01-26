@@ -29,7 +29,7 @@ struct POTALoginSheet: View {
     var body: some View {
         NavigationStack {
             Group {
-                if let webView = authService.getWebView() {
+                if let webView = authService.webView {
                     POTAAuthWebView(webView: webView)
                 } else {
                     ProgressView("Loading...")

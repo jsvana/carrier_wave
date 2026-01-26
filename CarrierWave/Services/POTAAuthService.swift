@@ -64,6 +64,7 @@ class POTAAuthService: NSObject, ObservableObject {
 
     @Published var isAuthenticating = false
     @Published var currentToken: POTAToken?
+    @Published private(set) var webView: WKWebView?
 
     /// Check if we have a valid (non-expired) POTA authentication token
     var isAuthenticated: Bool {
@@ -101,10 +102,6 @@ class POTAAuthService: NSObject, ObservableObject {
         }
     }
 
-    func getWebView() -> WKWebView? {
-        webView
-    }
-
     func cancelAuthentication() {
         authContinuation?.resume(throwing: POTAAuthError.authenticationCancelled)
         authContinuation = nil
@@ -115,6 +112,19 @@ class POTAAuthService: NSObject, ObservableObject {
         try? keychain.delete(for: KeychainHelper.Keys.potaIdToken)
         currentToken = nil
         webView = nil
+
+        // Clear Cognito-related data from default data store to prevent session conflicts
+        let dataStore = WKWebsiteDataStore.default()
+        let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
+        dataStore.fetchDataRecords(ofTypes: dataTypes) { records in
+            let cognitoRecords = records.filter {
+                $0.displayName.contains("pota") || $0.displayName.contains("cognito")
+                    || $0.displayName.contains("amazoncognito")
+            }
+            if !cognitoRecords.isEmpty {
+                dataStore.removeData(ofTypes: dataTypes, for: cognitoRecords) {}
+            }
+        }
     }
 
     func ensureValidToken() async throws -> String {
@@ -129,7 +139,6 @@ class POTAAuthService: NSObject, ObservableObject {
     // MARK: Private
 
     private let keychain = KeychainHelper.shared
-    private var webView: WKWebView?
     private var authContinuation: CheckedContinuation<POTAToken, Error>?
 
     private let potaAppURL = "https://pota.app"
@@ -196,18 +205,33 @@ class POTAAuthService: NSObject, ObservableObject {
     """
 
     private func setupWebView() {
-        let config = WKWebViewConfiguration()
-        config.websiteDataStore = .nonPersistent() // Don't persist between sessions
+        // Create a fresh non-persistent data store and clear any residual data
+        // This ensures each login attempt starts with a completely clean state
+        let dataStore = WKWebsiteDataStore.nonPersistent()
+        let dataTypes = WKWebsiteDataStore.allWebsiteDataTypes()
 
-        webView = WKWebView(frame: .zero, configuration: config)
-        webView?.navigationDelegate = self
+        // Clear the non-persistent store before use to ensure no residual state
+        dataStore.removeData(ofTypes: dataTypes, modifiedSince: .distantPast) { [weak self] in
+            // Dispatch back to main actor since completion handler runs on background thread
+            Task { @MainActor [weak self] in
+                guard let self else {
+                    return
+                }
 
-        guard let url = URL(string: "\(potaAppURL)/#/login") else {
-            authContinuation?.resume(throwing: POTAAuthError.tokenExtractionFailed)
-            return
+                let config = WKWebViewConfiguration()
+                config.websiteDataStore = dataStore
+
+                webView = WKWebView(frame: .zero, configuration: config)
+                webView?.navigationDelegate = self
+
+                guard let url = URL(string: "\(potaAppURL)/#/login") else {
+                    authContinuation?.resume(throwing: POTAAuthError.tokenExtractionFailed)
+                    return
+                }
+
+                webView?.load(URLRequest(url: url))
+            }
         }
-
-        webView?.load(URLRequest(url: url))
     }
 
     private func extractToken() async throws -> POTAToken {
@@ -217,7 +241,8 @@ class POTAAuthService: NSObject, ObservableObject {
 
         // Try multiple times with delay
         for _ in 0 ..< 5 {
-            if let token = try await webView.evaluateJavaScript(extractTokenJS) as? String, !token.isEmpty {
+            let result = try await webView.evaluateJavaScript(extractTokenJS)
+            if let token = result as? String, !token.isEmpty {
                 let potaToken = try decodeToken(token)
                 try saveToken(potaToken)
                 currentToken = potaToken
