@@ -3,7 +3,7 @@ import Foundation
 // MARK: - HAMRSAuthResponse
 
 /// Response from HAMRS /api/v1/couchdb_url endpoint
-struct HAMRSAuthResponse: Codable {
+struct HAMRSAuthResponse: Codable, @unchecked Sendable {
     let subscribed: Bool
     let url: String?
 }
@@ -12,7 +12,7 @@ struct HAMRSAuthResponse: Codable {
 
 /// HAMRS Logbook document from CouchDB
 /// Contains activation info that applies to all QSOs in the logbook
-struct HAMRSLogbook: Codable {
+struct HAMRSLogbook: Codable, @unchecked Sendable {
     // MARK: Lifecycle
 
     init(from decoder: Decoder) throws {
@@ -86,7 +86,7 @@ struct HAMRSLogbook: Codable {
 // MARK: - HAMRSQSO
 
 /// HAMRS QSO document from CouchDB
-struct HAMRSQSO: Codable {
+struct HAMRSQSO: Codable, @unchecked Sendable {
     // MARK: Lifecycle
 
     init(from decoder: Decoder) throws {
@@ -225,7 +225,7 @@ struct HAMRSQSO: Codable {
 // MARK: - FrequencyValue
 
 /// Handles frequency that can be either a number or string in JSON
-enum FrequencyValue: Codable {
+enum FrequencyValue: Codable, @unchecked Sendable {
     case double(Double)
     case string(String)
 
@@ -273,7 +273,7 @@ enum FrequencyValue: Codable {
 // MARK: - PowerValue
 
 /// Handles power that can be either a number or string in JSON
-enum PowerValue: Codable {
+enum PowerValue: Codable, @unchecked Sendable {
     case int(Int)
     case string(String)
 
@@ -321,7 +321,7 @@ enum PowerValue: Codable {
 // MARK: - CouchDBAllDocsResponse
 
 /// CouchDB _all_docs response
-struct CouchDBAllDocsResponse<T: Codable>: Codable {
+struct CouchDBAllDocsResponse<T: Codable>: Codable, @unchecked Sendable {
     // swiftlint:disable:next identifier_name
     let total_rows: Int
     let offset: Int
@@ -331,7 +331,7 @@ struct CouchDBAllDocsResponse<T: Codable>: Codable {
 // MARK: - CouchDBRow
 
 /// Single row in CouchDB _all_docs response
-struct CouchDBRow<T: Codable>: Codable {
+struct CouchDBRow<T: Codable>: Codable, @unchecked Sendable {
     let id: String
     let key: String
     let doc: T?

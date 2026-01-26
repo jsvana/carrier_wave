@@ -38,14 +38,14 @@ enum POTAError: Error, LocalizedError {
 
 // MARK: - POTAActivationsResponse
 
-struct POTAActivationsResponse: Decodable {
+struct POTAActivationsResponse: Decodable, @unchecked Sendable {
     let count: Int
     let activations: [POTARemoteActivation]
 }
 
 // MARK: - POTARemoteActivation
 
-struct POTARemoteActivation: Decodable {
+struct POTARemoteActivation: Decodable, @unchecked Sendable {
     enum CodingKeys: String, CodingKey {
         case callsign
         case date
@@ -77,14 +77,14 @@ struct POTARemoteActivation: Decodable {
 
 // MARK: - POTALogbookResponse
 
-struct POTALogbookResponse: Decodable {
+struct POTALogbookResponse: Decodable, @unchecked Sendable {
     let count: Int
     let entries: [POTARemoteQSO]
 }
 
 // MARK: - POTARemoteQSO
 
-struct POTARemoteQSO: Decodable {
+struct POTARemoteQSO: Decodable, @unchecked Sendable {
     // MARK: Lifecycle
 
     init(from decoder: Decoder) throws {
@@ -188,7 +188,8 @@ struct POTAUploadResult {
 
 // MARK: - POTAClient
 
-actor POTAClient {
+@MainActor
+final class POTAClient {
     // MARK: Lifecycle
 
     init(authService: POTAAuthService) {
@@ -210,10 +211,10 @@ actor POTAClient {
     }
 
     func uploadActivation(parkReference: String, qsos: [QSO]) async throws -> POTAUploadResult {
-        let debugLog = await SyncDebugLog.shared
+        let debugLog = SyncDebugLog.shared
 
         guard validateParkReference(parkReference) else {
-            await debugLog.error(
+            debugLog.error(
                 "Invalid park reference format: '\(parkReference)' (expected format like K-1234)",
                 service: .pota
             )
@@ -225,24 +226,24 @@ actor POTAClient {
 
         let parkQSOs = qsos.filter { $0.parkReference?.uppercased() == normalizedParkRef }
         guard !parkQSOs.isEmpty else {
-            await debugLog.info("No QSOs to upload for park \(normalizedParkRef)", service: .pota)
+            debugLog.info("No QSOs to upload for park \(normalizedParkRef)", service: .pota)
             return POTAUploadResult(
                 success: true, qsosAccepted: 0, message: "No QSOs for this park"
             )
         }
 
         guard
-            let requestData = await buildUploadRequest(
+            let requestData = buildUploadRequest(
                 parkReference: normalizedParkRef, qsos: qsos, token: token
             )
         else {
             throw POTAError.uploadFailed("Failed to build request")
         }
 
-        await debugLog.info(
+        debugLog.info(
             "Uploading \(parkQSOs.count) QSOs to park \(normalizedParkRef)", service: .pota
         )
-        await debugLog.debug(
+        debugLog.debug(
             "POST /adif - location=\(requestData.location), ref=\(normalizedParkRef), file=\(requestData.filename)",
             service: .pota
         )
@@ -250,11 +251,11 @@ actor POTAClient {
         let (data, response) = try await URLSession.shared.data(for: requestData.request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            await debugLog.error("Invalid response (not HTTP)", service: .pota)
+            debugLog.error("Invalid response (not HTTP)", service: .pota)
             throw POTAError.uploadFailed("Invalid response")
         }
 
-        return try await handleUploadResponse(
+        return try handleUploadResponse(
             data: data, httpResponse: httpResponse,
             parkReference: normalizedParkRef, qsoCount: parkQSOs.count
         )
@@ -264,11 +265,11 @@ actor POTAClient {
     func uploadActivationWithRecording(
         parkReference: String, qsos: [QSO], modelContext: ModelContext
     ) async throws -> POTAUploadResult {
-        let debugLog = await SyncDebugLog.shared
+        let debugLog = SyncDebugLog.shared
         let startTime = Date()
 
         guard validateParkReference(parkReference) else {
-            await debugLog.error(
+            debugLog.error(
                 "Invalid park reference format: '\(parkReference)' (expected format like K-1234)",
                 service: .pota
             )
@@ -280,29 +281,29 @@ actor POTAClient {
 
         let parkQSOs = qsos.filter { $0.parkReference?.uppercased() == normalizedParkRef }
         guard !parkQSOs.isEmpty else {
-            await debugLog.info("No QSOs to upload for park \(normalizedParkRef)", service: .pota)
+            debugLog.info("No QSOs to upload for park \(normalizedParkRef)", service: .pota)
             return POTAUploadResult(
                 success: true, qsosAccepted: 0, message: "No QSOs for this park"
             )
         }
 
         guard
-            let requestData = await buildUploadRequest(
+            let requestData = buildUploadRequest(
                 parkReference: normalizedParkRef, qsos: qsos, token: token
             )
         else {
             throw POTAError.uploadFailed("Failed to build request")
         }
 
-        let attempt = await createUploadAttempt(
+        let attempt = createUploadAttempt(
             startTime: startTime, parkReference: normalizedParkRef,
             requestData: requestData, modelContext: modelContext
         )
 
-        await debugLog.info(
+        debugLog.info(
             "Uploading \(requestData.qsoCount) QSOs to park \(normalizedParkRef)", service: .pota
         )
-        await debugLog.debug(
+        debugLog.debug(
             "POST /adif - location=\(requestData.location), ref=\(normalizedParkRef), file=\(requestData.filename)",
             service: .pota
         )
@@ -423,41 +424,41 @@ actor POTAClient {
     // MARK: - Job Status Methods
 
     func fetchJobs() async throws -> [POTAJob] {
-        let debugLog = await SyncDebugLog.shared
+        let debugLog = SyncDebugLog.shared
         let token = try await authService.ensureValidToken()
 
         guard let url = URL(string: "\(baseURL)/user/jobs") else {
-            await debugLog.error("Invalid URL for POTA jobs", service: .pota)
+            debugLog.error("Invalid URL for POTA jobs", service: .pota)
             throw POTAError.fetchFailed("Invalid URL")
         }
 
         var request = URLRequest(url: url)
         request.setValue(token, forHTTPHeaderField: "Authorization")
 
-        await debugLog.debug("GET /user/jobs", service: .pota)
+        debugLog.debug("GET /user/jobs", service: .pota)
 
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
-            await debugLog.error("Invalid response (not HTTP)", service: .pota)
+            debugLog.error("Invalid response (not HTTP)", service: .pota)
             throw POTAError.fetchFailed("Invalid response")
         }
 
-        await debugLog.debug("Jobs response: \(httpResponse.statusCode)", service: .pota)
+        debugLog.debug("Jobs response: \(httpResponse.statusCode)", service: .pota)
 
         guard httpResponse.statusCode == 200 else {
             if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                 throw POTAError.notAuthenticated
             }
             let body = String(data: data, encoding: .utf8) ?? ""
-            await debugLog.error(
+            debugLog.error(
                 "Jobs fetch failed: \(httpResponse.statusCode) - \(body)", service: .pota
             )
             throw POTAError.fetchFailed("HTTP \(httpResponse.statusCode): \(body)")
         }
 
         let jobs = try JSONDecoder().decode([POTAJob].self, from: data)
-        await debugLog.info("Fetched \(jobs.count) POTA jobs", service: .pota)
+        debugLog.info("Fetched \(jobs.count) POTA jobs", service: .pota)
         return jobs
     }
 

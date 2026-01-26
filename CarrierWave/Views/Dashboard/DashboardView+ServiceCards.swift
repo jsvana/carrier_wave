@@ -213,7 +213,7 @@ extension DashboardView {
         }
         .onChange(of: qrzIsConfigured) { _, isConfigured in
             if isConfigured {
-                Task { await loadQRZConfig() }
+                loadQRZConfig()
             }
         }
     }

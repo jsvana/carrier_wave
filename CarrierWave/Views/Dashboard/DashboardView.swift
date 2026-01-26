@@ -108,11 +108,8 @@ struct DashboardView: View {
                 }
                 .padding()
             }
-            .task {
-                await loadQRZConfig()
-                refreshServiceStatus()
-            }
             .onAppear {
+                loadQRZConfig()
                 refreshServiceStatus()
             }
             .toolbar {

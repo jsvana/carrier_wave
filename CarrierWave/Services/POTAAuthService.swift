@@ -35,7 +35,7 @@ enum POTAAuthError: Error, LocalizedError {
 
 // MARK: - POTAToken
 
-struct POTAToken: Codable {
+struct POTAToken: Codable, @unchecked Sendable {
     let idToken: String
     let expiresAt: Date
     let callsign: String?

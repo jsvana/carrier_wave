@@ -34,27 +34,35 @@ extension POTAClient {
         parkReference: String,
         qsos: [QSO],
         token: String
-    ) async -> POTAUploadRequestData? {
-        let debugLog = await SyncDebugLog.shared
+    ) -> POTAUploadRequestData? {
+        let debugLog = SyncDebugLog.shared
         let normalizedParkRef = parkReference.uppercased()
 
         // Filter QSOs for this park
         let parkQSOs = qsos.filter { $0.parkReference?.uppercased() == normalizedParkRef }
         guard !parkQSOs.isEmpty else {
-            await debugLog.info("No QSOs to upload for park \(normalizedParkRef)", service: .pota)
+            debugLog.info("No QSOs to upload for park \(normalizedParkRef)", service: .pota)
             return nil
         }
 
         let callsign = parkQSOs.first?.myCallsign ?? "UNKNOWN"
-        let location = deriveLocation(parkReference: normalizedParkRef, grid: parkQSOs.first?.myGrid)
+        let location = deriveLocation(
+            parkReference: normalizedParkRef, grid: parkQSOs.first?.myGrid
+        )
         let adifContent = generateADIF(for: parkQSOs, parkReference: normalizedParkRef)
-        let filename = buildFilename(callsign: callsign, parkReference: normalizedParkRef, qsos: parkQSOs)
-        let formFields = POTAFormFields(parkReference: normalizedParkRef, location: location, callsign: callsign)
+        let filename = buildFilename(
+            callsign: callsign, parkReference: normalizedParkRef, qsos: parkQSOs
+        )
+        let formFields = POTAFormFields(
+            parkReference: normalizedParkRef, location: location, callsign: callsign
+        )
 
-        guard let request = buildMultipartRequest(
-            token: token, filename: filename, adifContent: adifContent, formFields: formFields
-        ) else {
-            await debugLog.error("Invalid URL for POTA upload", service: .pota)
+        guard
+            let request = buildMultipartRequest(
+                token: token, filename: filename, adifContent: adifContent, formFields: formFields
+            )
+        else {
+            debugLog.error("Invalid URL for POTA upload", service: .pota)
             return nil
         }
 
@@ -87,7 +95,9 @@ extension POTAClient {
         let boundary = UUID().uuidString
         var body = Data()
         body.append(Data("--\(boundary)\r\n".utf8))
-        body.append(Data("Content-Disposition: form-data; name=\"adif\"; filename=\"\(filename)\"\r\n".utf8))
+        body.append(
+            Data("Content-Disposition: form-data; name=\"adif\"; filename=\"\(filename)\"\r\n".utf8)
+        )
         body.append(Data("Content-Type: application/octet-stream\r\n\r\n".utf8))
         body.append(Data(adifContent.utf8))
         body.append(Data("\r\n".utf8))
@@ -111,7 +121,9 @@ extension POTAClient {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue(token, forHTTPHeaderField: "Authorization")
-        request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+        request.setValue(
+            "multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type"
+        )
         request.httpBody = body
         return request
     }
@@ -175,7 +187,7 @@ extension POTAClient {
                 )
             }
 
-            return try await handleUploadResponse(
+            return try handleUploadResponse(
                 data: data, httpResponse: httpResponse,
                 parkReference: parkReference, qsoCount: qsoCount
             )
@@ -209,39 +221,53 @@ extension POTAClient {
         httpResponse: HTTPURLResponse,
         parkReference: String,
         qsoCount: Int
-    ) async throws -> POTAUploadResult {
-        let debugLog = await SyncDebugLog.shared
+    ) throws -> POTAUploadResult {
+        let debugLog = SyncDebugLog.shared
         let responseBody = String(data: data, encoding: .utf8) ?? "(binary data)"
-        await debugLog.debug("Response \(httpResponse.statusCode): \(responseBody.prefix(500))", service: .pota)
+        debugLog.debug(
+            "Response \(httpResponse.statusCode): \(responseBody.prefix(500))", service: .pota
+        )
 
         switch httpResponse.statusCode {
         case 200 ... 299:
-            return await parseSuccessResponse(data: data, parkReference: parkReference, qsoCount: qsoCount)
+            return parseSuccessResponse(
+                data: data, parkReference: parkReference, qsoCount: qsoCount
+            )
 
         case 401:
-            await debugLog.error("Upload failed: 401 Unauthorized - token may be expired", service: .pota)
+            debugLog.error(
+                "Upload failed: 401 Unauthorized - token may be expired", service: .pota
+            )
             throw POTAError.notAuthenticated
 
         case 400 ... 499:
             let errorMessage = String(data: data, encoding: .utf8) ?? "Client error"
-            await debugLog.error("Upload failed: \(httpResponse.statusCode) - \(errorMessage)", service: .pota)
+            debugLog.error(
+                "Upload failed: \(httpResponse.statusCode) - \(errorMessage)", service: .pota
+            )
             throw POTAError.uploadFailed(errorMessage)
 
         default:
-            await debugLog.error("Upload failed: \(httpResponse.statusCode) - Server error", service: .pota)
+            debugLog.error(
+                "Upload failed: \(httpResponse.statusCode) - Server error", service: .pota
+            )
             throw POTAError.uploadFailed("Server error: \(httpResponse.statusCode)")
         }
     }
 
-    private func parseSuccessResponse(data: Data, parkReference: String, qsoCount: Int) async -> POTAUploadResult {
-        let debugLog = await SyncDebugLog.shared
+    private func parseSuccessResponse(data: Data, parkReference: String, qsoCount: Int)
+        -> POTAUploadResult
+    {
+        let debugLog = SyncDebugLog.shared
         if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             let count = json["qsosAccepted"] as? Int ?? qsoCount
             let message = json["message"] as? String
-            await debugLog.info("Upload success: \(count) QSOs accepted for \(parkReference)", service: .pota)
+            debugLog.info(
+                "Upload success: \(count) QSOs accepted for \(parkReference)", service: .pota
+            )
             return POTAUploadResult(success: true, qsosAccepted: count, message: message)
         }
-        await debugLog.info(
+        debugLog.info(
             "Upload success: \(qsoCount) QSOs for \(parkReference) (no count in response)",
             service: .pota
         )

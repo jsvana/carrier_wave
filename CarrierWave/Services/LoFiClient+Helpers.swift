@@ -2,6 +2,7 @@ import Foundation
 
 // MARK: - LoFiClient Private Helpers
 
+@MainActor
 extension LoFiClient {
     func getToken() throws -> String {
         guard let token = try? keychain.readString(for: KeychainHelper.Keys.lofiAuthToken) else {

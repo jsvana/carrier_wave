@@ -242,8 +242,8 @@ struct SettingsMainView: View {
                     Text("About")
                 }
             }
-            .task {
-                await loadServiceStatus()
+            .onAppear {
+                loadServiceStatus()
             }
             .alert("Error", isPresented: $showingError) {
                 Button("OK") {}
@@ -287,7 +287,7 @@ struct SettingsMainView: View {
             try modelContext.save()
 
             // Reset LoFi sync timestamp so QSOs can be re-downloaded
-            await lofiClient.resetSyncTimestamp()
+            lofiClient.resetSyncTimestamp()
         } catch {
             errorMessage = "Failed to clear QSOs: \(error.localizedDescription)"
             showingError = true
@@ -318,13 +318,13 @@ struct SettingsMainView: View {
         }
     }
 
-    private func loadServiceStatus() async {
-        qrzIsConfigured = await qrzClient.hasApiKey()
-        qrzCallsign = await qrzClient.getCallsign()
+    private func loadServiceStatus() {
+        qrzIsConfigured = qrzClient.hasApiKey()
+        qrzCallsign = qrzClient.getCallsign()
 
-        lotwIsConfigured = await lotwClient.hasCredentials()
+        lotwIsConfigured = lotwClient.hasCredentials()
         if lotwIsConfigured {
-            if let creds = try? await lotwClient.getCredentials() {
+            if let creds = try? lotwClient.getCredentials() {
                 lotwUsername = creds.username
             }
         }

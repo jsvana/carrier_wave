@@ -31,8 +31,10 @@ class ICloudMonitor: ObservableObject {
         }
 
         metadataQuery = NSMetadataQuery()
-        metadataQuery?.predicate = NSPredicate(format: "%K LIKE[c] '*.adi' OR %K LIKE[c] '*.adif'",
-                                               NSMetadataItemFSNameKey, NSMetadataItemFSNameKey)
+        metadataQuery?.predicate = NSPredicate(
+            format: "%K LIKE[c] '*.adi' OR %K LIKE[c] '*.adif'",
+            NSMetadataItemFSNameKey, NSMetadataItemFSNameKey
+        )
         metadataQuery?.searchScopes = [NSMetadataQueryUbiquitousDocumentsScope]
 
         NotificationCenter.default.addObserver(
@@ -66,9 +68,10 @@ class ICloudMonitor: ObservableObject {
         guard let containerURL = iCloudContainerURL else {
             return
         }
-        let processedURL = containerURL
-            .deletingLastPathComponent()
-            .appendingPathComponent("Processed")
+        let processedURL =
+            containerURL
+                .deletingLastPathComponent()
+                .appendingPathComponent("Processed")
 
         try? fileManager.createDirectory(at: processedURL, withIntermediateDirectories: true)
 
@@ -94,7 +97,7 @@ class ICloudMonitor: ObservableObject {
             let settings = await center.notificationSettings()
 
             if settings.authorizationStatus == .notDetermined {
-                try? await center.requestAuthorization(options: [.alert, .sound, .badge])
+                _ = try? await center.requestAuthorization(options: [.alert, .sound, .badge])
             }
         }
     }
@@ -125,8 +128,9 @@ class ICloudMonitor: ObservableObject {
             }
 
             // Check if file is downloaded
-            let downloadStatus = metadataItem
-                .value(forAttribute: NSMetadataUbiquitousItemDownloadingStatusKey) as? String
+            let downloadStatus =
+                metadataItem
+                    .value(forAttribute: NSMetadataUbiquitousItemDownloadingStatusKey) as? String
 
             if downloadStatus == NSMetadataUbiquitousItemDownloadingStatusCurrent {
                 // File is downloaded and ready

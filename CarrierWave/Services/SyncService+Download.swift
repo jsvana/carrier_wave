@@ -6,37 +6,46 @@ import SwiftData
 extension SyncService {
     func downloadFromAllSources() async -> [ServiceType: Result<[FetchedQSO], Error>] {
         let timeout = syncTimeoutSeconds
+
+        // Capture service configuration state before entering task group
+        let qrzHasKey = qrzClient.hasApiKey()
+        let potaIsAuth = potaAuthService.isAuthenticated
+        let potaInMaintenance = POTAClient.isInMaintenanceWindow()
+        let lofiReady = lofiClient.isConfigured && lofiClient.isLinked
+        let hamrsReady = hamrsClient.isConfigured
+        let lotwHasCreds = lotwClient.hasCredentials()
+
         return await withTaskGroup(of: (ServiceType, Result<[FetchedQSO], Error>).self) { group in
             // QRZ download
-            if await qrzClient.hasApiKey() {
+            if qrzHasKey {
                 group.addTask {
                     await self.downloadFromQRZ(timeout: timeout)
                 }
             }
 
             // POTA download (skip during maintenance window)
-            if potaAuthService.isAuthenticated, !POTAClient.isInMaintenanceWindow() {
+            if potaIsAuth, !potaInMaintenance {
                 group.addTask {
                     await self.downloadFromPOTA(timeout: timeout)
                 }
             }
 
             // LoFi download
-            if lofiClient.isConfigured, lofiClient.isLinked {
+            if lofiReady {
                 group.addTask {
                     await self.downloadFromLoFi(timeout: timeout)
                 }
             }
 
             // HAMRS download
-            if hamrsClient.isConfigured {
+            if hamrsReady {
                 group.addTask {
                     await self.downloadFromHAMRS(timeout: timeout)
                 }
             }
 
             // LoTW download
-            if await lotwClient.hasCredentials() {
+            if lotwHasCreds {
                 group.addTask {
                     await self.downloadFromLoTW(timeout: timeout)
                 }
@@ -225,9 +234,9 @@ extension SyncService {
     ) {
         await MainActor.run { self.syncPhase = .downloading(service: .lotw) }
         let debugLog = SyncDebugLog.shared
+        let rxSince = lotwClient.getLastQSORxDate()
         debugLog.info("Starting LoTW download", service: .lotw)
         do {
-            let rxSince = await lotwClient.getLastQSORxDate()
             let response = try await withTimeout(seconds: timeout, service: .lotw) {
                 try await self.lotwClient.fetchQSOs(qsoRxSince: rxSince)
             }
@@ -237,7 +246,7 @@ extension SyncService {
 
             // Save timestamp for incremental sync
             if let lastQSORx = response.lastQSORx {
-                try await lotwClient.saveLastQSORxDate(lastQSORx)
+                try lotwClient.saveLastQSORxDate(lastQSORx)
             }
 
             for (index, qso) in response.qsos.prefix(5).enumerated() {

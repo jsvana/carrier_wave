@@ -42,8 +42,8 @@ struct LogsListContentView: View {
             .onDelete(perform: deleteQSOs)
         }
         .searchable(text: $searchText, prompt: "Search callsigns or parks")
-        .task {
-            await loadServiceConfiguration()
+        .onAppear {
+            loadServiceConfiguration()
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -115,8 +115,8 @@ struct LogsListContentView: View {
         }
     }
 
-    private func loadServiceConfiguration() async {
-        serviceConfig = await ServiceConfiguration(
+    private func loadServiceConfiguration() {
+        serviceConfig = ServiceConfiguration(
             qrz: qrzClient.hasApiKey(),
             pota: potaAuth.isAuthenticated,
             lofi: lofiClient.isConfigured && lofiClient.isLinked,

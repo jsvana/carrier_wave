@@ -13,7 +13,7 @@ extension SyncService {
 
         let results = await withTaskGroup(of: (ServiceType, Result<Int, Error>).self) { group in
             // QRZ upload
-            if await qrzClient.hasApiKey() {
+            if qrzClient.hasApiKey() {
                 let qrzQSOs = qsosNeedingUpload?.filter { $0.needsUpload(to: .qrz) } ?? []
                 if !qrzQSOs.isEmpty {
                     group.addTask {

@@ -99,8 +99,8 @@ struct LoFiSettingsView: View {
         } message: {
             Text(errorMessage)
         }
-        .task {
-            await checkStatus()
+        .onAppear {
+            checkStatus()
         }
     }
 
@@ -143,7 +143,7 @@ struct LoFiSettingsView: View {
                     .foregroundStyle(.secondary)
 
                 Button("I've confirmed the email") {
-                    Task { await confirmLinked() }
+                    confirmLinked()
                 }
 
                 Button("Resend confirmation email") {
@@ -196,7 +196,7 @@ struct LoFiSettingsView: View {
         }
     }
 
-    private func checkStatus() async {
+    private func checkStatus() {
         isConfigured = lofiClient.isConfigured
         isLinked = lofiClient.isLinked
 
@@ -213,24 +213,24 @@ struct LoFiSettingsView: View {
         defer { isLoading = false }
 
         do {
-            try await lofiClient.configure(callsign: callsign, email: email)
+            try lofiClient.configure(callsign: callsign, email: email)
             let registration = try await lofiClient.register()
             statusMessage = "Registered as \(registration.account.call)"
 
             try await lofiClient.linkDevice(email: email)
             statusMessage = "Check your email to confirm the device"
 
-            await checkStatus()
+            checkStatus()
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
         }
     }
 
-    private func confirmLinked() async {
+    private func confirmLinked() {
         do {
-            try await lofiClient.markAsLinked()
-            await checkStatus()
+            try lofiClient.markAsLinked()
+            checkStatus()
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
@@ -251,10 +251,8 @@ struct LoFiSettingsView: View {
     }
 
     private func logout() {
-        Task {
-            try? await lofiClient.clearCredentials()
-            await checkStatus()
-        }
+        try? lofiClient.clearCredentials()
+        checkStatus()
     }
 
     private func forceRedownload() async {

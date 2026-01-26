@@ -6,7 +6,8 @@ import Foundation
 
 // MARK: - ChallengesClient
 
-actor ChallengesClient {
+@MainActor
+final class ChallengesClient {
     // MARK: Lifecycle
 
     init(baseURL: String = "https://challenges.example.com") {
@@ -15,7 +16,7 @@ actor ChallengesClient {
 
     // MARK: Internal
 
-    nonisolated let keychain = KeychainHelper.shared
+    let keychain = KeychainHelper.shared
 
     // MARK: - Authentication
 
@@ -122,7 +123,7 @@ actor ChallengesClient {
 
         let joinRequest = JoinChallengeRequest(
             callsign: callsign,
-            deviceName: deviceName,
+            deviceName: Self.deviceName,
             inviteToken: inviteToken
         )
         request.httpBody = try JSONEncoder().encode(joinRequest)
@@ -289,16 +290,16 @@ actor ChallengesClient {
 
     // MARK: Private
 
+    private static let deviceName: String = {
+        #if canImport(UIKit)
+            UIDevice.current.name
+        #else
+            "Unknown Device"
+        #endif
+    }()
+
     private let baseURL: String
     private let userAgent = "CarrierWave/1.0"
-
-    private var deviceName: String {
-        #if canImport(UIKit)
-            return UIDevice.current.name
-        #else
-            return "Unknown Device"
-        #endif
-    }
 
     // MARK: - Request Building
 

@@ -140,7 +140,7 @@ extension DashboardView {
 
                         Menu {
                             Button(role: .destructive) {
-                                Task { await clearLoTWData() }
+                                clearLoTWData()
                             } label: {
                                 Label("Clear LoTW Data", systemImage: "trash")
                             }

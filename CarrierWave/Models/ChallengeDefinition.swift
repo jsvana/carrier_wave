@@ -1,6 +1,15 @@
 import Foundation
 import SwiftData
 
+/// Nonisolated helper functions to work around @MainActor Codable conformance issues
+private func decodeConfiguration(from data: Data) -> ChallengeConfiguration? {
+    try? JSONDecoder().decode(ChallengeConfiguration.self, from: data)
+}
+
+private func encodeConfiguration(_ config: ChallengeConfiguration) throws -> Data {
+    try JSONEncoder().encode(config)
+}
+
 // MARK: - ChallengeDefinition
 
 @Model
@@ -64,7 +73,7 @@ final class ChallengeDefinition {
     // MARK: - Configuration Access
 
     var configuration: ChallengeConfiguration? {
-        try? JSONDecoder().decode(ChallengeConfiguration.self, from: configurationData)
+        decodeConfiguration(from: configurationData)
     }
 
     var goals: [ChallengeGoal] {
@@ -186,7 +195,7 @@ extension ChallengeDefinition {
             historicalQSOsAllowed: dto.configuration.historicalQsosAllowed,
             inviteConfig: nil
         )
-        return try JSONEncoder().encode(config)
+        return try encodeConfiguration(config)
     }
 
     private static func buildGoals(from dto: ChallengeDefinitionDTO) -> [ChallengeGoal] {

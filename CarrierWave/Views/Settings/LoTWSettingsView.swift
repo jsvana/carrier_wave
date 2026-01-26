@@ -92,8 +92,8 @@ struct LoTWSettingsView: View {
         } message: {
             Text(errorMessage)
         }
-        .task {
-            await checkStatus()
+        .onAppear {
+            checkStatus()
         }
     }
 
@@ -111,20 +111,18 @@ struct LoTWSettingsView: View {
 
     private let lotwClient = LoTWClient()
 
-    private func checkStatus() async {
-        isAuthenticated = await lotwClient.hasCredentials()
+    private func checkStatus() {
+        isAuthenticated = lotwClient.hasCredentials()
         if isAuthenticated {
-            if let creds = try? await lotwClient.getCredentials() {
+            if let creds = try? lotwClient.getCredentials() {
                 username = creds.username
             }
         }
     }
 
     private func logout() {
-        Task {
-            await lotwClient.clearCredentials()
-            await checkStatus()
-        }
+        lotwClient.clearCredentials()
+        checkStatus()
     }
 
     private func forceRedownload() async {
@@ -205,7 +203,7 @@ struct LoTWLoginSheet: View {
 
         do {
             try await lotwClient.testCredentials(username: username, password: password)
-            try await lotwClient.saveCredentials(username: username, password: password)
+            try lotwClient.saveCredentials(username: username, password: password)
             storedUsername = username
             isAuthenticated = true
             dismiss()

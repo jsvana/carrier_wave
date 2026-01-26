@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - LoFiRegistrationRequest
 
-struct LoFiRegistrationRequest: Encodable, Sendable {
+struct LoFiRegistrationRequest: Encodable, @unchecked Sendable {
     let client: LoFiClientCredentials
     let account: LoFiAccountRequest
     let meta: LoFiMetaRequest
@@ -10,7 +10,7 @@ struct LoFiRegistrationRequest: Encodable, Sendable {
 
 // MARK: - LoFiClientCredentials
 
-struct LoFiClientCredentials: Encodable, Sendable {
+struct LoFiClientCredentials: Encodable, @unchecked Sendable {
     let key: String
     let name: String
     let secret: String
@@ -18,19 +18,19 @@ struct LoFiClientCredentials: Encodable, Sendable {
 
 // MARK: - LoFiAccountRequest
 
-struct LoFiAccountRequest: Encodable, Sendable {
+struct LoFiAccountRequest: Encodable, @unchecked Sendable {
     let call: String
 }
 
 // MARK: - LoFiMetaRequest
 
-struct LoFiMetaRequest: Encodable, Sendable {
+struct LoFiMetaRequest: Encodable, @unchecked Sendable {
     let app: String
 }
 
 // MARK: - LoFiRegistrationResponse
 
-struct LoFiRegistrationResponse: Decodable, Sendable {
+struct LoFiRegistrationResponse: Decodable, @unchecked Sendable {
     let token: String
     let client: LoFiClientInfo
     let account: LoFiAccountInfo
@@ -39,14 +39,14 @@ struct LoFiRegistrationResponse: Decodable, Sendable {
 
 // MARK: - LoFiClientInfo
 
-struct LoFiClientInfo: Decodable, Sendable {
+struct LoFiClientInfo: Decodable, @unchecked Sendable {
     let uuid: String
     let name: String
 }
 
 // MARK: - LoFiAccountInfo
 
-struct LoFiAccountInfo: Decodable, Sendable {
+struct LoFiAccountInfo: Decodable, @unchecked Sendable {
     enum CodingKeys: String, CodingKey {
         case uuid
         case call
@@ -66,13 +66,13 @@ struct LoFiAccountInfo: Decodable, Sendable {
 
 // MARK: - LoFiMetaInfo
 
-struct LoFiMetaInfo: Decodable, Sendable {
+struct LoFiMetaInfo: Decodable, @unchecked Sendable {
     let flags: LoFiSyncFlags
 }
 
 // MARK: - LoFiSyncFlags
 
-struct LoFiSyncFlags: Decodable, Sendable {
+struct LoFiSyncFlags: Decodable, @unchecked Sendable {
     enum CodingKeys: String, CodingKey {
         case suggestedSyncBatchSize = "suggested_sync_batch_size"
         case suggestedSyncLoopDelay = "suggested_sync_loop_delay"
@@ -86,26 +86,26 @@ struct LoFiSyncFlags: Decodable, Sendable {
 
 // MARK: - LoFiLinkDeviceRequest
 
-struct LoFiLinkDeviceRequest: Encodable, Sendable {
+struct LoFiLinkDeviceRequest: Encodable, @unchecked Sendable {
     let email: String
 }
 
 // MARK: - LoFiOperationsResponse
 
-struct LoFiOperationsResponse: Decodable, Sendable {
+struct LoFiOperationsResponse: Decodable, @unchecked Sendable {
     let operations: [LoFiOperation]
     let meta: LoFiOperationsMetaWrapper
 }
 
 // MARK: - LoFiOperationsMetaWrapper
 
-struct LoFiOperationsMetaWrapper: Decodable, Sendable {
+struct LoFiOperationsMetaWrapper: Decodable, @unchecked Sendable {
     let operations: LoFiOperationsMeta
 }
 
 // MARK: - LoFiOperationsMeta
 
-struct LoFiOperationsMeta: Decodable, Sendable {
+struct LoFiOperationsMeta: Decodable, @unchecked Sendable {
     enum CodingKeys: String, CodingKey {
         case totalRecords = "total_records"
         case syncedUntilMillis = "synced_until_millis"
@@ -133,7 +133,7 @@ struct LoFiOperationsMeta: Decodable, Sendable {
 
 // MARK: - LoFiOperation
 
-struct LoFiOperation: Decodable, Sendable {
+struct LoFiOperation: Decodable, @unchecked Sendable {
     // MARK: Lifecycle
 
     init(from decoder: Decoder) throws {
@@ -219,7 +219,7 @@ struct LoFiOperation: Decodable, Sendable {
 
 // MARK: - LoFiOperationRef
 
-struct LoFiOperationRef: Decodable, Sendable {
+struct LoFiOperationRef: Decodable, @unchecked Sendable {
     enum CodingKeys: String, CodingKey {
         case refType = "type"
         case reference = "ref"
@@ -249,20 +249,20 @@ extension LoFiOperation {
 
 // MARK: - LoFiQsosResponse
 
-struct LoFiQsosResponse: Decodable, Sendable {
+struct LoFiQsosResponse: Decodable, @unchecked Sendable {
     let qsos: [LoFiQso]
     let meta: LoFiQsosMetaWrapper
 }
 
 // MARK: - LoFiQsosMetaWrapper
 
-struct LoFiQsosMetaWrapper: Decodable, Sendable {
+struct LoFiQsosMetaWrapper: Decodable, @unchecked Sendable {
     let qsos: LoFiQsosMeta
 }
 
 // MARK: - LoFiQsosMeta
 
-struct LoFiQsosMeta: Decodable, Sendable {
+struct LoFiQsosMeta: Decodable, @unchecked Sendable {
     enum CodingKeys: String, CodingKey {
         case totalRecords = "total_records"
         case syncedUntilMillis = "synced_until_millis"
@@ -290,7 +290,7 @@ struct LoFiQsosMeta: Decodable, Sendable {
 
 // MARK: - LoFiQso
 
-struct LoFiQso: Decodable, Sendable {
+struct LoFiQso: Decodable, @unchecked Sendable {
     // MARK: Lifecycle
 
     init(from decoder: Decoder) throws {
@@ -362,7 +362,7 @@ struct LoFiQso: Decodable, Sendable {
 
 // MARK: - LoFiTheirInfo
 
-struct LoFiTheirInfo: Decodable, Sendable {
+struct LoFiTheirInfo: Decodable, @unchecked Sendable {
     let call: String?
     let sent: String?
     let guess: LoFiGuessInfo?
@@ -370,14 +370,14 @@ struct LoFiTheirInfo: Decodable, Sendable {
 
 // MARK: - LoFiOurInfo
 
-struct LoFiOurInfo: Decodable, Sendable {
+struct LoFiOurInfo: Decodable, @unchecked Sendable {
     let call: String?
     let sent: String?
 }
 
 // MARK: - LoFiGuessInfo
 
-struct LoFiGuessInfo: Decodable, Sendable {
+struct LoFiGuessInfo: Decodable, @unchecked Sendable {
     enum CodingKeys: String, CodingKey {
         case call
         case name
@@ -407,7 +407,7 @@ struct LoFiGuessInfo: Decodable, Sendable {
 
 // MARK: - LoFiQsoRef
 
-struct LoFiQsoRef: Decodable, Sendable {
+struct LoFiQsoRef: Decodable, @unchecked Sendable {
     enum CodingKeys: String, CodingKey {
         case refType = "type"
         case reference = "ref"

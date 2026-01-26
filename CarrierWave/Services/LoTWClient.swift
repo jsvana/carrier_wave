@@ -32,14 +32,15 @@ struct LoTWFetchedQSO {
 
 // MARK: - LoTWClient
 
-actor LoTWClient {
+@MainActor
+final class LoTWClient {
     // MARK: Internal
 
-    nonisolated let keychain = KeychainHelper.shared
+    let keychain = KeychainHelper.shared
 
     // MARK: - Configuration
 
-    nonisolated var isConfigured: Bool {
+    var isConfigured: Bool {
         (try? keychain.readString(for: KeychainHelper.Keys.lotwUsername)) != nil
             && (try? keychain.readString(for: KeychainHelper.Keys.lotwPassword)) != nil
     }
@@ -106,7 +107,7 @@ actor LoTWClient {
                 year: 2_000, month: 1, day: 1
             ).date!
 
-        var queryItems: [URLQueryItem] = [
+        let queryItems: [URLQueryItem] = [
             URLQueryItem(name: "login", value: credentials.username),
             URLQueryItem(name: "password", value: credentials.password),
             URLQueryItem(name: "qso_query", value: "1"),

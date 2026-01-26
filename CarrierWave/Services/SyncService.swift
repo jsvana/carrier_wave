@@ -47,17 +47,17 @@ class SyncService: ObservableObject {
 
     init(
         modelContext: ModelContext, potaAuthService: POTAAuthService,
-        lofiClient: LoFiClient = LoFiClient(),
-        hamrsClient: HAMRSClient = HAMRSClient(),
-        lotwClient: LoTWClient = LoTWClient()
+        lofiClient: LoFiClient? = nil,
+        hamrsClient: HAMRSClient? = nil,
+        lotwClient: LoTWClient? = nil
     ) {
         self.modelContext = modelContext
         qrzClient = QRZClient()
         self.potaAuthService = potaAuthService
         potaClient = POTAClient(authService: potaAuthService)
-        self.lofiClient = lofiClient
-        self.hamrsClient = hamrsClient
-        self.lotwClient = lotwClient
+        self.lofiClient = lofiClient ?? LoFiClient()
+        self.hamrsClient = hamrsClient ?? HAMRSClient()
+        self.lotwClient = lotwClient ?? LoTWClient()
     }
 
     // MARK: Internal
@@ -287,7 +287,7 @@ class SyncService: ObservableObject {
         }
 
         syncPhase = .downloading(service: .lotw)
-        let rxSince = await lotwClient.getLastQSORxDate()
+        let rxSince = lotwClient.getLastQSORxDate()
         let response = try await withTimeout(seconds: syncTimeoutSeconds, service: .lotw) {
             try await self.lotwClient.fetchQSOs(qsoRxSince: rxSince)
         }
@@ -298,7 +298,7 @@ class SyncService: ObservableObject {
 
         // Save timestamp for incremental sync
         if let lastQSORx = response.lastQSORx {
-            try await lotwClient.saveLastQSORxDate(lastQSORx)
+            try lotwClient.saveLastQSORxDate(lastQSORx)
         }
 
         try modelContext.save()

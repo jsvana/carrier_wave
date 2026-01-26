@@ -1,6 +1,7 @@
 import Foundation
 
-actor HAMRSClient {
+@MainActor
+final class HAMRSClient {
     // MARK: Lifecycle
 
     init() {
@@ -13,11 +14,11 @@ actor HAMRSClient {
 
     // MARK: - Configuration
 
-    nonisolated var isConfigured: Bool {
+    var isConfigured: Bool {
         (try? keychain.readString(for: KeychainHelper.Keys.hamrsApiKey)) != nil
     }
 
-    nonisolated func getApiKey() -> String? {
+    func getApiKey() -> String? {
         try? keychain.readString(for: KeychainHelper.Keys.hamrsApiKey)
     }
 

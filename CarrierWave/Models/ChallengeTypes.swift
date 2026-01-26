@@ -2,7 +2,7 @@ import Foundation
 
 // MARK: - ChallengeType
 
-enum ChallengeType: String, Codable, CaseIterable {
+enum ChallengeType: String, Codable, CaseIterable, @unchecked Sendable {
     case collection
     case cumulative
     case timeBounded
@@ -10,7 +10,7 @@ enum ChallengeType: String, Codable, CaseIterable {
 
 // MARK: - ParticipationStatus
 
-enum ParticipationStatus: String, Codable, CaseIterable {
+enum ParticipationStatus: String, Codable, CaseIterable, @unchecked Sendable {
     case active
     case completed
     case left
@@ -19,7 +19,7 @@ enum ParticipationStatus: String, Codable, CaseIterable {
 
 // MARK: - ChallengeSourceType
 
-enum ChallengeSourceType: String, Codable, CaseIterable {
+enum ChallengeSourceType: String, Codable, CaseIterable, @unchecked Sendable {
     case official
     case community
     case invite
@@ -27,7 +27,7 @@ enum ChallengeSourceType: String, Codable, CaseIterable {
 
 // MARK: - ScoringMethod
 
-enum ScoringMethod: String, Codable, CaseIterable {
+enum ScoringMethod: String, Codable, CaseIterable, @unchecked Sendable {
     case percentage
     case count
     case points
@@ -36,14 +36,14 @@ enum ScoringMethod: String, Codable, CaseIterable {
 
 // MARK: - TimeConstraintType
 
-enum TimeConstraintType: String, Codable {
+enum TimeConstraintType: String, Codable, @unchecked Sendable {
     case calendar
     case relative
 }
 
 // MARK: - ChallengeMetadata
 
-struct ChallengeMetadata: Codable, Equatable {
+struct ChallengeMetadata: Codable, Equatable, @unchecked Sendable {
     var name: String
     var description: String
     var author: String
@@ -53,7 +53,7 @@ struct ChallengeMetadata: Codable, Equatable {
 
 // MARK: - ChallengeGoal
 
-struct ChallengeGoal: Codable, Identifiable, Equatable {
+struct ChallengeGoal: Codable, Identifiable, Equatable, @unchecked Sendable {
     var id: String
     var name: String
     var category: String?
@@ -66,7 +66,7 @@ struct ChallengeGoal: Codable, Identifiable, Equatable {
 
 // MARK: - ChallengeTier
 
-struct ChallengeTier: Codable, Identifiable, Equatable {
+struct ChallengeTier: Codable, Identifiable, Equatable, @unchecked Sendable {
     var id: String
     var name: String
     var threshold: Int
@@ -76,7 +76,7 @@ struct ChallengeTier: Codable, Identifiable, Equatable {
 
 // MARK: - QualificationCriteria
 
-struct QualificationCriteria: Codable, Equatable {
+struct QualificationCriteria: Codable, Equatable, @unchecked Sendable {
     var bands: [String]?
     var modes: [String]?
     var requiredFields: [FieldRequirement]?
@@ -86,7 +86,7 @@ struct QualificationCriteria: Codable, Equatable {
 
 // MARK: - FieldRequirement
 
-struct FieldRequirement: Codable, Equatable {
+struct FieldRequirement: Codable, Equatable, @unchecked Sendable {
     var fieldName: String
     var mustExist: Bool
     var pattern: String?
@@ -94,14 +94,14 @@ struct FieldRequirement: Codable, Equatable {
 
 // MARK: - ChallengeDateRange
 
-struct ChallengeDateRange: Codable, Equatable {
+struct ChallengeDateRange: Codable, Equatable, @unchecked Sendable {
     var startDate: Date
     var endDate: Date
 }
 
 // MARK: - MatchRule
 
-struct MatchRule: Codable, Equatable {
+struct MatchRule: Codable, Equatable, @unchecked Sendable {
     var qsoField: String
     var goalField: String
     var transformation: MatchTransformation?
@@ -110,7 +110,7 @@ struct MatchRule: Codable, Equatable {
 
 // MARK: - MatchTransformation
 
-enum MatchTransformation: String, Codable {
+enum MatchTransformation: String, Codable, @unchecked Sendable {
     case uppercase
     case lowercase
     case stripPrefix
@@ -119,7 +119,7 @@ enum MatchTransformation: String, Codable {
 
 // MARK: - ScoringConfig
 
-struct ScoringConfig: Codable, Equatable {
+struct ScoringConfig: Codable, Equatable, @unchecked Sendable {
     var method: ScoringMethod
     var weights: [WeightRule]?
     var tiebreaker: TiebreakerRule?
@@ -128,14 +128,14 @@ struct ScoringConfig: Codable, Equatable {
 
 // MARK: - WeightRule
 
-struct WeightRule: Codable, Equatable {
+struct WeightRule: Codable, Equatable, @unchecked Sendable {
     var condition: String
     var multiplier: Double
 }
 
 // MARK: - TiebreakerRule
 
-enum TiebreakerRule: String, Codable {
+enum TiebreakerRule: String, Codable, @unchecked Sendable {
     case earliestCompletion
     case mostRecent
     case alphabetical
@@ -143,7 +143,7 @@ enum TiebreakerRule: String, Codable {
 
 // MARK: - TimeConstraints
 
-struct TimeConstraints: Codable, Equatable {
+struct TimeConstraints: Codable, Equatable, @unchecked Sendable {
     var type: TimeConstraintType
     var startDate: Date?
     var endDate: Date?
@@ -153,7 +153,7 @@ struct TimeConstraints: Codable, Equatable {
 
 // MARK: - ChallengeBadge
 
-struct ChallengeBadge: Codable, Identifiable, Equatable {
+struct ChallengeBadge: Codable, Identifiable, Equatable, @unchecked Sendable {
     var id: String
     var name: String
     var description: String
@@ -163,7 +163,7 @@ struct ChallengeBadge: Codable, Identifiable, Equatable {
 
 // MARK: - InviteConfig
 
-struct InviteConfig: Codable, Equatable {
+struct InviteConfig: Codable, Equatable, @unchecked Sendable {
     var maxParticipants: Int?
     var expiresAt: Date?
     var participantCount: Int
@@ -171,7 +171,7 @@ struct InviteConfig: Codable, Equatable {
 
 // MARK: - ChallengeProgress
 
-struct ChallengeProgress: Codable, Equatable {
+struct ChallengeProgress: Codable, Equatable, @unchecked Sendable {
     // MARK: Lifecycle
 
     init(
@@ -202,7 +202,7 @@ struct ChallengeProgress: Codable, Equatable {
 
 // MARK: - LeaderboardEntry
 
-struct LeaderboardEntry: Codable, Identifiable, Equatable {
+struct LeaderboardEntry: Codable, Identifiable, Equatable, @unchecked Sendable {
     var rank: Int
     var callsign: String
     var score: Int
@@ -215,7 +215,7 @@ struct LeaderboardEntry: Codable, Identifiable, Equatable {
 // MARK: - ChallengeConfiguration
 
 /// Combined configuration stored as JSON in ChallengeDefinition
-struct ChallengeConfiguration: Codable, Equatable {
+struct ChallengeConfiguration: Codable, Equatable, @unchecked Sendable {
     var goals: [ChallengeGoal]
     var tiers: [ChallengeTier]?
     var criteria: QualificationCriteria
@@ -228,13 +228,13 @@ struct ChallengeConfiguration: Codable, Equatable {
 
 // MARK: - APIResponse
 
-struct APIResponse<T: Codable>: Codable {
+struct APIResponse<T: Codable>: Codable, @unchecked Sendable {
     var data: T
 }
 
 // MARK: - APIError
 
-struct APIError: Codable {
+struct APIError: Codable, @unchecked Sendable {
     var code: String
     var message: String
     var details: [String: String]?
@@ -242,13 +242,13 @@ struct APIError: Codable {
 
 // MARK: - APIErrorResponse
 
-struct APIErrorResponse: Codable {
+struct APIErrorResponse: Codable, @unchecked Sendable {
     var error: APIError
 }
 
 // MARK: - ChallengeListData
 
-struct ChallengeListData: Codable {
+struct ChallengeListData: Codable, @unchecked Sendable {
     var challenges: [ChallengeListItemDTO]
     var total: Int
     var limit: Int
@@ -257,7 +257,7 @@ struct ChallengeListData: Codable {
 
 // MARK: - ChallengeListItemDTO
 
-struct ChallengeListItemDTO: Codable, Identifiable {
+struct ChallengeListItemDTO: Codable, Identifiable, @unchecked Sendable {
     var id: UUID
     var name: String
     var description: String
@@ -269,7 +269,7 @@ struct ChallengeListItemDTO: Codable, Identifiable {
 
 // MARK: - ChallengeCategory
 
-enum ChallengeCategory: String, Codable, CaseIterable {
+enum ChallengeCategory: String, Codable, CaseIterable, @unchecked Sendable {
     case award
     case event
     case club
@@ -279,7 +279,7 @@ enum ChallengeCategory: String, Codable, CaseIterable {
 
 // MARK: - ChallengeDefinitionDTO
 
-struct ChallengeDefinitionDTO: Codable, Identifiable {
+struct ChallengeDefinitionDTO: Codable, Identifiable, @unchecked Sendable {
     var id: UUID
     var version: Int
     var name: String
@@ -296,7 +296,7 @@ struct ChallengeDefinitionDTO: Codable, Identifiable {
 
 // MARK: - ChallengeConfigurationDTO
 
-struct ChallengeConfigurationDTO: Codable, Equatable {
+struct ChallengeConfigurationDTO: Codable, Equatable, @unchecked Sendable {
     var goals: ChallengeGoalsDTO
     var tiers: [ChallengeTierDTO]?
     var qualificationCriteria: QualificationCriteriaDTO
@@ -306,7 +306,7 @@ struct ChallengeConfigurationDTO: Codable, Equatable {
 
 // MARK: - ChallengeGoalsDTO
 
-struct ChallengeGoalsDTO: Codable, Equatable {
+struct ChallengeGoalsDTO: Codable, Equatable, @unchecked Sendable {
     var type: String
     var items: [ChallengeGoalItemDTO]?
     var target: Int?
@@ -315,14 +315,14 @@ struct ChallengeGoalsDTO: Codable, Equatable {
 
 // MARK: - ChallengeGoalItemDTO
 
-struct ChallengeGoalItemDTO: Codable, Identifiable, Equatable {
+struct ChallengeGoalItemDTO: Codable, Identifiable, Equatable, @unchecked Sendable {
     var id: String
     var name: String
 }
 
 // MARK: - ChallengeTierDTO
 
-struct ChallengeTierDTO: Codable, Identifiable, Equatable {
+struct ChallengeTierDTO: Codable, Identifiable, Equatable, @unchecked Sendable {
     var id: String
     var name: String
     var threshold: Int
@@ -330,7 +330,7 @@ struct ChallengeTierDTO: Codable, Identifiable, Equatable {
 
 // MARK: - QualificationCriteriaDTO
 
-struct QualificationCriteriaDTO: Codable, Equatable {
+struct QualificationCriteriaDTO: Codable, Equatable, @unchecked Sendable {
     var bands: [String]?
     var modes: [String]?
     var requiredFields: [String]?
@@ -340,28 +340,28 @@ struct QualificationCriteriaDTO: Codable, Equatable {
 
 // MARK: - DateRangeDTO
 
-struct DateRangeDTO: Codable, Equatable {
+struct DateRangeDTO: Codable, Equatable, @unchecked Sendable {
     var start: Date
     var end: Date
 }
 
 // MARK: - MatchRuleDTO
 
-struct MatchRuleDTO: Codable, Equatable {
+struct MatchRuleDTO: Codable, Equatable, @unchecked Sendable {
     var qsoField: String
     var goalField: String
 }
 
 // MARK: - ScoringConfigDTO
 
-struct ScoringConfigDTO: Codable, Equatable {
+struct ScoringConfigDTO: Codable, Equatable, @unchecked Sendable {
     var method: String
     var displayFormat: String?
 }
 
 // MARK: - ChallengeBadgeDTO
 
-struct ChallengeBadgeDTO: Codable, Identifiable, Equatable {
+struct ChallengeBadgeDTO: Codable, Identifiable, Equatable, @unchecked Sendable {
     var id: String
     var name: String
     var tierId: String?
@@ -369,7 +369,7 @@ struct ChallengeBadgeDTO: Codable, Identifiable, Equatable {
 
 // MARK: - LeaderboardData
 
-struct LeaderboardData: Codable {
+struct LeaderboardData: Codable, @unchecked Sendable {
     var leaderboard: [LeaderboardEntry]
     var total: Int
     var userPosition: LeaderboardUserPosition?
@@ -378,7 +378,7 @@ struct LeaderboardData: Codable {
 
 // MARK: - LeaderboardUserPosition
 
-struct LeaderboardUserPosition: Codable, Equatable {
+struct LeaderboardUserPosition: Codable, Equatable, @unchecked Sendable {
     var rank: Int
     var callsign: String
     var score: Int
@@ -386,7 +386,7 @@ struct LeaderboardUserPosition: Codable, Equatable {
 
 // MARK: - JoinChallengeRequest
 
-struct JoinChallengeRequest: Codable {
+struct JoinChallengeRequest: Codable, @unchecked Sendable {
     var callsign: String
     var deviceName: String
     var inviteToken: String?
@@ -394,7 +394,7 @@ struct JoinChallengeRequest: Codable {
 
 // MARK: - JoinChallengeData
 
-struct JoinChallengeData: Codable {
+struct JoinChallengeData: Codable, @unchecked Sendable {
     var participationId: UUID
     var deviceToken: String
     var joinedAt: Date
@@ -404,7 +404,7 @@ struct JoinChallengeData: Codable {
 
 // MARK: - ProgressReportRequest
 
-struct ProgressReportRequest: Codable {
+struct ProgressReportRequest: Codable, @unchecked Sendable {
     var completedGoals: [String]
     var currentValue: Int
     var qualifyingQsoCount: Int
@@ -413,7 +413,7 @@ struct ProgressReportRequest: Codable {
 
 // MARK: - ServerProgress
 
-struct ServerProgress: Codable, Equatable {
+struct ServerProgress: Codable, Equatable, @unchecked Sendable {
     var completedGoals: [String]
     var currentValue: Int
     var percentage: Double
@@ -424,7 +424,7 @@ struct ServerProgress: Codable, Equatable {
 
 // MARK: - ProgressReportData
 
-struct ProgressReportData: Codable {
+struct ProgressReportData: Codable, @unchecked Sendable {
     var accepted: Bool
     var serverProgress: ServerProgress
     var newBadges: [String]?
@@ -432,7 +432,7 @@ struct ProgressReportData: Codable {
 
 // MARK: - ParticipatingChallengeDTO
 
-struct ParticipatingChallengeDTO: Codable, Identifiable {
+struct ParticipatingChallengeDTO: Codable, Identifiable, @unchecked Sendable {
     var participationId: UUID
     var challengeId: UUID
     var challengeName: String

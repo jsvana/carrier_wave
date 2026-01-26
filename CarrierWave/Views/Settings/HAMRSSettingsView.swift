@@ -106,8 +106,8 @@ struct HAMRSSettingsView: View {
         } message: {
             Text(errorMessage)
         }
-        .task {
-            await checkStatus()
+        .onAppear {
+            checkStatus()
         }
     }
 
@@ -126,7 +126,7 @@ struct HAMRSSettingsView: View {
 
     private let hamrsClient = HAMRSClient()
 
-    private func checkStatus() async {
+    private func checkStatus() {
         isConfigured = hamrsClient.isConfigured
     }
 
@@ -137,7 +137,7 @@ struct HAMRSSettingsView: View {
         do {
             try await hamrsClient.configure(apiKey: apiKey)
             statusMessage = "Connected successfully"
-            await checkStatus()
+            checkStatus()
         } catch HAMRSError.subscriptionInactive {
             errorMessage = "HAMRS Pro subscription is inactive. Visit hamrs.app to resubscribe."
             showingError = true
@@ -151,12 +151,10 @@ struct HAMRSSettingsView: View {
     }
 
     private func logout() {
-        Task {
-            await hamrsClient.clearCredentials()
-            apiKey = ""
-            statusMessage = ""
-            await checkStatus()
-        }
+        hamrsClient.clearCredentials()
+        apiKey = ""
+        statusMessage = ""
+        checkStatus()
     }
 
     private func forceRedownload() async {

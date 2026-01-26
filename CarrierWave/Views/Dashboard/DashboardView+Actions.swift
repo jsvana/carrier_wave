@@ -4,9 +4,9 @@ import SwiftUI
 // MARK: - DashboardView Actions
 
 extension DashboardView {
-    func loadQRZConfig() async {
-        qrzIsConfigured = await qrzClient.hasApiKey()
-        qrzCallsign = await qrzClient.getCallsign()
+    func loadQRZConfig() {
+        qrzIsConfigured = qrzClient.hasApiKey()
+        qrzCallsign = qrzClient.getCallsign()
     }
 
     /// Refresh service configuration status from Keychain
@@ -170,7 +170,7 @@ extension DashboardView {
             try modelContext.save()
 
             // Reset sync timestamp so QSOs can be re-downloaded
-            await lofiClient.resetSyncTimestamp()
+            lofiClient.resetSyncTimestamp()
 
             lofiSyncResult = "Cleared \(lofiQSOs.count) QSOs"
         } catch {
@@ -195,8 +195,8 @@ extension DashboardView {
         }
     }
 
-    func clearHAMRSCredentials() async {
-        await hamrsClient.clearCredentials()
+    func clearHAMRSCredentials() {
+        hamrsClient.clearCredentials()
         hamrsSyncResult = nil
         refreshServiceStatus()
     }
@@ -218,13 +218,13 @@ extension DashboardView {
         }
     }
 
-    func clearLoTWData() async {
+    func clearLoTWData() {
         isSyncing = true
         lotwSyncResult = "Clearing..."
         defer { isSyncing = false }
 
         // Clear LoTW timestamps to allow re-download
-        await lotwClient.clearCredentials()
+        lotwClient.clearCredentials()
         lotwSyncResult = "Cleared"
         refreshServiceStatus()
     }

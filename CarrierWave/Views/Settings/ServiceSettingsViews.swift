@@ -66,8 +66,8 @@ struct QRZApiKeySheet: View {
         do {
             let client = QRZClient()
             let status = try await client.validateApiKey(apiKey)
-            try await client.saveApiKey(apiKey)
-            try await client.saveCallsign(status.callsign)
+            try client.saveApiKey(apiKey)
+            try client.saveCallsign(status.callsign)
             callsign = status.callsign
             isAuthenticated = true
             dismiss()
@@ -166,7 +166,7 @@ struct QRZSettingsView: View {
         } message: {
             Text(errorMessage)
         }
-        .task { await checkStatus() }
+        .onAppear { checkStatus() }
     }
 
     // MARK: Private
@@ -184,16 +184,14 @@ struct QRZSettingsView: View {
 
     private let qrzClient = QRZClient()
 
-    private func checkStatus() async {
-        isAuthenticated = await qrzClient.hasApiKey()
-        callsign = await qrzClient.getCallsign()
+    private func checkStatus() {
+        isAuthenticated = qrzClient.hasApiKey()
+        callsign = qrzClient.getCallsign()
     }
 
     private func logout() {
-        Task {
-            await qrzClient.logout()
-            await checkStatus()
-        }
+        qrzClient.logout()
+        checkStatus()
     }
 
     private func forceRedownload() async {

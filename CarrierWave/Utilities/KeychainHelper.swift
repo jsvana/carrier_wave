@@ -3,7 +3,7 @@ import Security
 
 // MARK: - KeychainError
 
-enum KeychainError: Error {
+enum KeychainError: Error, Sendable {
     case duplicateItem
     case itemNotFound
     case unexpectedStatus(OSStatus)
@@ -14,6 +14,7 @@ enum KeychainError: Error {
 
 /// Thread-safe keychain access helper.
 /// Keychain APIs are thread-safe at the OS level, so this type is safe to use from any context.
+/// All methods are nonisolated since Security framework APIs are thread-safe.
 struct KeychainHelper: Sendable {
     // MARK: Lifecycle
 
@@ -23,7 +24,7 @@ struct KeychainHelper: Sendable {
 
     static let shared = KeychainHelper()
 
-    func save(_ data: Data, for key: String) throws {
+    nonisolated func save(_ data: Data, for key: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -41,14 +42,14 @@ struct KeychainHelper: Sendable {
         }
     }
 
-    func save(_ string: String, for key: String) throws {
+    nonisolated func save(_ string: String, for key: String) throws {
         guard let data = string.data(using: .utf8) else {
             throw KeychainError.invalidData
         }
         try save(data, for: key)
     }
 
-    func read(for key: String) throws -> Data {
+    nonisolated func read(for key: String) throws -> Data {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
@@ -74,7 +75,7 @@ struct KeychainHelper: Sendable {
         return data
     }
 
-    func readString(for key: String) throws -> String {
+    nonisolated func readString(for key: String) throws -> String {
         let data = try read(for: key)
         guard let string = String(data: data, encoding: .utf8) else {
             throw KeychainError.invalidData
@@ -82,7 +83,7 @@ struct KeychainHelper: Sendable {
         return string
     }
 
-    func delete(for key: String) throws {
+    nonisolated func delete(for key: String) throws {
         let query: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,

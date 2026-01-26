@@ -6,9 +6,9 @@ import SwiftData
 final class ChallengesSyncService: ObservableObject {
     // MARK: Lifecycle
 
-    init(modelContext: ModelContext, client: ChallengesClient = ChallengesClient()) {
+    init(modelContext: ModelContext, client: ChallengesClient? = nil) {
         self.modelContext = modelContext
-        self.client = client
+        self.client = client ?? ChallengesClient()
         progressEngine = ChallengeProgressEngine(modelContext: modelContext)
     }
 

@@ -35,7 +35,8 @@ enum LoFiError: Error, LocalizedError {
 
 // MARK: - LoFiClient
 
-actor LoFiClient {
+@MainActor
+final class LoFiClient {
     // MARK: Lifecycle
 
     init() {
@@ -51,33 +52,33 @@ actor LoFiClient {
     let baseURL = "https://lofi.ham2k.net"
     let clientName = "CarrierWave"
     let appName = "CarrierWave"
-    nonisolated let keychain = KeychainHelper.shared
+    let keychain = KeychainHelper.shared
     let session: URLSession
 
     // MARK: - Configuration
 
-    nonisolated var isConfigured: Bool {
+    var isConfigured: Bool {
         (try? keychain.readString(for: KeychainHelper.Keys.lofiClientKey)) != nil
             && (try? keychain.readString(for: KeychainHelper.Keys.lofiCallsign)) != nil
     }
 
-    nonisolated var isLinked: Bool {
+    var isLinked: Bool {
         (try? keychain.readString(for: KeychainHelper.Keys.lofiDeviceLinked)) == "true"
     }
 
-    nonisolated var hasToken: Bool {
+    var hasToken: Bool {
         (try? keychain.readString(for: KeychainHelper.Keys.lofiAuthToken)) != nil
     }
 
-    nonisolated func getCallsign() -> String? {
+    func getCallsign() -> String? {
         try? keychain.readString(for: KeychainHelper.Keys.lofiCallsign)
     }
 
-    nonisolated func getEmail() -> String? {
+    func getEmail() -> String? {
         try? keychain.readString(for: KeychainHelper.Keys.lofiEmail)
     }
 
-    nonisolated func getLastSyncMillis() -> Int64 {
+    func getLastSyncMillis() -> Int64 {
         guard let str = try? keychain.readString(for: KeychainHelper.Keys.lofiLastSyncMillis),
               let value = Int64(str)
         else {

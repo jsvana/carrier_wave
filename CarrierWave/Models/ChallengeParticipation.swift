@@ -1,6 +1,15 @@
 import Foundation
 import SwiftData
 
+/// Nonisolated helper functions to work around @MainActor Codable conformance issues
+private func decodeProgress(from data: Data) -> ChallengeProgress? {
+    try? JSONDecoder().decode(ChallengeProgress.self, from: data)
+}
+
+private func encodeProgress(_ progress: ChallengeProgress) -> Data? {
+    try? JSONEncoder().encode(progress)
+}
+
 // MARK: - ChallengeParticipation
 
 @Model
@@ -71,11 +80,10 @@ final class ChallengeParticipation {
             guard let data = progressData else {
                 return ChallengeProgress()
             }
-            return (try? JSONDecoder().decode(ChallengeProgress.self, from: data))
-                ?? ChallengeProgress()
+            return decodeProgress(from: data) ?? ChallengeProgress()
         }
         set {
-            progressData = try? JSONEncoder().encode(newValue)
+            progressData = encodeProgress(newValue)
             needsSync = true
         }
     }

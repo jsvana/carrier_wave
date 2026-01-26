@@ -70,13 +70,14 @@ struct QRZFetchedQSO {
 
 // MARK: - QRZClient
 
-actor QRZClient {
+@MainActor
+final class QRZClient {
     // MARK: Internal
 
     // MARK: Internal (for extension access)
 
     let baseURL = "https://logbook.qrz.com/api"
-    nonisolated let keychain = KeychainHelper.shared
+    let keychain = KeychainHelper.shared
     let userAgent = "CarrierWave/1.0"
 
     // MARK: - Response Parsing
