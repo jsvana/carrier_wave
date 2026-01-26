@@ -184,6 +184,17 @@ Uses SwiftLint (`.swiftlint.yml`) and SwiftFormat (`.swiftformat`).
 
 See [docs/SETUP.md](docs/SETUP.md) for device builds and additional commands.
 
+## Version Updates
+
+When releasing a new version, update **both** locations:
+
+1. **Xcode project** (`CarrierWave.xcodeproj/project.pbxproj`):
+   - `MARKETING_VERSION` - The user-facing version (e.g., "1.2.0")
+   - `CURRENT_PROJECT_VERSION` - The build number (increment for each build)
+
+2. **Settings view** (`CarrierWave/Views/Settings/SettingsView.swift`):
+   - Update the hardcoded version string in the "About" section (~line 232)
+
 ## Issue Tracking
 
 This project uses **bd** (beads). Work is NOT complete until `git push` succeeds.
