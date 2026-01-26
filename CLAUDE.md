@@ -127,7 +127,6 @@
 | `LoTWSettingsView.swift` | LoTW login configuration |
 | `ChallengesSettingsView.swift` | Challenges feature settings |
 | `POTAAuthWebView.swift` | POTA OAuth WebView |
-| `POTACredentialsView.swift` | POTA credentials entry for auto-login |
 | `SyncDebugView.swift` | Sync debugging interface |
 | `AttributionsView.swift` | Third-party attributions |
 

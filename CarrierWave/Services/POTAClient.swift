@@ -478,10 +478,13 @@ final class POTAClient {
 
         let myState = activation.locationDesc?.split(separator: "-").last.map(String.init)
 
+        // Use mySigInfo from the QSO if available (more accurate), fall back to activation reference
+        let parkRef = qso.mySigInfo.nonEmpty ?? activation.reference
+
         return POTAFetchedQSO(
             callsign: qso.workedCallsign, band: band, mode: mode, timestamp: timestamp,
             rstSent: qso.rstSent, rstReceived: qso.rstRcvd,
-            myCallsign: qso.stationCallsign, parkReference: activation.reference,
+            myCallsign: qso.stationCallsign, parkReference: parkRef,
             myState: myState, potaQsoId: qso.qsoId
         )
     }

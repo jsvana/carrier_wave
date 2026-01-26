@@ -194,10 +194,10 @@ struct QRZSettingsView: View {
         checkStatus()
     }
 
+    @MainActor
     private func forceRedownload() async {
         isRedownloading = true
         redownloadResult = nil
-        defer { isRedownloading = false }
 
         do {
             let result = try await syncService.forceRedownloadFromQRZ()
@@ -205,6 +205,8 @@ struct QRZSettingsView: View {
         } catch {
             redownloadResult = "Error: \(error.localizedDescription)"
         }
+
+        isRedownloading = false
     }
 }
 
@@ -237,55 +239,53 @@ struct POTASettingsView: View {
                 } header: {
                     Text("Status")
                 } footer: {
-                    if token.isExpiringSoon() {
-                        Text("Session expiring soon. It will auto-refresh on next sync.")
-                    }
+                    Text("Session will auto-refresh using saved credentials.")
                 }
+            }
 
-                Section {
-                    NavigationLink("Login Credentials") {
-                        POTACredentialsView(authService: potaAuth)
-                    }
-                } footer: {
-                    Text("Update your saved credentials for automatic login.")
-                }
+            Section {
+                TextField("Email", text: $username)
+                    .textContentType(.emailAddress)
+                    .autocapitalization(.none)
+                    .keyboardType(.emailAddress)
+                    .autocorrectionDisabled()
 
-                Section { Button("Logout", role: .destructive) { potaAuth.logout() } }
-            } else {
-                Section {
-                    Text("Connect your POTA account to sync activations and hunter QSOs.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
+                SecureField("Password", text: $password)
+                    .textContentType(.password)
+            } header: {
+                Text("Credentials")
+            } footer: {
+                Text("Your credentials are stored securely and used to automatically log in.")
+            }
 
-                    NavigationLink("Save Credentials & Login") {
-                        POTACredentialsView(authService: potaAuth)
-                    }
-
-                    Button("Manual Login (WebView)") {
-                        showingLogin = true
-                        Task {
-                            do {
-                                _ = try await potaAuth.authenticate()
-                                showingLogin = false
-                            } catch {
-                                showingLogin = false
-                                errorMessage = error.localizedDescription
-                                showingError = true
-                            }
+            Section {
+                Button {
+                    Task { await testLogin() }
+                } label: {
+                    if isTesting {
+                        HStack {
+                            ProgressView()
+                                .padding(.trailing, 4)
+                            Text("Testing...")
                         }
+                        .frame(maxWidth: .infinity)
+                    } else {
+                        Text("Test Login")
+                            .frame(maxWidth: .infinity)
                     }
-                } header: {
-                    Text("Setup")
-                } footer: {
-                    Text(
-                        "Save your credentials for automatic login, or use manual login if you prefer."
-                    )
                 }
+                .disabled(username.isEmpty || password.isEmpty || isTesting)
+            }
 
+            if potaAuth.isAuthenticated {
                 Section {
-                    Link(destination: URL(string: "https://pota.app")!) {
-                        Label("Visit POTA Website", systemImage: "arrow.up.right.square")
-                    }
+                    Button("Logout", role: .destructive) { logout() }
+                }
+            }
+
+            Section {
+                Link(destination: URL(string: "https://pota.app")!) {
+                    Label("Visit POTA Website", systemImage: "arrow.up.right.square")
                 }
             }
 
@@ -321,13 +321,16 @@ struct POTASettingsView: View {
             }
         }
         .navigationTitle("POTA")
-        .sheet(isPresented: $showingLogin) {
-            POTALoginSheet(authService: potaAuth)
-        }
-        .alert("Error", isPresented: $showingError) {
+        .onAppear { loadExistingCredentials() }
+        .alert("Error", isPresented: $showError) {
             Button("OK") {}
         } message: {
             Text(errorMessage)
+        }
+        .alert("Success", isPresented: $showSuccess) {
+            Button("OK") {}
+        } message: {
+            Text("Login successful! Credentials saved.")
         }
     }
 
@@ -335,16 +338,49 @@ struct POTASettingsView: View {
 
     @AppStorage("debugMode") private var debugMode = false
     @EnvironmentObject private var syncService: SyncService
-    @State private var showingLogin = false
-    @State private var showingError = false
+    @State private var username = ""
+    @State private var password = ""
+    @State private var isTesting = false
+    @State private var showError = false
     @State private var errorMessage = ""
+    @State private var showSuccess = false
     @State private var isRedownloading = false
     @State private var redownloadResult: String?
 
+    private func loadExistingCredentials() {
+        if let savedUsername = potaAuth.getStoredUsername() {
+            username = savedUsername
+        }
+    }
+
+    private func testLogin() async {
+        isTesting = true
+        defer { isTesting = false }
+
+        do {
+            // Try to login with entered credentials
+            _ = try await potaAuth.performHeadlessLogin(username: username, password: password)
+
+            // Login succeeded - save credentials
+            try potaAuth.saveCredentials(username: username, password: password)
+
+            showSuccess = true
+        } catch {
+            errorMessage = error.localizedDescription
+            showError = true
+        }
+    }
+
+    private func logout() {
+        potaAuth.logout()
+        username = ""
+        password = ""
+    }
+
+    @MainActor
     private func forceRedownload() async {
         isRedownloading = true
         redownloadResult = nil
-        defer { isRedownloading = false }
 
         do {
             let result = try await syncService.forceRedownloadFromPOTA()
@@ -352,5 +388,7 @@ struct POTASettingsView: View {
         } catch {
             redownloadResult = "Error: \(error.localizedDescription)"
         }
+
+        isRedownloading = false
     }
 }

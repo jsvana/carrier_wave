@@ -49,11 +49,12 @@ struct ADIFParser {
         var records: [ADIFRecord] = []
 
         // Find header end if present
-        let workingContent: String = if let headerEnd = content.range(of: "<eoh>", options: .caseInsensitive) {
-            String(content[headerEnd.upperBound...])
-        } else {
-            content
-        }
+        let workingContent: String =
+            if let headerEnd = content.range(of: "<eoh>", options: .caseInsensitive) {
+                String(content[headerEnd.upperBound...])
+            } else {
+                content
+            }
 
         // Split by <eor> (end of record)
         let rawRecords = workingContent.split(separator: "<eor>", omittingEmptySubsequences: true)
@@ -87,8 +88,8 @@ struct ADIFParser {
                 myCallsign: fields["station_callsign"] ?? fields["operator"],
                 myGridsquare: fields["my_gridsquare"],
                 gridsquare: fields["gridsquare"],
-                sigInfo: fields["sig_info"],
-                mySigInfo: fields["my_sig_info"] ?? fields["pota_ref"],
+                sigInfo: fields["sig_info"] ?? fields["pota_ref"],
+                mySigInfo: fields["my_sig_info"],
                 comment: fields["comment"] ?? fields["notes"],
                 rawADIF: "<" + trimmed + "<eor>"
             )
@@ -106,12 +107,15 @@ struct ADIFParser {
 
         // Pattern: <fieldname:length>value or <fieldname:length:type>value
         let pattern = #"<(\w+):(\d+)(?::\w)?>"#
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive) else {
+        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive)
+        else {
             return fields
         }
 
         let nsString = record as NSString
-        let matches = regex.matches(in: record, range: NSRange(location: 0, length: nsString.length))
+        let matches = regex.matches(
+            in: record, range: NSRange(location: 0, length: nsString.length)
+        )
 
         for match in matches {
             guard match.numberOfRanges >= 3 else {

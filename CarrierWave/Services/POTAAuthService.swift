@@ -174,16 +174,12 @@ class POTAAuthService: NSObject, ObservableObject {
 
         // Try headless refresh if credentials are stored
         if hasStoredCredentials() {
-            do {
-                let newToken = try await authenticateWithStoredCredentials()
-                return newToken.idToken
-            } catch {
-                // Fall through to manual authentication
-            }
+            let newToken = try await authenticateWithStoredCredentials()
+            return newToken.idToken
         }
 
-        let newToken = try await authenticate()
-        return newToken.idToken
+        // No stored credentials - require manual setup
+        throw POTAAuthError.noStoredCredentials
     }
 
     // MARK: - Headless Authentication
@@ -192,6 +188,17 @@ class POTAAuthService: NSObject, ObservableObject {
     func hasStoredCredentials() -> Bool {
         (try? keychain.readString(for: KeychainHelper.Keys.potaUsername)) != nil
             && (try? keychain.readString(for: KeychainHelper.Keys.potaPassword)) != nil
+    }
+
+    /// Save credentials for automatic login
+    func saveCredentials(username: String, password: String) throws {
+        try keychain.save(username, for: KeychainHelper.Keys.potaUsername)
+        try keychain.save(password, for: KeychainHelper.Keys.potaPassword)
+    }
+
+    /// Get the stored username (for display purposes)
+    func getStoredUsername() -> String? {
+        try? keychain.readString(for: KeychainHelper.Keys.potaUsername)
     }
 
     /// Authenticates using stored credentials without user interaction

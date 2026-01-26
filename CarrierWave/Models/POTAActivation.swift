@@ -36,6 +36,10 @@ enum POTAActivationStatus {
 struct POTAActivation: Identifiable {
     // MARK: Internal
 
+    /// Modes that represent activation metadata, not actual QSOs (from Ham2K PoLo)
+    /// These should never be uploaded to POTA or counted as QSOs
+    static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
+
     let parkReference: String
     let utcDate: Date
     let callsign: String
@@ -79,8 +83,11 @@ struct POTAActivation: Identifiable {
         let calendar = Calendar(identifier: .gregorian)
         let utc = TimeZone(identifier: "UTC")!
 
-        // Filter to QSOs with park references
-        let parkQSOs = qsos.filter { $0.parkReference?.isEmpty == false }
+        // Filter to QSOs with park references, excluding metadata modes (WEATHER, SOLAR, NOTE)
+        let parkQSOs = qsos.filter {
+            $0.parkReference?.isEmpty == false
+                && !metadataModes.contains($0.mode.uppercased())
+        }
 
         // Group by (park, utcDate, callsign)
         var groups: [String: [QSO]] = [:]

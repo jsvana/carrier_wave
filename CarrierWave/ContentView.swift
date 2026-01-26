@@ -55,11 +55,18 @@ struct ContentView: View {
                 }
                 .tag(AppTab.challenges)
 
-            SettingsMainView(potaAuth: potaAuthService)
-                .tabItem {
-                    Label("Settings", systemImage: "gear")
+            Group {
+                if let syncService {
+                    SettingsMainView(potaAuth: potaAuthService)
+                        .environmentObject(syncService)
+                } else {
+                    SettingsMainView(potaAuth: potaAuthService)
                 }
-                .tag(AppTab.settings)
+            }
+            .tabItem {
+                Label("Settings", systemImage: "gear")
+            }
+            .tag(AppTab.settings)
         }
         .onAppear {
             iCloudMonitor.startMonitoring()

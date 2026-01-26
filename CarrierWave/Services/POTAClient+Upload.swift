@@ -23,6 +23,9 @@ struct POTAFormFields {
 // MARK: - POTAClient Upload Methods
 
 extension POTAClient {
+    /// Modes that represent activation metadata, not actual QSOs (from Ham2K PoLo)
+    static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
+
     /// Validate park reference format (e.g., "K-1234", "VE-1234", "US-1234")
     func validateParkReference(_ parkReference: String) -> Bool {
         let parkPattern = #"^[A-Za-z]{1,4}-\d{1,6}$"#
@@ -38,8 +41,11 @@ extension POTAClient {
         let debugLog = SyncDebugLog.shared
         let normalizedParkRef = parkReference.uppercased()
 
-        // Filter QSOs for this park
-        let parkQSOs = qsos.filter { $0.parkReference?.uppercased() == normalizedParkRef }
+        // Filter QSOs for this park, excluding metadata modes (WEATHER, SOLAR, NOTE)
+        let parkQSOs = qsos.filter {
+            $0.parkReference?.uppercased() == normalizedParkRef
+                && !Self.metadataModes.contains($0.mode.uppercased())
+        }
         guard !parkQSOs.isEmpty else {
             debugLog.info("No QSOs to upload for park \(normalizedParkRef)", service: .pota)
             return nil

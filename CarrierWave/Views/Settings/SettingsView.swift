@@ -10,6 +10,7 @@ struct SettingsMainView: View {
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var showingClearAllConfirmation = false
+    @State private var isClearingQSOs = false
     @State private var dedupeTimeWindow = 5
     @State private var isDeduplicating = false
     @State private var showingDedupeResult = false
@@ -207,9 +208,19 @@ struct SettingsMainView: View {
                             Label("Sync Debug Log", systemImage: "doc.text.magnifyingglass")
                         }
 
-                        Button("Clear All QSOs", role: .destructive) {
+                        Button(role: .destructive) {
                             showingClearAllConfirmation = true
+                        } label: {
+                            if isClearingQSOs {
+                                HStack {
+                                    ProgressView()
+                                    Text("Clearing...")
+                                }
+                            } else {
+                                Text("Clear All QSOs")
+                            }
                         }
+                        .disabled(isClearingQSOs)
                     }
                 } header: {
                     Text("Developer")
@@ -269,21 +280,12 @@ struct SettingsMainView: View {
     }
 
     private func clearAllQSOs() async {
+        isClearingQSOs = true
+        defer { isClearingQSOs = false }
+
         do {
-            // Delete all ServicePresence records first (due to relationships)
-            let presenceDescriptor = FetchDescriptor<ServicePresence>()
-            let allPresence = try modelContext.fetch(presenceDescriptor)
-            for presence in allPresence {
-                modelContext.delete(presence)
-            }
-
-            // Delete all QSOs
-            let qsoDescriptor = FetchDescriptor<QSO>()
-            let allQSOs = try modelContext.fetch(qsoDescriptor)
-            for qso in allQSOs {
-                modelContext.delete(qso)
-            }
-
+            // Use batch deletion - cascade delete rule handles ServicePresence
+            try modelContext.delete(model: QSO.self)
             try modelContext.save()
 
             // Reset LoFi sync timestamp so QSOs can be re-downloaded

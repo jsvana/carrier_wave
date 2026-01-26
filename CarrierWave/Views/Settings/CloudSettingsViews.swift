@@ -255,10 +255,10 @@ struct LoFiSettingsView: View {
         checkStatus()
     }
 
+    @MainActor
     private func forceRedownload() async {
         isRedownloading = true
         redownloadResult = nil
-        defer { isRedownloading = false }
 
         do {
             let result = try await syncService.forceRedownloadFromLoFi()
@@ -266,5 +266,7 @@ struct LoFiSettingsView: View {
         } catch {
             redownloadResult = "Error: \(error.localizedDescription)"
         }
+
+        isRedownloading = false
     }
 }
