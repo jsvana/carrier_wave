@@ -52,12 +52,18 @@ struct POTAActivationsContentView: View {
             if isAuthenticated, jobs.isEmpty {
                 Task { await refreshJobs() }
             }
+            startMaintenanceTimer()
+        }
+        .onDisappear {
+            stopMaintenanceTimer()
         }
     }
 
     // MARK: Private
 
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("debugMode") private var debugMode = false
+    @AppStorage("bypassPOTAMaintenance") private var bypassMaintenance = false
     @Query(filter: #Predicate<QSO> { $0.parkReference != nil })
     private var allParkQSOs: [QSO]
 
@@ -65,6 +71,15 @@ struct POTAActivationsContentView: View {
     @State private var isLoading = false
     @State private var errorMessage: String?
     @State private var activationToUpload: POTAActivation?
+    @State private var maintenanceTimeRemaining: String?
+    @State private var maintenanceTimer: Timer?
+
+    private var isInMaintenance: Bool {
+        if debugMode, bypassMaintenance {
+            return false
+        }
+        return POTAClient.isInMaintenanceWindow()
+    }
 
     private var isAuthenticated: Bool {
         potaAuth.isAuthenticated
@@ -97,8 +112,38 @@ struct POTAActivationsContentView: View {
     }
 
     @ViewBuilder
+    private var maintenanceBanner: some View {
+        HStack {
+            Image(systemName: "wrench.and.screwdriver")
+                .foregroundStyle(.orange)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("POTA Maintenance Window")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+                if let remaining = maintenanceTimeRemaining {
+                    Text("Uploads disabled. Resumes in \(remaining)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Uploads temporarily disabled (2330-0400 UTC)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            Spacer()
+        }
+        .padding(.vertical, 4)
+    }
+
+    @ViewBuilder
     private var activationsList: some View {
         List {
+            if isInMaintenance {
+                Section {
+                    maintenanceBanner
+                }
+            }
+
             if let error = errorMessage {
                 Section {
                     HStack {
@@ -120,6 +165,7 @@ struct POTAActivationsContentView: View {
                     ForEach(parkGroup.activations) { activation in
                         ActivationRow(
                             activation: activation,
+                            isUploadDisabled: isInMaintenance,
                             onUploadTapped: { activationToUpload = activation }
                         )
                     }
@@ -137,6 +183,22 @@ struct POTAActivationsContentView: View {
         .refreshable {
             await refreshJobs()
         }
+    }
+
+    private func startMaintenanceTimer() {
+        updateMaintenanceTime()
+        maintenanceTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
+            updateMaintenanceTime()
+        }
+    }
+
+    private func stopMaintenanceTimer() {
+        maintenanceTimer?.invalidate()
+        maintenanceTimer = nil
+    }
+
+    private func updateMaintenanceTime() {
+        maintenanceTimeRemaining = POTAClient.formatMaintenanceTimeRemaining()
     }
 
     private func parkName(for reference: String) -> String? {
@@ -206,6 +268,7 @@ private struct ActivationRow: View {
     // MARK: Internal
 
     let activation: POTAActivation
+    var isUploadDisabled: Bool = false
     let onUploadTapped: () -> Void
 
     var body: some View {
@@ -235,6 +298,7 @@ private struct ActivationRow: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .controlSize(.small)
+                .disabled(isUploadDisabled)
             }
         }
         .padding(.vertical, 4)

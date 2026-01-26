@@ -17,6 +17,7 @@ struct SettingsMainView: View {
 
     @AppStorage("debugMode") private var debugMode = false
     @AppStorage("readOnlyMode") private var readOnlyMode = false
+    @AppStorage("bypassPOTAMaintenance") private var bypassPOTAMaintenance = false
 
     private let lofiClient = LoFiClient()
     private let qrzClient = QRZClient()
@@ -198,6 +199,7 @@ struct SettingsMainView: View {
 
                     if debugMode {
                         Toggle("Read-Only Mode", isOn: $readOnlyMode)
+                        Toggle("Bypass POTA Maintenance", isOn: $bypassPOTAMaintenance)
 
                         NavigationLink {
                             SyncDebugView()
@@ -212,7 +214,9 @@ struct SettingsMainView: View {
                 } header: {
                     Text("Developer")
                 } footer: {
-                    if debugMode, readOnlyMode {
+                    if debugMode, bypassPOTAMaintenance {
+                        Text("POTA maintenance window bypass enabled. Uploads allowed 24/7.")
+                    } else if debugMode, readOnlyMode {
                         Text(
                             "Read-only mode: uploads disabled. Downloads and local changes still work."
                         )
