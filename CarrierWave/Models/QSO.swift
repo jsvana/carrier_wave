@@ -108,7 +108,7 @@ final class QSO {
     /// Deduplication key: callsign + band + mode + timestamp (rounded to 2 min)
     var deduplicationKey: String {
         let roundedTimestamp = timestamp.timeIntervalSince1970
-        let rounded = Int(roundedTimestamp / 120) * 120 // 2 minute buckets
+        let rounded = Int(roundedTimestamp / 120) * 120  // 2 minute buckets
         return "\(callsign.uppercased())|\(band.uppercased())|\(mode.uppercased())|\(rounded)"
     }
 
@@ -144,7 +144,7 @@ final class QSO {
 
     /// Check if this is likely a US station (for state counting)
     var isUSStation: Bool {
-        dxccEntity?.number == 291 // United States DXCC number
+        dxccEntity?.number == 291  // United States DXCC number
     }
 
     /// Count of populated optional fields (for deduplication tiebreaker)
@@ -206,9 +206,16 @@ final class QSO {
         servicePresence.filter(\.isPresent).count
     }
 
-    /// Date only (for activity tracking)
+    /// Date only in local timezone (for activity tracking)
     var dateOnly: Date {
         Calendar.current.startOfDay(for: timestamp)
+    }
+
+    /// Date only in UTC (for POTA activation grouping - activations are defined by UTC date)
+    var utcDateOnly: Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(identifier: "UTC")!
+        return calendar.startOfDay(for: timestamp)
     }
 
     // MARK: - Service Presence Helpers
@@ -253,6 +260,29 @@ final class QSO {
             }
         } else {
             let newPresence = ServicePresence.needsUpload(to: service, qso: self)
+            context.insert(newPresence)
+            servicePresence.append(newPresence)
+        }
+    }
+
+    /// Check if upload to a service was rejected by the user
+    func isUploadRejected(for service: ServiceType) -> Bool {
+        presence(for: service)?.uploadRejected ?? false
+    }
+
+    /// Mark QSO upload as rejected for a service
+    func markUploadRejected(for service: ServiceType, context: ModelContext) {
+        if let existing = presence(for: service) {
+            existing.uploadRejected = true
+            existing.needsUpload = false
+        } else {
+            let newPresence = ServicePresence(
+                serviceType: service,
+                isPresent: false,
+                needsUpload: false,
+                uploadRejected: true,
+                qso: self
+            )
             context.insert(newPresence)
             servicePresence.append(newPresence)
         }

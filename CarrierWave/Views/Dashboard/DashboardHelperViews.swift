@@ -30,24 +30,36 @@ struct QSOStatistics {
         Set(qsos.compactMap(\.parkReference).filter { !$0.isEmpty }).count
     }
 
+    /// Modes that represent activation metadata, not actual QSOs (from Ham2K PoLo)
+    /// These should never be counted as QSOs for activation purposes
+    private static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
+
     /// Activations with 10+ QSOs (valid POTA activations)
-    /// Each activation is a unique park+date combination
+    /// Each activation is a unique park+UTC date combination
     var successfulActivations: Int {
-        let parksOnly = qsos.filter { $0.parkReference != nil && !$0.parkReference!.isEmpty }
-        // Group by park + date (each day at a park is a separate activation)
+        // Filter to QSOs with park references, excluding metadata modes
+        let parksOnly = qsos.filter {
+            $0.parkReference != nil && !$0.parkReference!.isEmpty
+                && !Self.metadataModes.contains($0.mode.uppercased())
+        }
+        // Group by park + UTC date (each UTC day at a park is a separate activation)
         let grouped = Dictionary(grouping: parksOnly) { qso in
-            "\(qso.parkReference!)|\(qso.dateOnly.timeIntervalSince1970)"
+            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
         }
         return grouped.values.filter { $0.count >= 10 }.count
     }
 
     /// Activations with <10 QSOs (activation attempts)
-    /// Each activation is a unique park+date combination
+    /// Each activation is a unique park+UTC date combination
     var attemptedActivations: Int {
-        let parksOnly = qsos.filter { $0.parkReference != nil && !$0.parkReference!.isEmpty }
-        // Group by park + date (each day at a park is a separate activation)
+        // Filter to QSOs with park references, excluding metadata modes
+        let parksOnly = qsos.filter {
+            $0.parkReference != nil && !$0.parkReference!.isEmpty
+                && !Self.metadataModes.contains($0.mode.uppercased())
+        }
+        // Group by park + UTC date (each UTC day at a park is a separate activation)
         let grouped = Dictionary(grouping: parksOnly) { qso in
-            "\(qso.parkReference!)|\(qso.dateOnly.timeIntervalSince1970)"
+            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
         }
         return grouped.values.filter { $0.count < 10 }.count
     }
@@ -131,22 +143,28 @@ struct QSOStatistics {
     }
 
     private func groupedByPark() -> [StatCategoryItem] {
-        let parksOnly = qsos.filter { $0.parkReference != nil && !$0.parkReference!.isEmpty }
-        // Group by park + date (each day at a park is a separate activation)
+        // Filter to QSOs with park references, excluding metadata modes
+        let parksOnly = qsos.filter {
+            $0.parkReference != nil && !$0.parkReference!.isEmpty
+                && !Self.metadataModes.contains($0.mode.uppercased())
+        }
+        // Group by park + UTC date (each UTC day at a park is a separate activation)
         let grouped = Dictionary(grouping: parksOnly) { qso in
-            "\(qso.parkReference!)|\(qso.dateOnly.timeIntervalSince1970)"
+            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
         }
         let dateFormatter = DateFormatter()
         dateFormatter.dateStyle = .medium
         dateFormatter.timeStyle = .none
+        dateFormatter.timeZone = TimeZone(identifier: "UTC")
         return grouped.map { _, qsos in
             let park = qsos.first?.parkReference ?? "Unknown"
-            let date = qsos.first?.dateOnly ?? Date()
+            let date = qsos.first?.utcDateOnly ?? Date()
             let status = qsos.count >= 10 ? "✓" : "(\(qsos.count)/10)"
             return StatCategoryItem(
                 identifier: "\(park) - \(dateFormatter.string(from: date))",
                 description: status,
-                qsos: qsos
+                qsos: qsos,
+                date: date
             )
         }
     }
@@ -219,9 +237,9 @@ struct ActivityGrid: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top, spacing: spacing) {
-                    ForEach(0 ..< columns, id: \.self) { column in
+                    ForEach(0..<columns, id: \.self) { column in
                         VStack(spacing: spacing) {
-                            ForEach(0 ..< rows, id: \.self) { row in
+                            ForEach(0..<rows, id: \.self) { row in
                                 let date = dateFor(column: column, row: row)
                                 let count = activityData[date] ?? 0
 
@@ -312,7 +330,7 @@ struct ActivityGrid: View {
         var labels: [(Int, String)] = []
         var lastMonth = -1
 
-        for column in 0 ..< columns {
+        for column in 0..<columns {
             let date = dateFor(column: column, row: 0)
             let month = calendar.component(.month, from: date)
 
@@ -425,8 +443,8 @@ struct SyncStatusOverlay: View {
             return false
         }
         switch phase {
-        case let .downloading(svc),
-             let .uploading(svc):
+        case .downloading(let svc),
+            .uploading(let svc):
             return svc == service
         case .processing:
             return true
@@ -438,9 +456,9 @@ struct SyncStatusOverlay: View {
             return ""
         }
         switch phase {
-        case let .downloading(svc) where svc == service:
+        case .downloading(let svc) where svc == service:
             return "Downloading..."
-        case let .uploading(svc) where svc == service:
+        case .uploading(let svc) where svc == service:
             return "Uploading..."
         case .processing:
             return "Processing..."
@@ -454,9 +472,9 @@ struct SyncStatusOverlay: View {
             return .gray
         }
         switch phase {
-        case let .downloading(svc) where svc == service:
+        case .downloading(let svc) where svc == service:
             return .blue
-        case let .uploading(svc) where svc == service:
+        case .uploading(let svc) where svc == service:
             return .green
         case .processing:
             return .orange

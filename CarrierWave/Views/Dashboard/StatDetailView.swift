@@ -17,16 +17,24 @@ struct StatDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
-                    Button {
-                        sortByCount = true
-                    } label: {
-                        Label("By Count", systemImage: sortByCount ? "checkmark" : "")
+                    if category == .parks {
+                        Button {
+                            sortMode = .date
+                        } label: {
+                            Label("By Date", systemImage: sortMode == .date ? "checkmark" : "")
+                        }
                     }
 
                     Button {
-                        sortByCount = false
+                        sortMode = .count
                     } label: {
-                        Label("A-Z", systemImage: sortByCount ? "" : "checkmark")
+                        Label("By Count", systemImage: sortMode == .count ? "checkmark" : "")
+                    }
+
+                    Button {
+                        sortMode = .alphabetical
+                    } label: {
+                        Label("A-Z", systemImage: sortMode == .alphabetical ? "checkmark" : "")
                     }
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")
@@ -37,13 +45,30 @@ struct StatDetailView: View {
 
     // MARK: Private
 
-    @State private var sortByCount = true
+    private enum SortMode {
+        case date
+        case count
+        case alphabetical
+    }
+
+    @State private var sortMode: SortMode = .date
 
     private var sortedItems: [StatCategoryItem] {
-        if sortByCount {
+        switch sortMode {
+        case .date:
+            // Sort by date descending; fall back to count if no date
+            items.sorted { lhs, rhs in
+                if let lhsDate = lhs.date, let rhsDate = rhs.date {
+                    return lhsDate > rhsDate
+                }
+                return lhs.count > rhs.count
+            }
+        case .count:
             items.sorted { $0.count > $1.count }
-        } else {
-            items.sorted { $0.identifier.localizedCaseInsensitiveCompare($1.identifier) == .orderedAscending }
+        case .alphabetical:
+            items.sorted {
+                $0.identifier.localizedCaseInsensitiveCompare($1.identifier) == .orderedAscending
+            }
         }
     }
 }
