@@ -46,6 +46,37 @@ struct LoTWSettingsView: View {
                     }
                 }
             }
+
+            if debugMode, isAuthenticated {
+                Section {
+                    Button {
+                        Task { await forceRedownload() }
+                    } label: {
+                        if isRedownloading {
+                            HStack {
+                                ProgressView()
+                                    .padding(.trailing, 4)
+                                Text("Re-downloading...")
+                            }
+                        } else {
+                            Text("Force Re-download All QSOs")
+                        }
+                    }
+                    .disabled(isRedownloading)
+
+                    if let result = redownloadResult {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text(
+                        "Re-fetches all QSOs from LoTW and updates existing records with fresh parsed values."
+                    )
+                }
+            }
         }
         .navigationTitle("LoTW")
         .sheet(isPresented: $showingLogin) {
@@ -68,11 +99,15 @@ struct LoTWSettingsView: View {
 
     // MARK: Private
 
+    @AppStorage("debugMode") private var debugMode = false
+    @EnvironmentObject private var syncService: SyncService
     @State private var isAuthenticated = false
     @State private var username = ""
     @State private var showingLogin = false
     @State private var errorMessage = ""
     @State private var showingError = false
+    @State private var isRedownloading = false
+    @State private var redownloadResult: String?
 
     private let lotwClient = LoTWClient()
 
@@ -89,6 +124,19 @@ struct LoTWSettingsView: View {
         Task {
             await lotwClient.clearCredentials()
             await checkStatus()
+        }
+    }
+
+    private func forceRedownload() async {
+        isRedownloading = true
+        redownloadResult = nil
+        defer { isRedownloading = false }
+
+        do {
+            let result = try await syncService.forceRedownloadFromLoTW()
+            redownloadResult = "Updated \(result.updated), Created \(result.created)"
+        } catch {
+            redownloadResult = "Error: \(error.localizedDescription)"
         }
     }
 }
