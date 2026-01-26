@@ -59,7 +59,8 @@ struct QRZFetchedQSO {
     let myCallsign: String?
     let myGrid: String?
     let theirGrid: String?
-    let parkReference: String?
+    let parkReference: String? // My park (from MY_SIG_INFO/MY_POTA_REF)
+    let theirParkReference: String? // Their park (from SIG_INFO)
     let notes: String?
     let qrzLogId: String?
     let qrzConfirmed: Bool
@@ -269,7 +270,9 @@ actor QRZClient {
         }
 
         while true {
-            let request = buildFetchRequest(url: url, apiKey: apiKey, offset: offset, pageSize: pageSize, since: since)
+            let request = buildFetchRequest(
+                url: url, apiKey: apiKey, offset: offset, pageSize: pageSize, since: since
+            )
             let (pageQSOs, responseCount) = try await fetchQSOPage(request: request)
 
             allQSOs.append(contentsOf: pageQSOs)
@@ -320,7 +323,9 @@ actor QRZClient {
         request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
 
-        let formData = ["KEY": apiKey, "ACTION": "FETCH", "OPTION": optionParts.joined(separator: ",")]
+        let formData = [
+            "KEY": apiKey, "ACTION": "FETCH", "OPTION": optionParts.joined(separator: ","),
+        ]
         request.httpBody = formEncode(formData).data(using: .utf8)
         return request
     }
@@ -349,7 +354,8 @@ actor QRZClient {
         }
 
         guard result == "OK" else {
-            let errorReason = parsed["REASON"] ?? "RESULT=\(result), Response: \(responseString.prefix(300))"
+            let errorReason =
+                parsed["REASON"] ?? "RESULT=\(result), Response: \(responseString.prefix(300))"
             throw QRZError.fetchFailed(errorReason)
         }
 
@@ -369,7 +375,8 @@ actor QRZClient {
             return latin1String
         }
         let firstBytes = data.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " ")
-        throw QRZError.invalidResponse("Cannot decode \(data.count) bytes, first bytes: \(firstBytes)")
+        throw QRZError.invalidResponse(
+            "Cannot decode \(data.count) bytes, first bytes: \(firstBytes)")
     }
 }
 

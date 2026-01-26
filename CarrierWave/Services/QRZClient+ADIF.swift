@@ -43,10 +43,11 @@ extension QRZClient {
                 continue
             }
 
-            let timestamp = parseTimestamp(
-                date: fields["QSO_DATE"] ?? fields["qso_date"],
-                time: fields["TIME_ON"] ?? fields["time_on"]
-            ) ?? Date()
+            let timestamp =
+                parseTimestamp(
+                    date: fields["QSO_DATE"] ?? fields["qso_date"],
+                    time: fields["TIME_ON"] ?? fields["time_on"]
+                ) ?? Date()
 
             var frequency: Double?
             if let freqStr = fields["FREQ"] ?? fields["freq"], let freq = Double(freqStr) {
@@ -57,6 +58,13 @@ extension QRZClient {
             let qrzConfirmed = qrzStatus?.uppercased() == "C"
             let lotwDate = parseLotwDate(fields["LOTW_QSL_RCVD"] ?? fields["lotw_qsl_rcvd"])
 
+            // My park reference: MY_SIG_INFO or MY_POTA_REF (activator's park)
+            let myParkRef =
+                fields["MY_SIG_INFO"] ?? fields["my_sig_info"]
+                    ?? fields["MY_POTA_REF"] ?? fields["my_pota_ref"]
+            // Their park reference: SIG_INFO (contacted station's park)
+            let theirParkRef = fields["SIG_INFO"] ?? fields["sig_info"]
+
             let qso = QRZFetchedQSO(
                 callsign: callsign.uppercased(), band: band.uppercased(), mode: mode.uppercased(),
                 frequency: frequency, timestamp: timestamp,
@@ -65,7 +73,8 @@ extension QRZClient {
                 myCallsign: fields["STATION_CALLSIGN"] ?? fields["station_callsign"],
                 myGrid: fields["MY_GRIDSQUARE"] ?? fields["my_gridsquare"],
                 theirGrid: fields["GRIDSQUARE"] ?? fields["gridsquare"],
-                parkReference: fields["SIG_INFO"] ?? fields["sig_info"],
+                parkReference: myParkRef,
+                theirParkReference: theirParkRef,
                 notes: fields["COMMENT"] ?? fields["comment"],
                 qrzLogId: fields["APP_QRZLOG_LOGID"] ?? fields["app_qrzlog_logid"],
                 qrzConfirmed: qrzConfirmed, lotwConfirmedDate: lotwDate, rawADIF: record
@@ -176,7 +185,16 @@ extension QRZClient {
         addField("station_callsign", qso.myCallsign)
         addField("my_gridsquare", qso.myGrid)
         addField("gridsquare", qso.theirGrid)
-        addField("sig_info", qso.parkReference)
+        // My park reference (activator's park)
+        if let myPark = qso.parkReference {
+            addField("my_sig", "POTA")
+            addField("my_sig_info", myPark)
+        }
+        // Their park reference (contacted station's park)
+        if let theirPark = qso.theirParkReference {
+            addField("sig", "POTA")
+            addField("sig_info", theirPark)
+        }
         addField("comment", qso.notes)
 
         return fields.joined(separator: " ") + " <eor>"
@@ -189,9 +207,10 @@ extension QRZClient {
 
         return params.map { key, value in
             let escapedKey = key.addingPercentEncoding(withAllowedCharacters: allowed) ?? key
-            let escapedValue = value
-                .replacingOccurrences(of: " ", with: "+")
-                .addingPercentEncoding(withAllowedCharacters: allowed) ?? value
+            let escapedValue =
+                value
+                    .replacingOccurrences(of: " ", with: "+")
+                    .addingPercentEncoding(withAllowedCharacters: allowed) ?? value
             return "\(escapedKey)=\(escapedValue)"
         }.joined(separator: "&")
     }

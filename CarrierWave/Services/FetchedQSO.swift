@@ -117,7 +117,7 @@ extension FetchedQSO {
             myGrid: qrz.myGrid,
             theirGrid: qrz.theirGrid,
             parkReference: qrz.parkReference,
-            theirParkReference: nil,
+            theirParkReference: qrz.theirParkReference,
             notes: qrz.notes,
             rawADIF: qrz.rawADIF,
             name: nil,

@@ -11,7 +11,8 @@ excluded:
 
 # Rules configuration
 disabled_rules:
-  - trailing_comma  # Allow trailing commas
+  - trailing_comma # Allow trailing commas
+  - opening_brace # Conflicts with SwiftFormat line wrapping
 
 opt_in_rules:
   - array_init

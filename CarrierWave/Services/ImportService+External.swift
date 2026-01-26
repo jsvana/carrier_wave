@@ -13,11 +13,15 @@ extension ImportService {
 
         let descriptor = FetchDescriptor<QSO>()
         let existingQSOs = try modelContext.fetch(descriptor)
-        let byQrzLogId = Dictionary(grouping: existingQSOs.filter { $0.qrzLogId != nil }) { $0.qrzLogId! }
+        let byQrzLogId = Dictionary(grouping: existingQSOs.filter { $0.qrzLogId != nil }) {
+            $0.qrzLogId!
+        }
         let byDedupeKey = Dictionary(grouping: existingQSOs) { $0.deduplicationKey }
 
         for qrzQso in qsos {
-            let result = processQRZQso(qrzQso, myCallsign: myCallsign, byQrzLogId: byQrzLogId, byDedupeKey: byDedupeKey)
+            let result = processQRZQso(
+                qrzQso, myCallsign: myCallsign, byQrzLogId: byQrzLogId, byDedupeKey: byDedupeKey
+            )
             switch result {
             case .updated: updated += 1
             case .imported: imported += 1
@@ -49,7 +53,8 @@ extension ImportService {
         // Try to find by deduplication key
         let tempQso = QSO(
             callsign: qrzQso.callsign, band: qrzQso.band, mode: qrzQso.mode,
-            timestamp: qrzQso.timestamp, myCallsign: qrzQso.myCallsign ?? myCallsign, importSource: .qrz
+            timestamp: qrzQso.timestamp, myCallsign: qrzQso.myCallsign ?? myCallsign,
+            importSource: .qrz
         )
 
         if let existing = byDedupeKey[tempQso.deduplicationKey]?.first {
@@ -72,8 +77,10 @@ extension ImportService {
             callsign: qrzQso.callsign, band: qrzQso.band, mode: qrzQso.mode,
             frequency: qrzQso.frequency, timestamp: qrzQso.timestamp,
             rstSent: qrzQso.rstSent, rstReceived: qrzQso.rstReceived,
-            myCallsign: qrzQso.myCallsign ?? myCallsign, myGrid: qrzQso.myGrid, theirGrid: qrzQso.theirGrid,
-            parkReference: qrzQso.parkReference, notes: qrzQso.notes, importSource: .qrz,
+            myCallsign: qrzQso.myCallsign ?? myCallsign, myGrid: qrzQso.myGrid,
+            theirGrid: qrzQso.theirGrid,
+            parkReference: qrzQso.parkReference, theirParkReference: qrzQso.theirParkReference,
+            notes: qrzQso.notes, importSource: .qrz,
             rawADIF: qrzQso.rawADIF, qrzLogId: qrzQso.qrzLogId,
             qrzConfirmed: qrzQso.qrzConfirmed, lotwConfirmedDate: qrzQso.lotwConfirmedDate
         )
@@ -119,7 +126,8 @@ extension ImportService {
     func processPOTAQso(_ potaQso: POTAFetchedQSO, byDedupeKey: [String: [QSO]]) -> QSOProcessResult {
         let rounded = Int(potaQso.timestamp.timeIntervalSince1970 / 120) * 120
         let call = potaQso.callsign.uppercased()
-        let dedupeKey = "\(call)|\(potaQso.band.uppercased())|\(potaQso.mode.uppercased())|\(rounded)"
+        let dedupeKey =
+            "\(call)|\(potaQso.band.uppercased())|\(potaQso.mode.uppercased())|\(rounded)"
 
         if let existing = byDedupeKey[dedupeKey]?.first {
             existing.parkReference = existing.parkReference.nonEmpty ?? potaQso.parkReference
@@ -136,9 +144,11 @@ extension ImportService {
     }
 
     func createQSOFromPOTA(_ pq: POTAFetchedQSO) -> QSO {
-        QSO(callsign: pq.callsign, band: pq.band, mode: pq.mode, frequency: nil,
+        QSO(
+            callsign: pq.callsign, band: pq.band, mode: pq.mode, frequency: nil,
             timestamp: pq.timestamp, rstSent: pq.rstSent, rstReceived: pq.rstReceived,
             myCallsign: pq.myCallsign, myGrid: nil, theirGrid: nil,
-            parkReference: pq.parkReference, notes: nil, importSource: .pota, rawADIF: nil)
+            parkReference: pq.parkReference, notes: nil, importSource: .pota, rawADIF: nil
+        )
     }
 }

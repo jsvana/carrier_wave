@@ -33,7 +33,9 @@ class ImportService: ObservableObject {
     let modelContext: ModelContext
     let parser = ADIFParser()
 
-    func importADIF(from url: URL, source: ImportSource, myCallsign: String) async throws -> ImportResult {
+    func importADIF(from url: URL, source: ImportSource, myCallsign: String) async throws
+        -> ImportResult
+    {
         isImporting = true
         defer { isImporting = false }
 
@@ -45,7 +47,9 @@ class ImportService: ObservableObject {
         return try await importADIF(content: content, source: source, myCallsign: myCallsign)
     }
 
-    func importADIF(content: String, source: ImportSource, myCallsign: String) async throws -> ImportResult {
+    func importADIF(content: String, source: ImportSource, myCallsign: String) async throws
+        -> ImportResult
+    {
         isImporting = true
         defer { isImporting = false }
 
@@ -156,7 +160,9 @@ class ImportService: ObservableObject {
 
     // MARK: Private
 
-    private func createQSO(from record: ADIFRecord, source: ImportSource, myCallsign: String) throws -> QSO {
+    private func createQSO(from record: ADIFRecord, source: ImportSource, myCallsign: String) throws
+        -> QSO
+    {
         guard let timestamp = record.timestamp else {
             throw ImportError.missingTimestamp
         }
@@ -167,6 +173,7 @@ class ImportService: ObservableObject {
             rstSent: record.rstSent, rstReceived: record.rstReceived,
             myCallsign: record.myCallsign ?? myCallsign, myGrid: record.myGridsquare,
             theirGrid: record.gridsquare, parkReference: record.mySigInfo,
+            theirParkReference: record.sigInfo,
             notes: record.comment, importSource: source, rawADIF: record.rawADIF
         )
     }
@@ -175,15 +182,18 @@ class ImportService: ObservableObject {
         guard let mode = lofiQso.mode?.uppercased() else {
             return
         }
-        guard let parkRef = operation.refs.first(where: { $0.refType == "potaActivation" })?.reference else {
+        guard
+            let parkRef = operation.refs.first(where: { $0.refType == "potaActivation" })?.reference
+        else {
             return
         }
 
-        let timestamp: Date = if let startMillis = operation.startAtMillisMin {
-            Date(timeIntervalSince1970: Double(startMillis) / 1_000.0)
-        } else {
-            lofiQso.timestamp
-        }
+        let timestamp: Date =
+            if let startMillis = operation.startAtMillisMin {
+                Date(timeIntervalSince1970: Double(startMillis) / 1_000.0)
+            } else {
+                lofiQso.timestamp
+            }
 
         var calendar = Calendar.current
         calendar.timeZone = TimeZone(identifier: "UTC")!
