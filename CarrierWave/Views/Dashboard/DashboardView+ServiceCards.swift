@@ -100,6 +100,7 @@ extension DashboardView {
     var qrzCard: some View {
         let inQRZ = uploadedCount(for: .qrz)
         let pending = pendingCount(for: .qrz)
+        let confirmed = qsos.filter(\.qrzConfirmed).count
 
         return VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -132,6 +133,14 @@ extension DashboardView {
                         Image(systemName: "checkmark.circle")
                             .foregroundStyle(.blue)
                         Text("\(inQRZ) QSOs synced")
+                            .font(.subheadline)
+                    }
+
+                    // QSL confirmations from QRZ
+                    HStack(spacing: 4) {
+                        Image(systemName: "checkmark.seal")
+                            .foregroundStyle(.green)
+                        Text("\(confirmed) QSLs confirmed")
                             .font(.subheadline)
                     }
 
@@ -218,9 +227,6 @@ extension DashboardView {
         // Check maintenance inline - debugMode and bypassPOTAMaintenance are @AppStorage
         let canBypass = debugMode && bypassPOTAMaintenance
         let isInMaintenance = POTAClient.isInMaintenanceWindow() && !canBypass
-        _ = print(
-            "[POTA Card] debug=\(debugMode), bypass=\(bypassPOTAMaintenance), maint=\(isInMaintenance)"
-        )
 
         VStack(alignment: .leading, spacing: 8) {
             HStack {
