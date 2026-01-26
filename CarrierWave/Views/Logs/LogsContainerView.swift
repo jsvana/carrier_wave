@@ -37,11 +37,7 @@ struct LogsContainerView: View {
     @State private var selectedSegment: LogsSegment = .qsos
 
     private var availableSegments: [LogsSegment] {
-        if potaClient != nil {
-            LogsSegment.allCases
-        } else {
-            [.qsos]
-        }
+        LogsSegment.allCases
     }
 
     @ViewBuilder
@@ -66,9 +62,7 @@ struct LogsContainerView: View {
                 potaAuth: potaAuth
             )
         case .potaActivations:
-            if let potaClient {
-                POTAActivationsContentView(potaClient: potaClient, potaAuth: potaAuth)
-            }
+            POTAActivationsContentView(potaClient: potaClient, potaAuth: potaAuth)
         }
     }
 }

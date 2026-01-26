@@ -32,6 +32,7 @@
 --smarttabs enabled
 --stripunusedargs closure-only
 --swiftversion 5.9
+--modifierorder nonisolated,override,acl,setteracl,dynamic,mutating,lazy,final,required,convenience,typeMethods,owned
 --tabwidth 4
 --trimwhitespace always
 --wraparguments preserve

@@ -52,6 +52,7 @@
 | `POTAClient+Upload.swift` | POTA multipart ADIF upload |
 | `POTAClient+ADIF.swift` | POTA ADIF formatting |
 | `POTAClient+GridLookup.swift` | POTA grid square lookup |
+| `POTAParksCache.swift` | POTA park reference to name lookup cache |
 | `POTAAuthService.swift` | POTA OAuth flow handling (main service) |
 | `POTAAuthService+JavaScript.swift` | JavaScript helpers for POTA WebView auth |
 | `POTAAuthService+HeadlessAuth.swift` | Headless authentication with stored credentials |
@@ -104,6 +105,7 @@
 | File | Purpose |
 |------|---------|
 | `POTAActivationsView.swift` | POTA activations grouped by park with upload |
+| `POTAActivationsHelperViews.swift` | Helper views for POTA activations (rows, sheets) |
 | `POTALogEntryRow.swift` | Individual POTA log entry display (legacy) |
 
 ### Views - Challenges (`CarrierWave/Views/Challenges/`)
@@ -129,6 +131,7 @@
 | `POTAAuthWebView.swift` | POTA OAuth WebView |
 | `SyncDebugView.swift` | Sync debugging interface |
 | `AttributionsView.swift` | Third-party attributions |
+| `ExternalDataView.swift` | External data cache status and refresh (POTA parks) |
 
 ### Utilities (`CarrierWave/Utilities/`)
 | File | Purpose |

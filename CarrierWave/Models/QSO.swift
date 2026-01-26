@@ -108,7 +108,7 @@ final class QSO {
     /// Deduplication key: callsign + band + mode + timestamp (rounded to 2 min)
     var deduplicationKey: String {
         let roundedTimestamp = timestamp.timeIntervalSince1970
-        let rounded = Int(roundedTimestamp / 120) * 120  // 2 minute buckets
+        let rounded = Int(roundedTimestamp / 120) * 120 // 2 minute buckets
         return "\(callsign.uppercased())|\(band.uppercased())|\(mode.uppercased())|\(rounded)"
     }
 
@@ -144,7 +144,7 @@ final class QSO {
 
     /// Check if this is likely a US station (for state counting)
     var isUSStation: Bool {
-        dxccEntity?.number == 291  // United States DXCC number
+        dxccEntity?.number == 291 // United States DXCC number
     }
 
     /// Count of populated optional fields (for deduplication tiebreaker)

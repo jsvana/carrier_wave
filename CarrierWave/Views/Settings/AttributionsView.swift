@@ -38,8 +38,34 @@ struct AttributionsView: View {
                     description: "Simple, fast logging for amateur radio operators",
                     url: "https://hamrs.app"
                 )
+
+                serviceRow(
+                    name: "Logbook of The World",
+                    description: "ARRL's free QSL confirmation service for amateur radio contacts",
+                    url: "https://lotw.arrl.org"
+                )
             } header: {
                 Text("Ham Radio Services")
+            }
+
+            Section {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("POTA Parks Database")
+                        .font(.headline)
+
+                    Text(
+                        """
+                        Park reference data is downloaded from Parks on the Air (pota.app) \
+                        to display park names throughout the app. This data is refreshed \
+                        automatically every two weeks.
+                        """
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                }
+                .padding(.vertical, 4)
+            } header: {
+                Text("External Data")
             }
 
             Section {

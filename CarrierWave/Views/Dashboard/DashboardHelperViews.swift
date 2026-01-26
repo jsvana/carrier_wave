@@ -30,10 +30,6 @@ struct QSOStatistics {
         Set(qsos.compactMap(\.parkReference).filter { !$0.isEmpty }).count
     }
 
-    /// Modes that represent activation metadata, not actual QSOs (from Ham2K PoLo)
-    /// These should never be counted as QSOs for activation purposes
-    private static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
-
     /// Activations with 10+ QSOs (valid POTA activations)
     /// Each activation is a unique park+UTC date combination
     var successfulActivations: Int {
@@ -89,6 +85,10 @@ struct QSOStatistics {
     }
 
     // MARK: Private
+
+    /// Modes that represent activation metadata, not actual QSOs (from Ham2K PoLo)
+    /// These should never be counted as QSOs for activation purposes
+    private static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
 
     private func groupedByEntity() -> [StatCategoryItem] {
         // Group by DXCC entity number
@@ -159,12 +159,13 @@ struct QSOStatistics {
         return grouped.map { _, qsos in
             let park = qsos.first?.parkReference ?? "Unknown"
             let date = qsos.first?.utcDateOnly ?? Date()
-            let status = qsos.count >= 10 ? "✓" : "(\(qsos.count)/10)"
+            let status = qsos.count >= 10 ? "Valid" : "\(qsos.count)/10 QSOs"
             return StatCategoryItem(
                 identifier: "\(park) - \(dateFormatter.string(from: date))",
                 description: status,
                 qsos: qsos,
-                date: date
+                date: date,
+                parkReference: park
             )
         }
     }
@@ -237,9 +238,9 @@ struct ActivityGrid: View {
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top, spacing: spacing) {
-                    ForEach(0..<columns, id: \.self) { column in
+                    ForEach(0 ..< columns, id: \.self) { column in
                         VStack(spacing: spacing) {
-                            ForEach(0..<rows, id: \.self) { row in
+                            ForEach(0 ..< rows, id: \.self) { row in
                                 let date = dateFor(column: column, row: row)
                                 let count = activityData[date] ?? 0
 
@@ -330,7 +331,7 @@ struct ActivityGrid: View {
         var labels: [(Int, String)] = []
         var lastMonth = -1
 
-        for column in 0..<columns {
+        for column in 0 ..< columns {
             let date = dateFor(column: column, row: 0)
             let month = calendar.component(.month, from: date)
 
@@ -443,8 +444,8 @@ struct SyncStatusOverlay: View {
             return false
         }
         switch phase {
-        case .downloading(let svc),
-            .uploading(let svc):
+        case let .downloading(svc),
+             let .uploading(svc):
             return svc == service
         case .processing:
             return true
@@ -456,9 +457,9 @@ struct SyncStatusOverlay: View {
             return ""
         }
         switch phase {
-        case .downloading(let svc) where svc == service:
+        case let .downloading(svc) where svc == service:
             return "Downloading..."
-        case .uploading(let svc) where svc == service:
+        case let .uploading(svc) where svc == service:
             return "Uploading..."
         case .processing:
             return "Processing..."
@@ -472,9 +473,9 @@ struct SyncStatusOverlay: View {
             return .gray
         }
         switch phase {
-        case .downloading(let svc) where svc == service:
+        case let .downloading(svc) where svc == service:
             return .blue
-        case .uploading(let svc) where svc == service:
+        case let .uploading(svc) where svc == service:
             return .green
         case .processing:
             return .orange

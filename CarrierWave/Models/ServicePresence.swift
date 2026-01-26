@@ -10,6 +10,7 @@ final class ServicePresence {
         serviceType: ServiceType,
         isPresent: Bool = false,
         needsUpload: Bool = false,
+        uploadRejected: Bool = false,
         lastConfirmedAt: Date? = nil,
         qso: QSO? = nil
     ) {
@@ -17,6 +18,7 @@ final class ServicePresence {
         self.serviceType = serviceType
         self.isPresent = isPresent
         self.needsUpload = needsUpload
+        self.uploadRejected = uploadRejected
         self.lastConfirmedAt = lastConfirmedAt
         self.qso = qso
     }
@@ -27,6 +29,8 @@ final class ServicePresence {
     var serviceType: ServiceType
     var isPresent: Bool
     var needsUpload: Bool
+    /// User explicitly rejected uploading this QSO to this service
+    var uploadRejected: Bool = false
     var lastConfirmedAt: Date?
 
     var qso: QSO?

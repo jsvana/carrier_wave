@@ -237,6 +237,16 @@ struct SettingsMainView: View {
                 }
 
                 Section {
+                    NavigationLink {
+                        ExternalDataView()
+                    } label: {
+                        Label("External Data", systemImage: "arrow.down.circle")
+                    }
+                } header: {
+                    Text("Data")
+                }
+
+                Section {
                     HStack {
                         Text("Version")
                         Spacer()

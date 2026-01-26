@@ -40,6 +40,9 @@ struct CarrierWaveApp: App {
     var body: some Scene {
         WindowGroup {
             ContentView()
+                .task {
+                    await POTAParksCache.shared.ensureLoaded()
+                }
                 .onOpenURL { url in
                     handleURL(url)
                 }

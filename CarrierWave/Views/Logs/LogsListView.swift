@@ -155,8 +155,14 @@ struct QSORow: View {
                 Label(qso.mode, systemImage: "dot.radiowaves.left.and.right")
 
                 if let park = qso.parkReference {
-                    Label(park, systemImage: "tree")
-                        .foregroundStyle(.green)
+                    if let name = parkName {
+                        Label("\(park) - \(name)", systemImage: "tree")
+                            .foregroundStyle(.green)
+                            .lineLimit(1)
+                    } else {
+                        Label(park, systemImage: "tree")
+                            .foregroundStyle(.green)
+                    }
                 }
 
                 Spacer()
@@ -175,9 +181,16 @@ struct QSORow: View {
             }
         }
         .padding(.vertical, 4)
+        .task {
+            if let park = qso.parkReference {
+                parkName = await POTAParksCache.shared.name(for: park)
+            }
+        }
     }
 
     // MARK: Private
+
+    @State private var parkName: String?
 
     private var sortedPresence: [ServicePresence] {
         qso.servicePresence.sorted { $0.serviceType.rawValue < $1.serviceType.rawValue }

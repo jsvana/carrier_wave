@@ -76,6 +76,15 @@ struct POTAActivation: Identifiable {
 
     var hasQSOsToUpload: Bool { pendingCount > 0 }
 
+    /// Whether this activation has been rejected (all non-uploaded QSOs are rejected)
+    var isRejected: Bool {
+        let notUploaded = qsos.filter { !$0.isPresentInPOTA() }
+        guard !notUploaded.isEmpty else {
+            return false
+        }
+        return notUploaded.allSatisfy { $0.isUploadRejected(for: .pota) }
+    }
+
     // MARK: - Grouping
 
     /// Group QSOs into activations by (parkReference, UTC date, callsign)
@@ -131,9 +140,14 @@ struct POTAActivation: Identifiable {
         qsos.filter { $0.isPresentInPOTA() }
     }
 
-    /// QSOs that need to be uploaded to POTA
+    /// QSOs where upload was rejected by the user
+    func rejectedQSOs() -> [QSO] {
+        qsos.filter { $0.isUploadRejected(for: .pota) }
+    }
+
+    /// QSOs that need to be uploaded to POTA (not uploaded and not rejected)
     func pendingQSOs() -> [QSO] {
-        qsos.filter { !$0.isPresentInPOTA() }
+        qsos.filter { !$0.isPresentInPOTA() && !$0.isUploadRejected(for: .pota) }
     }
 
     // MARK: Private

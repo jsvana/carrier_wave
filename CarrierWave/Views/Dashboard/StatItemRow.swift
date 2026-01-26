@@ -27,12 +27,18 @@ struct StatItemRow: View {
             }
         }
         .padding(.vertical, 8)
+        .task {
+            if let parkRef = item.parkReference {
+                parkName = await POTAParksCache.shared.name(for: parkRef)
+            }
+        }
     }
 
     // MARK: Private
 
     @State private var isExpanded = false
     @State private var visibleQSOCount = 5
+    @State private var parkName: String?
 
     private let batchSize = 5
 
@@ -50,10 +56,16 @@ struct StatItemRow: View {
                     .foregroundStyle(.tertiary)
             }
 
-            if !item.description.isEmpty {
-                Text(item.description)
+            if let name = parkName {
+                Text(name)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+            }
+
+            if !item.description.isEmpty {
+                Text(item.description)
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
             }
         }
         .contentShape(Rectangle())
