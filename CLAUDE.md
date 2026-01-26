@@ -41,6 +41,7 @@
 | `ChallengeSource.swift` | Where challenge definitions come from |
 | `ChallengeTypes.swift` | Challenge-related enums and types |
 | `LeaderboardCache.swift` | Cached leaderboard data |
+| `POTAActivation.swift` | POTA activation grouping view model |
 
 ### Services (`CarrierWave/Services/`)
 | File | Purpose |
@@ -97,11 +98,11 @@
 | `LogsContainerView.swift` | Container with segmented picker for QSOs and POTA Uploads |
 | `LogsListView.swift` | Searchable/filterable QSO list content |
 
-### Views - POTA Uploads (`CarrierWave/Views/POTAUploads/`)
+### Views - POTA Activations (`CarrierWave/Views/POTAActivations/`)
 | File | Purpose |
 |------|---------|
-| `POTAUploadsView.swift` | POTA upload timeline content view |
-| `POTALogEntryRow.swift` | Individual POTA log entry display |
+| `POTAActivationsView.swift` | POTA activations grouped by park with upload |
+| `POTALogEntryRow.swift` | Individual POTA log entry display (legacy) |
 
 ### Views - Challenges (`CarrierWave/Views/Challenges/`)
 | File | Purpose |
