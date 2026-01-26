@@ -253,4 +253,68 @@ extension SyncService {
             return (.lotw, .failure(error))
         }
     }
+
+    // MARK: - Force Re-download Methods
+
+    /// Force re-download all QSOs from QRZ and reprocess them
+    func forceRedownloadFromQRZ() async throws -> (updated: Int, created: Int) {
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Force re-downloading from QRZ", service: .qrz)
+
+        let qsos = try await qrzClient.fetchQSOs(since: nil)
+        let fetched = qsos.map { FetchedQSO.fromQRZ($0) }
+
+        debugLog.info("Fetched \(fetched.count) QSOs from QRZ", service: .qrz)
+        return try reprocessQSOs(fetched)
+    }
+
+    /// Force re-download all QSOs from POTA and reprocess them
+    func forceRedownloadFromPOTA() async throws -> (updated: Int, created: Int) {
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Force re-downloading from POTA", service: .pota)
+
+        let qsos = try await potaClient.fetchAllQSOs()
+        let fetched = qsos.map { FetchedQSO.fromPOTA($0) }
+
+        debugLog.info("Fetched \(fetched.count) QSOs from POTA", service: .pota)
+        return try reprocessQSOs(fetched)
+    }
+
+    /// Force re-download all QSOs from LoFi and reprocess them
+    func forceRedownloadFromLoFi() async throws -> (updated: Int, created: Int) {
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Force re-downloading from LoFi", service: .lofi)
+
+        // Fetch ALL QSOs, not just since last sync
+        let qsos = try await lofiClient.fetchAllQsos()
+        let fetched = qsos.compactMap { FetchedQSO.fromLoFi($0.0, operation: $0.1) }
+
+        debugLog.info("Fetched \(fetched.count) QSOs from LoFi", service: .lofi)
+        return try reprocessQSOs(fetched)
+    }
+
+    /// Force re-download all QSOs from HAMRS and reprocess them
+    func forceRedownloadFromHAMRS() async throws -> (updated: Int, created: Int) {
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Force re-downloading from HAMRS", service: .hamrs)
+
+        let qsos = try await hamrsClient.fetchAllQSOs()
+        let fetched = qsos.compactMap { FetchedQSO.fromHAMRS($0.0, logbook: $0.1) }
+
+        debugLog.info("Fetched \(fetched.count) QSOs from HAMRS", service: .hamrs)
+        return try reprocessQSOs(fetched)
+    }
+
+    /// Force re-download all QSOs from LoTW and reprocess them
+    func forceRedownloadFromLoTW() async throws -> (updated: Int, created: Int) {
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Force re-downloading from LoTW", service: .lotw)
+
+        // Fetch ALL QSOs (no qsoRxSince filter)
+        let response = try await lotwClient.fetchQSOs(qsoRxSince: nil)
+        let fetched = response.qsos.map { FetchedQSO.fromLoTW($0) }
+
+        debugLog.info("Fetched \(fetched.count) QSOs from LoTW", service: .lotw)
+        return try reprocessQSOs(fetched)
+    }
 }
