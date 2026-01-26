@@ -140,6 +140,86 @@ extension SyncService {
         existing.markPresent(in: fetched.source, context: modelContext)
     }
 
+    /// Update existing QSO with all fields from fetched data (for force re-download)
+    func updateExistingQSO(existing: QSO, from fetched: FetchedQSO) {
+        existing.frequency = fetched.frequency
+        existing.rstSent = fetched.rstSent
+        existing.rstReceived = fetched.rstReceived
+        existing.myGrid = fetched.myGrid
+        existing.theirGrid = fetched.theirGrid
+        existing.parkReference = fetched.parkReference
+        existing.theirParkReference = fetched.theirParkReference
+        existing.notes = fetched.notes
+        existing.rawADIF = fetched.rawADIF
+        existing.name = fetched.name
+        existing.qth = fetched.qth
+        existing.state = fetched.state
+        existing.country = fetched.country
+        existing.power = fetched.power
+        existing.sotaRef = fetched.sotaRef
+
+        // QRZ-specific
+        if fetched.source == .qrz {
+            existing.qrzLogId = fetched.qrzLogId
+            existing.qrzConfirmed = fetched.qrzConfirmed
+            existing.lotwConfirmedDate = fetched.lotwConfirmedDate
+        }
+
+        // LoTW-specific
+        if fetched.source == .lotw {
+            existing.lotwConfirmed = fetched.lotwConfirmed
+            existing.lotwConfirmedDate = fetched.lotwConfirmedDate
+            existing.dxcc = fetched.dxcc
+        }
+
+        existing.markPresent(in: fetched.source, context: modelContext)
+    }
+
+    /// Reprocess fetched QSOs, updating existing ones instead of skipping
+    func reprocessQSOs(_ fetched: [FetchedQSO]) throws -> (updated: Int, created: Int) {
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Reprocessing \(fetched.count) QSOs (force re-download)")
+
+        let descriptor = FetchDescriptor<QSO>()
+        let existingQSOs = try modelContext.fetch(descriptor)
+        let existingByKey = Dictionary(grouping: existingQSOs) { $0.deduplicationKey }
+
+        var updated = 0
+        var created = 0
+
+        for fetchedQSO in fetched {
+            let key = fetchedQSO.deduplicationKey
+            if let existing = existingByKey[key]?.first {
+                updateExistingQSO(existing: existing, from: fetchedQSO)
+                updated += 1
+            } else {
+                let newQSO = createQSO(from: fetchedQSO)
+                modelContext.insert(newQSO)
+                createPresenceForNewQSO(newQSO, source: fetchedQSO.source)
+                created += 1
+            }
+        }
+
+        try modelContext.save()
+        debugLog.info("Reprocess complete: updated=\(updated), created=\(created)")
+        return (updated, created)
+    }
+
+    /// Create presence records for a newly created QSO
+    private func createPresenceForNewQSO(_ qso: QSO, source: ServiceType) {
+        for service in ServiceType.allCases {
+            let presence = if service == source {
+                ServicePresence.downloaded(from: service, qso: qso)
+            } else if service.supportsUpload {
+                ServicePresence.needsUpload(to: service, qso: qso)
+            } else {
+                ServicePresence(serviceType: service, isPresent: false, qso: qso)
+            }
+            modelContext.insert(presence)
+            qso.servicePresence.append(presence)
+        }
+    }
+
     /// Merge multiple fetched QSOs into one (for new QSO creation)
     func mergeFetchedGroup(_ group: [FetchedQSO]) -> FetchedQSO {
         guard var merged = group.first else {
