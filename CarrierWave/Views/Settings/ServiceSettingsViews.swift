@@ -95,7 +95,9 @@ struct QRZSettingsView: View {
                             Text(callsign).foregroundStyle(.secondary)
                         }
                     }
-                } header: { Text("Status") }
+                } header: {
+                    Text("Status")
+                }
 
                 Section { Button("Logout", role: .destructive) { logout() } }
             } else {
@@ -104,17 +106,51 @@ struct QRZSettingsView: View {
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                     Button("Connect to QRZ") { showingLogin = true }
-                } header: { Text("Setup") }
-                    footer: { Text("Requires QRZ XML Logbook Data subscription.") }
+                } header: {
+                    Text("Setup")
+                } footer: {
+                    Text("Requires QRZ XML Logbook Data subscription.")
+                }
 
                 Section {
                     Link(
                         destination: URL(
-                            string: "https://shop.qrz.com/collections/subscriptions/products/" +
-                                "xml-logbook-data-subscription-1-year")!
+                            string: "https://shop.qrz.com/collections/subscriptions/products/"
+                                + "xml-logbook-data-subscription-1-year")!
                     ) {
                         Label("Get QRZ Subscription", systemImage: "arrow.up.right.square")
                     }
+                }
+            }
+
+            if debugMode, isAuthenticated {
+                Section {
+                    Button {
+                        Task { await forceRedownload() }
+                    } label: {
+                        if isRedownloading {
+                            HStack {
+                                ProgressView()
+                                    .padding(.trailing, 4)
+                                Text("Re-downloading...")
+                            }
+                        } else {
+                            Text("Force Re-download All QSOs")
+                        }
+                    }
+                    .disabled(isRedownloading)
+
+                    if let result = redownloadResult {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text(
+                        "Re-fetches all QSOs from QRZ and updates existing records with fresh parsed values."
+                    )
                 }
             }
         }
@@ -125,19 +161,26 @@ struct QRZSettingsView: View {
                 errorMessage: $errorMessage, showingError: $showingError
             )
         }
-        .alert("Error", isPresented: $showingError) { Button("OK") {} }
-        message: { Text(errorMessage) }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK") {}
+        } message: {
+            Text(errorMessage)
+        }
         .task { await checkStatus() }
     }
 
     // MARK: Private
 
+    @AppStorage("debugMode") private var debugMode = false
+    @EnvironmentObject private var syncService: SyncService
     @State private var isAuthenticated = false
     @State private var callsign: String?
     @State private var showingLogin = false
     @State private var apiKey = ""
     @State private var errorMessage = ""
     @State private var showingError = false
+    @State private var isRedownloading = false
+    @State private var redownloadResult: String?
 
     private let qrzClient = QRZClient()
 
@@ -150,6 +193,19 @@ struct QRZSettingsView: View {
         Task {
             await qrzClient.logout()
             await checkStatus()
+        }
+    }
+
+    private func forceRedownload() async {
+        isRedownloading = true
+        redownloadResult = nil
+        defer { isRedownloading = false }
+
+        do {
+            let result = try await syncService.forceRedownloadFromQRZ()
+            redownloadResult = "Updated \(result.updated), Created \(result.created)"
+        } catch {
+            redownloadResult = "Error: \(error.localizedDescription)"
         }
     }
 }
@@ -173,7 +229,9 @@ struct POTASettingsView: View {
                             Text(callsign).foregroundStyle(.secondary)
                         }
                     }
-                } header: { Text("Status") }
+                } header: {
+                    Text("Status")
+                }
 
                 Section { Button("Logout", role: .destructive) { potaAuth.logout() } }
             } else {
@@ -195,7 +253,9 @@ struct POTASettingsView: View {
                             }
                         }
                     }
-                } header: { Text("Setup") }
+                } header: {
+                    Text("Setup")
+                }
 
                 Section {
                     Link(destination: URL(string: "https://pota.app")!) {
@@ -203,18 +263,69 @@ struct POTASettingsView: View {
                     }
                 }
             }
+
+            if debugMode, potaAuth.isAuthenticated {
+                Section {
+                    Button {
+                        Task { await forceRedownload() }
+                    } label: {
+                        if isRedownloading {
+                            HStack {
+                                ProgressView()
+                                    .padding(.trailing, 4)
+                                Text("Re-downloading...")
+                            }
+                        } else {
+                            Text("Force Re-download All QSOs")
+                        }
+                    }
+                    .disabled(isRedownloading)
+
+                    if let result = redownloadResult {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text(
+                        "Re-fetches all QSOs from POTA and updates existing records with fresh parsed values."
+                    )
+                }
+            }
         }
         .navigationTitle("POTA")
         .sheet(isPresented: $showingLogin) {
             POTALoginSheet(authService: potaAuth)
         }
-        .alert("Error", isPresented: $showingError) { Button("OK") {} }
-        message: { Text(errorMessage) }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK") {}
+        } message: {
+            Text(errorMessage)
+        }
     }
 
     // MARK: Private
 
+    @AppStorage("debugMode") private var debugMode = false
+    @EnvironmentObject private var syncService: SyncService
     @State private var showingLogin = false
     @State private var showingError = false
     @State private var errorMessage = ""
+    @State private var isRedownloading = false
+    @State private var redownloadResult: String?
+
+    private func forceRedownload() async {
+        isRedownloading = true
+        redownloadResult = nil
+        defer { isRedownloading = false }
+
+        do {
+            let result = try await syncService.forceRedownloadFromPOTA()
+            redownloadResult = "Updated \(result.updated), Created \(result.created)"
+        } catch {
+            redownloadResult = "Error: \(error.localizedDescription)"
+        }
+    }
 }
