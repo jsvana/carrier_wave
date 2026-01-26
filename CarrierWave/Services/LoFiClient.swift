@@ -275,6 +275,25 @@ actor LoFiClient {
         return allQsos
     }
 
+    /// Fetch ALL QSOs from all operations (ignoring last sync timestamp, for force re-download)
+    func fetchAllQsos() async throws -> [(LoFiQso, LoFiOperation)] {
+        NSLog("[LoFi] fetchAllQsos: fetching all QSOs (force re-download)")
+
+        // Fetch all operations (treat as fresh sync to get everything)
+        let operations = try await fetchAllOperations(isFreshSync: true)
+
+        // Fetch all QSOs starting from 0
+        let (qsosByUUID, _) = try await fetchQsosForOperations(
+            operations,
+            lastSyncMillis: 0,
+            isFreshSync: true
+        )
+
+        let allQsos = Array(qsosByUUID.values)
+        NSLog("[LoFi] fetchAllQsos: Total QSOs fetched: %d", allQsos.count)
+        return allQsos
+    }
+
     // MARK: - Clear
 
     /// Reset just the sync timestamp so QSOs can be re-downloaded
@@ -325,8 +344,10 @@ actor LoFiClient {
         }
 
         let operations = Array(operationsByUUID.values)
-        NSLog("[LoFi] Total unique operations: %d, expected QSOs: %d",
-              operations.count, operations.reduce(0) { $0 + $1.qsoCount })
+        NSLog(
+            "[LoFi] Total unique operations: %d, expected QSOs: %d",
+            operations.count, operations.reduce(0) { $0 + $1.qsoCount }
+        )
         return operations
     }
 
@@ -391,8 +412,10 @@ actor LoFiClient {
         }
 
         if qsos.count != operation.qsoCount {
-            NSLog("[LoFi] Operation %@: expected %d QSOs, got %d",
-                  operation.uuid, operation.qsoCount, qsos.count)
+            NSLog(
+                "[LoFi] Operation %@: expected %d QSOs, got %d",
+                operation.uuid, operation.qsoCount, qsos.count
+            )
         }
         return (qsos, maxSyncMillis)
     }
