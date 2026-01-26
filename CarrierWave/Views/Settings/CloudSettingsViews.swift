@@ -61,6 +61,37 @@ struct LoFiSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
             }
+
+            if debugMode, isLinked {
+                Section {
+                    Button {
+                        Task { await forceRedownload() }
+                    } label: {
+                        if isRedownloading {
+                            HStack {
+                                ProgressView()
+                                    .padding(.trailing, 4)
+                                Text("Re-downloading...")
+                            }
+                        } else {
+                            Text("Force Re-download All QSOs")
+                        }
+                    }
+                    .disabled(isRedownloading)
+
+                    if let result = redownloadResult {
+                        Text(result)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                } header: {
+                    Text("Debug")
+                } footer: {
+                    Text(
+                        "Re-fetches all QSOs from LoFi and updates existing records with fresh parsed values."
+                    )
+                }
+            }
         }
         .navigationTitle("Ham2K LoFi")
         .alert("Error", isPresented: $showingError) {
@@ -75,11 +106,15 @@ struct LoFiSettingsView: View {
 
     // MARK: Private
 
+    @AppStorage("debugMode") private var debugMode = false
+    @EnvironmentObject private var syncService: SyncService
     @State private var callsign = ""
     @State private var email = ""
     @State private var isConfigured = false
     @State private var isLinked = false
     @State private var isLoading = false
+    @State private var isRedownloading = false
+    @State private var redownloadResult: String?
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var statusMessage = ""
@@ -140,7 +175,9 @@ struct LoFiSettingsView: View {
         } header: {
             Text("Setup")
         } footer: {
-            Text("Your callsign is used to access your LoFi account. Email is for device verification.")
+            Text(
+                "Your callsign is used to access your LoFi account. Email is for device verification."
+            )
         }
 
         Section {
@@ -217,6 +254,19 @@ struct LoFiSettingsView: View {
         Task {
             try? await lofiClient.clearCredentials()
             await checkStatus()
+        }
+    }
+
+    private func forceRedownload() async {
+        isRedownloading = true
+        redownloadResult = nil
+        defer { isRedownloading = false }
+
+        do {
+            let result = try await syncService.forceRedownloadFromLoFi()
+            redownloadResult = "Updated \(result.updated), Created \(result.created)"
+        } catch {
+            redownloadResult = "Error: \(error.localizedDescription)"
         }
     }
 }
