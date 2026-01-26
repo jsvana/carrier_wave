@@ -134,6 +134,69 @@ struct LoFiOperationsMeta: Decodable, Sendable {
 // MARK: - LoFiOperation
 
 struct LoFiOperation: Decodable, Sendable {
+    // MARK: Lifecycle
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        uuid = try container.decode(String.self, forKey: .uuid)
+        stationCall = try container.decode(String.self, forKey: .stationCall)
+        account = try container.decode(String.self, forKey: .account)
+        createdAtMillis = try container.decode(Double.self, forKey: .createdAtMillis)
+        createdOnDeviceId = try container.decodeIfPresent(String.self, forKey: .createdOnDeviceId)
+        updatedAtMillis = try container.decode(Double.self, forKey: .updatedAtMillis)
+        updatedOnDeviceId = try container.decodeIfPresent(String.self, forKey: .updatedOnDeviceId)
+        syncedAtMillis = try container.decodeIfPresent(Double.self, forKey: .syncedAtMillis)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        subtitle = try container.decodeIfPresent(String.self, forKey: .subtitle)
+        grid = try container.decodeIfPresent(String.self, forKey: .grid)
+        refs = try container.decode([LoFiOperationRef].self, forKey: .refs)
+        qsoCount = try container.decode(Int.self, forKey: .qsoCount)
+        startAtMillisMin = try container.decodeIfPresent(Double.self, forKey: .startAtMillisMin)
+        startAtMillisMax = try container.decodeIfPresent(Double.self, forKey: .startAtMillisMax)
+        isNew = try container.decodeIfPresent(Bool.self, forKey: .isNew)
+
+        // Handle deleted field as either Int or Bool (API returns both)
+        if let intValue = try? container.decodeIfPresent(Int.self, forKey: .deleted) {
+            deleted = intValue
+        } else if let boolValue = try? container.decodeIfPresent(Bool.self, forKey: .deleted) {
+            deleted = boolValue ? 1 : 0
+        } else {
+            deleted = nil
+        }
+
+        // Handle synced field as either Int or Bool (API may return both)
+        if let intValue = try? container.decodeIfPresent(Int.self, forKey: .synced) {
+            synced = intValue
+        } else if let boolValue = try? container.decodeIfPresent(Bool.self, forKey: .synced) {
+            synced = boolValue ? 1 : 0
+        } else {
+            synced = nil
+        }
+    }
+
+    // MARK: Internal
+
+    enum CodingKeys: String, CodingKey {
+        case uuid
+        case stationCall
+        case account
+        case createdAtMillis
+        case createdOnDeviceId
+        case updatedAtMillis
+        case updatedOnDeviceId
+        case syncedAtMillis
+        case title
+        case subtitle
+        case grid
+        case refs
+        case qsoCount
+        case startAtMillisMin
+        case startAtMillisMax
+        case isNew
+        case deleted
+        case synced
+    }
+
     let uuid: String
     let stationCall: String
     let account: String
@@ -228,6 +291,57 @@ struct LoFiQsosMeta: Decodable, Sendable {
 // MARK: - LoFiQso
 
 struct LoFiQso: Decodable, Sendable {
+    // MARK: Lifecycle
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        uuid = try container.decode(String.self, forKey: .uuid)
+        operation = try container.decodeIfPresent(String.self, forKey: .operation)
+        account = try container.decodeIfPresent(String.self, forKey: .account)
+        createdAtMillis = try container.decodeIfPresent(Double.self, forKey: .createdAtMillis)
+        updatedAtMillis = try container.decodeIfPresent(Double.self, forKey: .updatedAtMillis)
+        syncedAtMillis = try container.decodeIfPresent(Double.self, forKey: .syncedAtMillis)
+        startAtMillis = try container.decode(Double.self, forKey: .startAtMillis)
+        their = try container.decodeIfPresent(LoFiTheirInfo.self, forKey: .their)
+        our = try container.decodeIfPresent(LoFiOurInfo.self, forKey: .our)
+        band = try container.decodeIfPresent(String.self, forKey: .band)
+        freq = try container.decodeIfPresent(Double.self, forKey: .freq)
+        mode = try container.decodeIfPresent(String.self, forKey: .mode)
+        refs = try container.decodeIfPresent([LoFiQsoRef].self, forKey: .refs)
+        txPwr = try container.decodeIfPresent(String.self, forKey: .txPwr)
+        notes = try container.decodeIfPresent(String.self, forKey: .notes)
+
+        // Handle deleted field as either Int or Bool (API returns both)
+        if let intValue = try? container.decodeIfPresent(Int.self, forKey: .deleted) {
+            deleted = intValue
+        } else if let boolValue = try? container.decodeIfPresent(Bool.self, forKey: .deleted) {
+            deleted = boolValue ? 1 : 0
+        } else {
+            deleted = nil
+        }
+    }
+
+    // MARK: Internal
+
+    enum CodingKeys: String, CodingKey {
+        case uuid
+        case operation
+        case account
+        case createdAtMillis
+        case updatedAtMillis
+        case syncedAtMillis
+        case startAtMillis
+        case their
+        case our
+        case band
+        case freq
+        case mode
+        case refs
+        case txPwr
+        case notes
+        case deleted
+    }
+
     let uuid: String
     let operation: String?
     let account: String?

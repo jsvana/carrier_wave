@@ -9,6 +9,16 @@ extension DashboardView {
         qrzCallsign = await qrzClient.getCallsign()
     }
 
+    /// Refresh service configuration status from Keychain
+    /// Called on appear to pick up changes made in settings
+    func refreshServiceStatus() {
+        lofiIsConfigured = lofiClient.isConfigured
+        lofiIsLinked = lofiClient.isLinked
+        lofiCallsign = lofiClient.getCallsign()
+        hamrsIsConfigured = hamrsClient.isConfigured
+        lotwIsConfigured = lotwClient.isConfigured
+    }
+
     func performFullSync() async {
         isSyncing = true
         defer {
@@ -188,6 +198,7 @@ extension DashboardView {
     func clearHAMRSCredentials() async {
         await hamrsClient.clearCredentials()
         hamrsSyncResult = nil
+        refreshServiceStatus()
     }
 
     func syncFromLoTW() async {
@@ -215,5 +226,6 @@ extension DashboardView {
         // Clear LoTW timestamps to allow re-download
         await lotwClient.clearCredentials()
         lotwSyncResult = "Cleared"
+        refreshServiceStatus()
     }
 }

@@ -211,13 +211,18 @@ extension DashboardView {
 
     // MARK: - POTA Card
 
+    @ViewBuilder
     var potaCard: some View {
         let inPOTA = uploadedCount(for: .pota)
         let pending = pendingCount(for: .pota)
-        let isInMaintenance =
-            POTAClient.isInMaintenanceWindow() && !(debugMode && bypassPOTAMaintenance)
+        // Check maintenance inline - debugMode and bypassPOTAMaintenance are @AppStorage
+        let canBypass = debugMode && bypassPOTAMaintenance
+        let isInMaintenance = POTAClient.isInMaintenanceWindow() && !canBypass
+        _ = print(
+            "[POTA Card] debug=\(debugMode), bypass=\(bypassPOTAMaintenance), maint=\(isInMaintenance)"
+        )
 
-        return VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("POTA")
                     .font(.headline)
