@@ -2,6 +2,15 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
+## [1.8.3] - 2026-01-27
+
+### Added
+- "Request a Feature" button in Settings linking to Discord
+
+### Fixed
+- Deduplication now treats equivalent modes as duplicates (PHONE/SSB/USB/LSB/AM/FM/DV, DATA/FT8/FT4/PSK31/RTTY)
+- When merging duplicates, the more specific mode is preserved (e.g., SSB over PHONE)
+
 ## [1.8.2] - 2026-01-27
 
 ### Added
