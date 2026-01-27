@@ -141,7 +141,6 @@
 | File | Purpose |
 |------|---------|
 | `KeychainHelper.swift` | Secure credential storage |
-| `ShakeDetector.swift` | Shake gesture detection for bug reports |
 
 ## Building and Testing
 

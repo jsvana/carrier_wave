@@ -98,18 +98,6 @@ struct ContentView: View {
             // Navigate to challenges tab
             selectedTab = .challenges
         }
-        .onShake {
-            // Debounce: ignore shakes within 1 second of each other
-            let now = Date()
-            if let lastShake = lastShakeTime, now.timeIntervalSince(lastShake) < 1.0 {
-                return
-            }
-            lastShakeTime = now
-            showingBugReport = true
-        }
-        .sheet(isPresented: $showingBugReport) {
-            BugReportView(potaAuth: potaAuthService, iCloudMonitor: iCloudMonitor)
-        }
     }
 
     // MARK: Private
@@ -120,8 +108,6 @@ struct ContentView: View {
     @State private var selectedTab: AppTab = .dashboard
     @State private var syncService: SyncService?
     @State private var potaClient: POTAClient?
-    @State private var showingBugReport = false
-    @State private var lastShakeTime: Date?
 
     private let lofiClient = LoFiClient()
     private let qrzClient = QRZClient()
