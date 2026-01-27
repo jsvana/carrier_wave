@@ -2,6 +2,11 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
+## [1.8.2] - 2026-01-27
+
+### Fixed
+- Configure button on dashboard service cards now navigates to settings instead of spinning indefinitely
+
 ## [1.8.0] - 2026-01-27
 
 ### Changed
