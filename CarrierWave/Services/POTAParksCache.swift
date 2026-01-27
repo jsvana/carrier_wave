@@ -10,18 +10,22 @@ import Foundation
 struct POTAParksCacheMetadata: Codable, Sendable {
     let downloadedAt: Date
     let recordCount: Int
+}
 
-    static func load(from url: URL) -> POTAParksCacheMetadata? {
-        guard let data = try? Data(contentsOf: url) else {
-            return nil
-        }
-        return try? JSONDecoder().decode(POTAParksCacheMetadata.self, from: data)
+// MARK: - POTAParksCacheMetadata File Operations
+
+/// Load metadata from disk (nonisolated helper for actor use)
+private func loadParksCacheMetadata(from url: URL) -> POTAParksCacheMetadata? {
+    guard let data = try? Data(contentsOf: url) else {
+        return nil
     }
+    return try? JSONDecoder().decode(POTAParksCacheMetadata.self, from: data)
+}
 
-    func save(to url: URL) {
-        if let data = try? JSONEncoder().encode(self) {
-            try? data.write(to: url)
-        }
+/// Save metadata to disk (nonisolated helper for actor use)
+private func saveParksCacheMetadata(_ metadata: POTAParksCacheMetadata, to url: URL) {
+    if let data = try? JSONEncoder().encode(metadata) {
+        try? data.write(to: url)
     }
 }
 
@@ -178,7 +182,7 @@ actor POTAParksCache {
     }
 
     private func loadMetadata() -> POTAParksCacheMetadata? {
-        POTAParksCacheMetadata.load(from: metadataFileURL)
+        loadParksCacheMetadata(from: metadataFileURL)
     }
 
     private func saveMetadata(recordCount: Int) {
@@ -186,7 +190,7 @@ actor POTAParksCache {
             downloadedAt: Date(),
             recordCount: recordCount
         )
-        metadata.save(to: metadataFileURL)
+        saveParksCacheMetadata(metadata, to: metadataFileURL)
     }
 
     private func downloadAndCache() async throws {

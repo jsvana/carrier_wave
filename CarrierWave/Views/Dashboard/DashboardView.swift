@@ -31,26 +31,15 @@ struct DashboardView: View {
     }
 
     /// Derived counts from ServicePresence
-    /// Use direct query on allPresence to avoid SwiftData relationship refresh issues
     func uploadedCount(for service: ServiceType) -> Int {
-        let count = allPresence.filter { $0.serviceType == service && $0.isPresent }.count
-        // Debug: print breakdown
-        if service == .lofi, debugMode {
-            let total = qsos.count
-            let withLofiPresence = allPresence.filter { $0.serviceType == .lofi }.count
-            let withLofiPresent = allPresence.filter { $0.serviceType == .lofi && $0.isPresent }
-                .count
-            print(
-                "[Dashboard] LoFi: total=\(total), presence=\(withLofiPresence), isPresent=\(withLofiPresent)"
-            )
-        }
-        return count
+        allPresence.filter { $0.serviceType == service && $0.isPresent }.count
     }
 
     func pendingCount(for service: ServiceType) -> Int {
         allPresence.filter { $0.serviceType == service && $0.needsUpload }.count
     }
 
+    // Sync state
     @State var isSyncing = false
     @State var syncingService: ServiceType?
     @State var lastSyncDate: Date?
@@ -82,71 +71,90 @@ struct DashboardView: View {
     @State var hamrsIsConfigured: Bool = false
     @State var lotwIsConfigured: Bool = false
 
+    /// Service detail sheet state
+    @State var selectedService: ServiceIdentifier?
+
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
-                    // Activity Grid
                     activityCard
-
-                    // Summary Stats
                     summaryCard
-
-                    // Service Cards (2x3 grid)
-                    HStack(spacing: 12) {
-                        lofiCard
-                        qrzCard
-                    }
-                    HStack(spacing: 12) {
-                        potaCard
-                        hamrsCard
-                    }
-                    HStack(spacing: 12) {
-                        lotwCard
-                        icloudCard
-                    }
+                    servicesList
                 }
                 .padding()
             }
+            .background(Color(.systemGroupedBackground))
             .onAppear {
                 loadQRZConfig()
                 refreshServiceStatus()
             }
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: 12) {
-                        if debugMode {
-                            Button {
-                                Task { await performDownloadOnly() }
-                            } label: {
-                                if isSyncing {
-                                    ProgressView()
-                                } else {
-                                    Image(systemName: "arrow.down.circle")
-                                }
-                            }
-                            .disabled(isSyncing)
-                            .accessibilityLabel("Download only")
-                        }
-
-                        Button {
-                            Task { await performFullSync() }
-                        } label: {
-                            if isSyncing {
-                                ProgressView()
-                            } else {
-                                Image(systemName: "arrow.triangle.2.circlepath")
-                            }
-                        }
-                        .disabled(isSyncing)
-                        .accessibilityLabel("Sync all services")
-                    }
+                    toolbarButtons
+                }
+            }
+            .sheet(item: $selectedService) { service in
+                serviceDetailSheet(for: service)
+            }
+            .sheet(isPresented: $showingQRZSetup) {
+                QRZApiKeySheet(
+                    apiKey: $qrzApiKey,
+                    callsign: $qrzCallsign,
+                    isAuthenticated: $qrzIsConfigured,
+                    errorMessage: $qrzErrorMessage,
+                    showingError: $showingQRZError
+                )
+            }
+            .sheet(isPresented: $showingPOTALogin) {
+                POTALoginSheet(authService: potaAuth)
+            }
+            .alert("Error", isPresented: $showingQRZError) {
+                Button("OK") {}
+            } message: {
+                Text(qrzErrorMessage)
+            }
+            .onChange(of: qrzIsConfigured) { _, isConfigured in
+                if isConfigured {
+                    loadQRZConfig()
                 }
             }
         }
     }
 
-    // MARK: - Activity Card (GitHub-style)
+    // MARK: - Toolbar
+
+    private var toolbarButtons: some View {
+        HStack(spacing: 12) {
+            if debugMode {
+                Button {
+                    Task { await performDownloadOnly() }
+                } label: {
+                    if isSyncing {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "arrow.down.circle")
+                    }
+                }
+                .disabled(isSyncing)
+                .accessibilityLabel("Download only")
+            }
+
+            Button {
+                Task { await performFullSync() }
+            } label: {
+                if isSyncing {
+                    ProgressView()
+                } else {
+                    Image(systemName: "arrow.triangle.2.circlepath")
+                }
+            }
+            .disabled(isSyncing)
+            .accessibilityLabel("Sync all services")
+        }
+    }
+
+    // MARK: - Activity Card
 
     private var activityCard: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -182,72 +190,75 @@ struct DashboardView: View {
                 }
             }
 
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible()),
-                    GridItem(.flexible()),
-                ], spacing: 12
-            ) {
-                Button {
-                    selectedTab = .logs
-                } label: {
-                    StatBox(
-                        title: "QSOs", value: "\(stats.totalQSOs)",
-                        icon: "antenna.radiowaves.left.and.right"
-                    )
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink {
-                    StatDetailView(category: .qsls, items: stats.items(for: .qsls))
-                } label: {
-                    StatBox(title: "QSLs", value: "\(stats.confirmedQSLs)", icon: "checkmark.seal")
-                }
-                .buttonStyle(.plain)
-
-                if lotwIsConfigured {
-                    NavigationLink {
-                        StatDetailView(category: .entities, items: stats.items(for: .entities))
-                    } label: {
-                        StatBox(
-                            title: "DXCC Entities", value: "\(stats.uniqueEntities)", icon: "globe"
-                        )
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    StatBox(title: "DXCC Entities", value: "--", icon: "globe")
-                        .opacity(0.5)
-                }
-
-                NavigationLink {
-                    StatDetailView(category: .grids, items: stats.items(for: .grids))
-                } label: {
-                    StatBox(title: "Grids", value: "\(stats.uniqueGrids)", icon: "square.grid.3x3")
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink {
-                    StatDetailView(category: .bands, items: stats.items(for: .bands))
-                } label: {
-                    StatBox(title: "Bands", value: "\(stats.uniqueBands)", icon: "waveform")
-                }
-                .buttonStyle(.plain)
-
-                NavigationLink {
-                    StatDetailView(category: .parks, items: stats.items(for: .parks))
-                } label: {
-                    ActivationsStatBox(successful: stats.successfulActivations)
-                }
-                .buttonStyle(.plain)
-            }
+            statsGrid
         }
         .padding()
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
+
+    private var statsGrid: some View {
+        LazyVGrid(
+            columns: [
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+                GridItem(.flexible()),
+            ], spacing: 12
+        ) {
+            Button {
+                selectedTab = .logs
+            } label: {
+                StatBox(
+                    title: "QSOs",
+                    value: "\(stats.totalQSOs)",
+                    icon: "antenna.radiowaves.left.and.right"
+                )
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                StatDetailView(category: .qsls, items: stats.items(for: .qsls))
+            } label: {
+                StatBox(title: "QSLs", value: "\(stats.confirmedQSLs)", icon: "checkmark.seal")
+            }
+            .buttonStyle(.plain)
+
+            if lotwIsConfigured {
+                NavigationLink {
+                    StatDetailView(category: .entities, items: stats.items(for: .entities))
+                } label: {
+                    StatBox(title: "DXCC Entities", value: "\(stats.uniqueEntities)", icon: "globe")
+                }
+                .buttonStyle(.plain)
+            } else {
+                StatBox(title: "DXCC Entities", value: "--", icon: "globe")
+                    .opacity(0.5)
+            }
+
+            NavigationLink {
+                StatDetailView(category: .grids, items: stats.items(for: .grids))
+            } label: {
+                StatBox(title: "Grids", value: "\(stats.uniqueGrids)", icon: "square.grid.3x3")
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                StatDetailView(category: .bands, items: stats.items(for: .bands))
+            } label: {
+                StatBox(title: "Bands", value: "\(stats.uniqueBands)", icon: "waveform")
+            }
+            .buttonStyle(.plain)
+
+            NavigationLink {
+                StatDetailView(category: .parks, items: stats.items(for: .parks))
+            } label: {
+                ActivationsStatBox(successful: stats.successfulActivations)
+            }
+            .buttonStyle(.plain)
+        }
+    }
 }
 
-// Service cards are in DashboardView+ServiceCards.swift
+// Services list and detail sheets are in DashboardView+Services.swift
 // Action methods are in DashboardView+Actions.swift
 // Helper views are in DashboardHelperViews.swift

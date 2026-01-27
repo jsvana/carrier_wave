@@ -87,11 +87,12 @@
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |
 |------|---------|
-| `DashboardView.swift` | Main dashboard with stats grid |
-| `DashboardView+Actions.swift` | Dashboard action handlers |
-| `DashboardView+ServiceCards.swift` | Service status cards (LoFi, QRZ, POTA) |
-| `DashboardView+ServiceCardsSecondary.swift` | Service status cards (HAMRS, LoTW, iCloud) |
-| `DashboardHelperViews.swift` | Reusable dashboard components |
+| `DashboardView.swift` | Main dashboard with stats grid and services list |
+| `DashboardView+Actions.swift` | Dashboard action handlers (sync, clear data) |
+| `DashboardView+Services.swift` | Services list builder and detail sheet builders |
+| `DashboardHelperViews.swift` | Reusable dashboard components (StatBox, ActivityGrid, QSOStatistics) |
+| `ServiceListView.swift` | Vertical stacked service list with status indicators |
+| `ServiceDetailSheet.swift` | Service detail sheet for tap-through actions |
 | `StatDetailView.swift` | Drilldown view for stat categories |
 | `StatItemRow.swift` | Individual stat row with expandable QSOs |
 

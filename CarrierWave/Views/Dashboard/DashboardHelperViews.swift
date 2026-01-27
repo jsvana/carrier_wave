@@ -19,7 +19,7 @@ struct QSOStatistics {
     }
 
     var uniqueBands: Int {
-        Set(realQSOs.map(\.band)).count
+        Set(realQSOs.map { $0.band.lowercased() }).count
     }
 
     var confirmedQSLs: Int {
@@ -120,7 +120,7 @@ struct QSOStatistics {
     }
 
     private func groupedByBand() -> [StatCategoryItem] {
-        let grouped = Dictionary(grouping: realQSOs) { $0.band }
+        let grouped = Dictionary(grouping: realQSOs) { $0.band.lowercased() }
         return grouped.map { band, qsos in
             StatCategoryItem(
                 identifier: band,
@@ -359,130 +359,5 @@ struct ActivityGrid: View {
         }
         let intensity = min(Double(count) / Double(max(maxCount, 1)), 1.0)
         return Color.green.opacity(0.3 + intensity * 0.7)
-    }
-}
-
-// MARK: - AnimatedSyncButton
-
-struct AnimatedSyncButton: View {
-    // MARK: Internal
-
-    let title: String
-    let isAnimating: Bool
-    let isDisabled: Bool
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: 6) {
-                Image(systemName: "arrow.triangle.2.circlepath")
-                    .rotationEffect(.degrees(rotation))
-                Text(title)
-            }
-        }
-        .buttonStyle(.bordered)
-        .disabled(isDisabled)
-        .onChange(of: isAnimating) { _, animating in
-            if animating {
-                withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
-                    rotation = 360
-                }
-            } else {
-                withAnimation(.default) {
-                    rotation = 0
-                }
-            }
-        }
-    }
-
-    // MARK: Private
-
-    @State private var rotation: Double = 0
-}
-
-// MARK: - SyncStatusOverlay
-
-struct SyncStatusOverlay: View {
-    // MARK: Internal
-
-    let phase: SyncService.SyncPhase?
-    let service: ServiceType
-
-    var body: some View {
-        HStack(spacing: 6) {
-            // Animated spinner
-            Image(systemName: "arrow.triangle.2.circlepath")
-                .font(.subheadline)
-                .foregroundStyle(statusColor)
-                .rotationEffect(.degrees(rotation))
-                .scaleEffect(pulseScale)
-
-            Text(statusText)
-                .font(.caption)
-                .fontWeight(.medium)
-                .foregroundStyle(statusColor)
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(statusColor.opacity(0.15))
-        .clipShape(Capsule())
-        .onAppear {
-            withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
-                rotation = 360
-            }
-            withAnimation(.easeInOut(duration: 0.8).repeatForever(autoreverses: true)) {
-                pulseScale = 1.1
-            }
-        }
-    }
-
-    // MARK: Private
-
-    @State private var pulseScale: CGFloat = 1.0
-    @State private var rotation: Double = 0
-
-    private var isActive: Bool {
-        guard let phase else {
-            return false
-        }
-        switch phase {
-        case let .downloading(svc),
-             let .uploading(svc):
-            return svc == service
-        case .processing:
-            return true
-        }
-    }
-
-    private var statusText: String {
-        guard let phase else {
-            return ""
-        }
-        switch phase {
-        case let .downloading(svc) where svc == service:
-            return "Downloading..."
-        case let .uploading(svc) where svc == service:
-            return "Uploading..."
-        case .processing:
-            return "Processing..."
-        default:
-            return "Waiting..."
-        }
-    }
-
-    private var statusColor: Color {
-        guard let phase else {
-            return .gray
-        }
-        switch phase {
-        case let .downloading(svc) where svc == service:
-            return .blue
-        case let .uploading(svc) where svc == service:
-            return .green
-        case .processing:
-            return .orange
-        default:
-            return .gray
-        }
     }
 }
