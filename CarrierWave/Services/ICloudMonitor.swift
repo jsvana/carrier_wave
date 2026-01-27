@@ -21,6 +21,14 @@ class ICloudMonitor: ObservableObject {
             .appendingPathComponent("Import")
     }
 
+    var statusDescription: String {
+        if fileManager.url(forUbiquityContainerIdentifier: nil) != nil {
+            isMonitoring ? "Available (Monitoring)" : "Available"
+        } else {
+            "Not Available"
+        }
+    }
+
     func startMonitoring() {
         guard !isMonitoring else {
             return
