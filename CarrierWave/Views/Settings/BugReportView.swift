@@ -209,23 +209,30 @@ struct BugReportView: View {
             return
         }
 
-        // No screenshot: prefer mailto: URL (opens user's default mail app: Gmail, Outlook, etc.)
-        if let mailtoURL = createMailtoURL() {
-            print("[BugReport] Opening mailto URL: \(mailtoURL.absoluteString.prefix(200))...")
-            UIApplication.shared.open(mailtoURL) { success in
-                print("[BugReport] mailto open result: \(success)")
-                if !success {
-                    DispatchQueue.main.async {
-                        tryFallbackMailMethods()
+        #if targetEnvironment(simulator)
+            // Simulator can't open mailto: URLs due to entitlement restrictions
+            print("[BugReport] Running in simulator, copying to clipboard")
+            UIPasteboard.general.string = emailBody
+            showingCopiedAlert = true
+        #else
+            // No screenshot: prefer mailto: URL (opens user's default mail app: Gmail, Outlook, etc.)
+            if let mailtoURL = createMailtoURL() {
+                print("[BugReport] Opening mailto URL: \(mailtoURL.absoluteString.prefix(200))...")
+                UIApplication.shared.open(mailtoURL) { success in
+                    print("[BugReport] mailto open result: \(success)")
+                    if !success {
+                        DispatchQueue.main.async {
+                            tryFallbackMailMethods()
+                        }
                     }
                 }
+                dismiss()
+                return
             }
-            dismiss()
-            return
-        }
 
-        print("[BugReport] Failed to create mailto URL, trying fallbacks")
-        tryFallbackMailMethods()
+            print("[BugReport] Failed to create mailto URL, trying fallbacks")
+            tryFallbackMailMethods()
+        #endif
     }
 
     private func tryFallbackMailMethods() {
