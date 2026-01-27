@@ -10,6 +10,17 @@ enum AppTab: Hashable {
     case settings
 }
 
+// MARK: - SettingsDestination
+
+enum SettingsDestination: Hashable {
+    case qrz
+    case pota
+    case lofi
+    case hamrs
+    case lotw
+    case icloud
+}
+
 // MARK: - ContentView
 
 struct ContentView: View {
@@ -22,7 +33,8 @@ struct ContentView: View {
                     iCloudMonitor: iCloudMonitor,
                     potaAuth: potaAuthService,
                     syncService: syncService,
-                    selectedTab: $selectedTab
+                    selectedTab: $selectedTab,
+                    settingsDestination: $settingsDestination
                 )
                 .tabItem {
                     Label("Dashboard", systemImage: "square.grid.2x2")
@@ -57,10 +69,10 @@ struct ContentView: View {
 
             Group {
                 if let syncService {
-                    SettingsMainView(potaAuth: potaAuthService)
+                    SettingsMainView(potaAuth: potaAuthService, destination: $settingsDestination)
                         .environmentObject(syncService)
                 } else {
-                    SettingsMainView(potaAuth: potaAuthService)
+                    SettingsMainView(potaAuth: potaAuthService, destination: $settingsDestination)
                 }
             }
             .tabItem {
@@ -106,6 +118,7 @@ struct ContentView: View {
     @StateObject private var iCloudMonitor = ICloudMonitor()
     @StateObject private var potaAuthService = POTAAuthService()
     @State private var selectedTab: AppTab = .dashboard
+    @State private var settingsDestination: SettingsDestination?
     @State private var syncService: SyncService?
     @State private var potaClient: POTAClient?
 

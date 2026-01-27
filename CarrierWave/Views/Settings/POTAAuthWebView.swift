@@ -46,6 +46,18 @@ struct POTALoginSheet: View {
                 }
             }
         }
+        .task {
+            do {
+                _ = try await authService.authenticate()
+                // Authentication succeeded, dismiss the sheet
+                dismiss()
+            } catch POTAAuthError.authenticationCancelled {
+                // User cancelled, already handled by cancel button
+            } catch {
+                // Other errors - the webView may still be showing error state
+                // User can cancel manually
+            }
+        }
     }
 
     // MARK: Private

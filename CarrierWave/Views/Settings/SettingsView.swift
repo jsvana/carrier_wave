@@ -7,7 +7,9 @@ import UIKit
 struct SettingsMainView: View {
     @Environment(\.modelContext) private var modelContext
     @ObservedObject var potaAuth: POTAAuthService
+    @Binding var destination: SettingsDestination?
 
+    @State private var navigationPath = NavigationPath()
     @State private var showingError = false
     @State private var errorMessage = ""
     @State private var showingClearAllConfirmation = false
@@ -39,7 +41,7 @@ struct SettingsMainView: View {
     @Query(sort: \ChallengeSource.name) private var challengeSources: [ChallengeSource]
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $navigationPath) {
             List {
                 SyncSourcesSection(
                     potaAuth: potaAuth,
@@ -59,8 +61,34 @@ struct SettingsMainView: View {
                 dataSection
                 aboutSection
             }
+            .navigationDestination(for: SettingsDestination.self) { dest in
+                switch dest {
+                case .qrz:
+                    QRZSettingsView()
+                case .pota:
+                    POTASettingsView(potaAuth: potaAuth)
+                case .lofi:
+                    LoFiSettingsView()
+                case .hamrs:
+                    HAMRSSettingsView()
+                case .lotw:
+                    LoTWSettingsView()
+                case .icloud:
+                    ICloudSettingsView()
+                }
+            }
             .onAppear {
                 loadServiceStatus()
+            }
+            .task(id: destination) {
+                // Handle deep link - task restarts when destination changes
+                guard let dest = destination else {
+                    return
+                }
+                // Small delay to ensure NavigationStack is ready after tab switch
+                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+                navigationPath.append(dest)
+                destination = nil
             }
             .alert("Error", isPresented: $showingError) {
                 Button("OK") {}

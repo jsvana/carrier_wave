@@ -186,7 +186,11 @@ extension DashboardView {
             isMonitoring: nil,
             onSync: { await syncFromLoFi() },
             onClearData: { await clearLoFiData() },
-            onConfigure: { selectedService = nil }
+            onConfigure: {
+                selectedService = nil
+                settingsDestination = .lofi
+                selectedTab = .settings
+            }
         )
     }
 
@@ -211,7 +215,8 @@ extension DashboardView {
             onClearData: { await clearQRZData() },
             onConfigure: {
                 selectedService = nil
-                showingQRZSetup = true
+                settingsDestination = .qrz
+                selectedTab = .settings
             }
         )
     }
@@ -240,7 +245,8 @@ extension DashboardView {
             onClearData: nil,
             onConfigure: {
                 selectedService = nil
-                showingPOTALogin = true
+                settingsDestination = .pota
+                selectedTab = .settings
             }
         )
     }
@@ -264,7 +270,11 @@ extension DashboardView {
             isMonitoring: nil,
             onSync: { await syncFromHAMRS() },
             onClearData: nil,
-            onConfigure: { selectedService = nil }
+            onConfigure: {
+                selectedService = nil
+                settingsDestination = .hamrs
+                selectedTab = .settings
+            }
         )
     }
 
@@ -287,7 +297,11 @@ extension DashboardView {
             isMonitoring: nil,
             onSync: { await syncFromLoTW() },
             onClearData: { clearLoTWData() },
-            onConfigure: { selectedService = nil }
+            onConfigure: {
+                selectedService = nil
+                settingsDestination = .lotw
+                selectedTab = .settings
+            }
         )
     }
 
@@ -310,7 +324,11 @@ extension DashboardView {
             isMonitoring: iCloudMonitor.isMonitoring,
             onSync: nil,
             onClearData: nil,
-            onConfigure: nil
+            onConfigure: {
+                selectedService = nil
+                settingsDestination = .icloud
+                selectedTab = .settings
+            }
         )
     }
 }

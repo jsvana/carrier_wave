@@ -12,6 +12,7 @@ struct DashboardView: View {
     @ObservedObject var potaAuth: POTAAuthService
     @ObservedObject var syncService: SyncService
     @Binding var selectedTab: AppTab
+    @Binding var settingsDestination: SettingsDestination?
 
     @AppStorage("debugMode") var debugMode = false
     @AppStorage("bypassPOTAMaintenance") var bypassPOTAMaintenance = false
@@ -48,14 +49,9 @@ struct DashboardView: View {
     // QRZ state
     @State var qrzCallsign: String?
     @State var qrzIsConfigured: Bool = false
-    @State var showingQRZSetup: Bool = false
-    @State var qrzApiKey: String = ""
-    @State var qrzErrorMessage: String = ""
-    @State var showingQRZError: Bool = false
     @State var qrzSyncResult: String?
 
-    // POTA state
-    @State var showingPOTALogin: Bool = false
+    /// POTA state
     @State var potaSyncResult: String?
 
     /// HAMRS state
@@ -96,28 +92,6 @@ struct DashboardView: View {
             }
             .sheet(item: $selectedService) { service in
                 serviceDetailSheet(for: service)
-            }
-            .sheet(isPresented: $showingQRZSetup) {
-                QRZApiKeySheet(
-                    apiKey: $qrzApiKey,
-                    callsign: $qrzCallsign,
-                    isAuthenticated: $qrzIsConfigured,
-                    errorMessage: $qrzErrorMessage,
-                    showingError: $showingQRZError
-                )
-            }
-            .sheet(isPresented: $showingPOTALogin) {
-                POTALoginSheet(authService: potaAuth)
-            }
-            .alert("Error", isPresented: $showingQRZError) {
-                Button("OK") {}
-            } message: {
-                Text(qrzErrorMessage)
-            }
-            .onChange(of: qrzIsConfigured) { _, isConfigured in
-                if isConfigured {
-                    loadQRZConfig()
-                }
             }
         }
     }
