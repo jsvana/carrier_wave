@@ -1,5 +1,4 @@
 import Foundation
-import MessageUI
 import UIKit
 
 // MARK: - BugCategory
@@ -54,12 +53,6 @@ final class BugReportService {
         let lotwConfigured: Bool
         let hamrsConfigured: Bool
         let iCloudStatus: String
-    }
-
-    static let recipientEmail = "jaysvana@gmail.com"
-
-    static func canSendMail() -> Bool {
-        MFMailComposeViewController.canSendMail()
     }
 
     func collectDeviceInfo(debugMode: Bool) -> DeviceInfo {
@@ -148,10 +141,6 @@ final class BugReportService {
         ----------------
         \(syncLogs)
         """
-    }
-
-    func emailSubject(category: BugCategory, version: String) -> String {
-        "[Carrier Wave Bug] \(category.rawValue) - v\(version)"
     }
 
     // MARK: Private

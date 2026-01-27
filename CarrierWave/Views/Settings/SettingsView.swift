@@ -206,6 +206,10 @@ struct SettingsMainView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Link(destination: URL(string: "https://discord.gg/qgWeQKZPHT")!) {
+                Label("Join Discord", systemImage: "bubble.left.and.bubble.right")
+            }
+
             Button {
                 showingBugReport = true
             } label: {

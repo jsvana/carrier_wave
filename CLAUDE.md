@@ -134,8 +134,7 @@
 | `SyncDebugView.swift` | Sync debugging interface |
 | `AttributionsView.swift` | Third-party attributions |
 | `ExternalDataView.swift` | External data cache status and refresh (POTA parks) |
-| `BugReportView.swift` | Bug report form with mail composer |
-| `MailComposeView.swift` | MFMailComposeViewController wrapper |
+| `BugReportView.swift` | Bug report form with dpaste upload and Discord instructions |
 
 ### Utilities (`CarrierWave/Utilities/`)
 | File | Purpose |

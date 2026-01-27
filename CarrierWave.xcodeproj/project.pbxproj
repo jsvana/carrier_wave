@@ -29,9 +29,22 @@
 		CF8DD1C62F2098950021A936 /* CarrierWaveUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = CarrierWaveUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		CF2284E92F29585A0043E333 /* Exceptions for "CarrierWave" folder in "CarrierWave" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = CF8DD1AC2F2098940021A936 /* CarrierWave */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		CF8DD1AF2F2098940021A936 /* CarrierWave */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				CF2284E92F29585A0043E333 /* Exceptions for "CarrierWave" folder in "CarrierWave" target */,
+			);
 			path = CarrierWave;
 			sourceTree = "<group>";
 		};
@@ -400,6 +413,8 @@
 				DEVELOPMENT_TEAM = 7UE4RDLUSX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CarrierWave/Info.plist;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -409,7 +424,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.8.0;
+				MARKETING_VERSION = 1.8.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jsvana.FullDuplex;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -432,6 +447,8 @@
 				DEVELOPMENT_TEAM = 7UE4RDLUSX;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = CarrierWave/Info.plist;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -441,7 +458,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.8.0;
+				MARKETING_VERSION = 1.8.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jsvana.FullDuplex;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
@@ -463,7 +480,7 @@
 				DEVELOPMENT_TEAM = 7UE4RDLUSX;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.8.0;
+				MARKETING_VERSION = 1.8.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jsvana.FullDuplexTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -485,7 +502,7 @@
 				DEVELOPMENT_TEAM = 7UE4RDLUSX;
 				GENERATE_INFOPLIST_FILE = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 26.2;
-				MARKETING_VERSION = 1.8.0;
+				MARKETING_VERSION = 1.8.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jsvana.FullDuplexTests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -505,7 +522,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7UE4RDLUSX;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.8.0;
+				MARKETING_VERSION = 1.8.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jsvana.FullDuplexUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
@@ -525,7 +542,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 7UE4RDLUSX;
 				GENERATE_INFOPLIST_FILE = YES;
-				MARKETING_VERSION = 1.8.0;
+				MARKETING_VERSION = 1.8.1;
 				PRODUCT_BUNDLE_IDENTIFIER = com.jsvana.FullDuplexUITests;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				STRING_CATALOG_GENERATE_SYMBOLS = NO;
