@@ -1,6 +1,7 @@
 import MessageUI
 import PhotosUI
 import SwiftUI
+import UIKit
 
 struct BugReportView: View {
     // MARK: Lifecycle
@@ -200,16 +201,42 @@ struct BugReportView: View {
 
     private func sendReport() {
         isSending = true
+        defer { isSending = false }
 
-        if BugReportService.canSendMail() {
+        // If we have a screenshot, prefer MFMailComposeViewController (supports attachments)
+        // Otherwise prefer mailto: (works with Gmail, Outlook, etc.)
+        if screenshotData != nil, BugReportService.canSendMail() {
             showingMailComposer = true
-        } else {
-            // Fallback: copy to clipboard
-            UIPasteboard.general.string = emailBody
-            showingCopiedAlert = true
+            return
         }
 
-        isSending = false
+        // Try mailto: URL (works with any mail app, but no attachment support)
+        if let mailtoURL = createMailtoURL(), UIApplication.shared.canOpenURL(mailtoURL) {
+            UIApplication.shared.open(mailtoURL)
+            dismiss()
+            return
+        }
+
+        // Fallback to MFMailComposeViewController even without screenshot
+        if BugReportService.canSendMail() {
+            showingMailComposer = true
+            return
+        }
+
+        // Last resort: copy to clipboard
+        UIPasteboard.general.string = emailBody
+        showingCopiedAlert = true
+    }
+
+    private func createMailtoURL() -> URL? {
+        var components = URLComponents()
+        components.scheme = "mailto"
+        components.path = BugReportService.recipientEmail
+        components.queryItems = [
+            URLQueryItem(name: "subject", value: emailSubject),
+            URLQueryItem(name: "body", value: emailBody),
+        ]
+        return components.url
     }
 
     private func handleMailResult(_ result: MFMailComposeResult) {
@@ -218,8 +245,9 @@ struct BugReportView: View {
         case .sent:
             dismiss()
         case .failed:
-            errorMessage = "Failed to send email. Please try again."
-            showingError = true
+            // Try clipboard fallback on failure
+            UIPasteboard.general.string = emailBody
+            showingCopiedAlert = true
         case .cancelled,
              .saved:
             break
