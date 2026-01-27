@@ -98,7 +98,7 @@ struct ContentView: View {
             // Navigate to challenges tab
             selectedTab = .challenges
         }
-        .onReceive(NotificationCenter.default.publisher(for: .deviceDidShake)) { _ in
+        .onShake {
             // Debounce: ignore shakes within 1 second of each other
             let now = Date()
             if let lastShake = lastShakeTime, now.timeIntervalSince(lastShake) < 1.0 {

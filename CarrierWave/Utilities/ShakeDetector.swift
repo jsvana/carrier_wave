@@ -1,41 +1,43 @@
 import SwiftUI
 import UIKit
 
-// MARK: - ShakeDetector
-
-/// A view modifier that detects device shake gestures
-struct ShakeDetector: ViewModifier {
-    let onShake: () -> Void
-
-    func body(content: Content) -> some View {
-        content
-            .onReceive(NotificationCenter.default.publisher(for: .deviceDidShake)) { _ in
-                onShake()
-            }
-    }
-}
-
-extension View {
-    func onShake(perform action: @escaping () -> Void) -> some View {
-        modifier(ShakeDetector(onShake: action))
-    }
-}
-
 // MARK: - Notification.Name Extension
 
 extension Notification.Name {
     static let deviceDidShake = Notification.Name("deviceDidShakeNotification")
 }
 
-// MARK: - ShakeDetectingWindow
+// MARK: - ShakeDetectingViewController
 
-/// Custom UIWindow subclass that detects shake gestures
-/// Add this to your App's WindowGroup scene
-class ShakeDetectingWindow: UIWindow {
+/// A view controller that detects shake gestures and posts a notification
+final class ShakeDetectingViewController: UIViewController {
     override func motionEnded(_ motion: UIEvent.EventSubtype, with event: UIEvent?) {
         if motion == .motionShake {
             NotificationCenter.default.post(name: .deviceDidShake, object: nil)
         }
         super.motionEnded(motion, with: event)
+    }
+}
+
+// MARK: - ShakeDetectingView
+
+/// A SwiftUI view that wraps a shake-detecting view controller
+struct ShakeDetectingView: UIViewControllerRepresentable {
+    func makeUIViewController(context: Context) -> ShakeDetectingViewController {
+        ShakeDetectingViewController()
+    }
+
+    func updateUIViewController(_ uiViewController: ShakeDetectingViewController, context: Context) {}
+}
+
+// MARK: - View Extension
+
+extension View {
+    /// Adds shake gesture detection to this view
+    func onShake(perform action: @escaping () -> Void) -> some View {
+        background(ShakeDetectingView())
+            .onReceive(NotificationCenter.default.publisher(for: .deviceDidShake)) { _ in
+                action()
+            }
     }
 }

@@ -1,46 +1,12 @@
 import SwiftData
 import SwiftUI
-import UIKit
 import UniformTypeIdentifiers
-
-// MARK: - AppDelegate
-
-class AppDelegate: NSObject, UIApplicationDelegate {
-    func application(
-        _ application: UIApplication,
-        configurationForConnecting connectingSceneSession: UISceneSession,
-        options: UIScene.ConnectionOptions
-    ) -> UISceneConfiguration {
-        let config = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
-        config.delegateClass = ShakeDetectingSceneDelegate.self
-        return config
-    }
-}
-
-// MARK: - ShakeDetectingSceneDelegate
-
-class ShakeDetectingSceneDelegate: UIResponder, UIWindowSceneDelegate {
-    var window: UIWindow?
-
-    func scene(
-        _ scene: UIScene,
-        willConnectTo session: UISceneSession,
-        options connectionOptions: UIScene.ConnectionOptions
-    ) {
-        guard let windowScene = scene as? UIWindowScene else {
-            return
-        }
-        window = ShakeDetectingWindow(windowScene: windowScene)
-    }
-}
 
 // MARK: - CarrierWaveApp
 
 @main
 struct CarrierWaveApp: App {
     // MARK: Internal
-
-    @UIApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([

@@ -203,21 +203,32 @@ struct BugReportView: View {
         isSending = true
         defer { isSending = false }
 
-        // If we have a screenshot, prefer MFMailComposeViewController (supports attachments)
-        // Otherwise prefer mailto: (works with Gmail, Outlook, etc.)
+        // If we have a screenshot, must use MFMailComposeViewController (supports attachments)
         if screenshotData != nil, BugReportService.canSendMail() {
             showingMailComposer = true
             return
         }
 
-        // Try mailto: URL (works with any mail app, but no attachment support)
-        if let mailtoURL = createMailtoURL(), UIApplication.shared.canOpenURL(mailtoURL) {
-            UIApplication.shared.open(mailtoURL)
+        // No screenshot: prefer mailto: URL (opens user's default mail app: Gmail, Outlook, etc.)
+        // Just try to open it - iOS will handle showing an error if no mail app is configured
+        if let mailtoURL = createMailtoURL() {
+            UIApplication.shared.open(mailtoURL) { success in
+                if !success {
+                    // mailto: failed, try fallbacks on main thread
+                    DispatchQueue.main.async {
+                        tryFallbackMailMethods()
+                    }
+                }
+            }
             dismiss()
             return
         }
 
-        // Fallback to MFMailComposeViewController even without screenshot
+        tryFallbackMailMethods()
+    }
+
+    private func tryFallbackMailMethods() {
+        // Try MFMailComposeViewController
         if BugReportService.canSendMail() {
             showingMailComposer = true
             return
