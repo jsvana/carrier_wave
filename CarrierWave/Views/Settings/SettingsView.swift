@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import UIKit
 
 // MARK: - SettingsMainView
 
@@ -15,6 +16,8 @@ struct SettingsMainView: View {
     @State private var isDeduplicating = false
     @State private var showingDedupeResult = false
     @State private var dedupeResultMessage = ""
+    @State private var isExportingDatabase = false
+    @State private var exportedFile: ExportedFile?
 
     @AppStorage("debugMode") private var debugMode = false
     @AppStorage("readOnlyMode") private var readOnlyMode = false
@@ -37,231 +40,23 @@ struct SettingsMainView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    // QRZ
-                    NavigationLink {
-                        QRZSettingsView()
-                    } label: {
-                        HStack {
-                            Label("QRZ Logbook", systemImage: "globe")
-                            Spacer()
-                            if qrzIsConfigured {
-                                if let callsign = qrzCallsign {
-                                    Text(callsign)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                    .accessibilityLabel("Connected")
-                            }
-                        }
-                    }
-
-                    // POTA
-                    NavigationLink {
-                        POTASettingsView(potaAuth: potaAuth)
-                    } label: {
-                        HStack {
-                            Label("POTA", systemImage: "leaf")
-                            Spacer()
-                            if let token = potaAuth.currentToken, !token.isExpired {
-                                if let callsign = token.callsign {
-                                    Text(callsign)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                    .accessibilityLabel("Logged in")
-                            }
-                        }
-                    }
-
-                    // LoFi
-                    NavigationLink {
-                        LoFiSettingsView()
-                    } label: {
-                        HStack {
-                            Label("Ham2K LoFi", systemImage: "antenna.radiowaves.left.and.right")
-                            Spacer()
-                            if lofiClient.isConfigured {
-                                if let callsign = lofiClient.getCallsign() {
-                                    Text(callsign)
-                                        .foregroundStyle(.secondary)
-                                }
-                                if lofiClient.isLinked {
-                                    Image(systemName: "checkmark.circle.fill")
-                                        .foregroundStyle(.green)
-                                        .accessibilityLabel("Connected")
-                                } else {
-                                    Image(systemName: "clock")
-                                        .foregroundStyle(.orange)
-                                        .accessibilityLabel("Pending connection")
-                                }
-                            }
-                        }
-                    }
-
-                    // HAMRS
-                    NavigationLink {
-                        HAMRSSettingsView()
-                    } label: {
-                        HStack {
-                            Label("HAMRS Pro", systemImage: "rectangle.stack")
-                            Spacer()
-                            if hamrsClient.isConfigured {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                    .accessibilityLabel("Connected")
-                            }
-                        }
-                    }
-
-                    // LoTW
-                    NavigationLink {
-                        LoTWSettingsView()
-                    } label: {
-                        HStack {
-                            Label("LoTW", systemImage: "envelope.badge.shield.half.filled")
-                            Spacer()
-                            if lotwIsConfigured {
-                                if let username = lotwUsername {
-                                    Text(username)
-                                        .foregroundStyle(.secondary)
-                                }
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                    .accessibilityLabel("Connected")
-                            }
-                        }
-                    }
-
-                    // iCloud
-                    NavigationLink {
-                        ICloudSettingsView()
-                    } label: {
-                        HStack {
-                            Label("iCloud Folder", systemImage: "icloud")
-                            Spacer()
-                            if iCloudMonitor.iCloudContainerURL != nil {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                    .accessibilityLabel("Available")
-                            }
-                        }
-                    }
-
-                    // Challenges
-                    NavigationLink {
-                        ChallengesSettingsView()
-                    } label: {
-                        HStack {
-                            Label("Challenges", systemImage: "flag.2.crossed")
-                            Spacer()
-                            if challengeSources.contains(where: { $0.lastFetched != nil }) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .foregroundStyle(.green)
-                                    .accessibilityLabel("Connected")
-                            }
-                        }
-                    }
-                } header: {
-                    Text("Sync Sources")
-                }
-
-                Section {
-                    Stepper(
-                        "Time window: \(dedupeTimeWindow) min", value: $dedupeTimeWindow, in: 1 ... 15
-                    )
-
-                    Button {
-                        Task { await runDeduplication() }
-                    } label: {
-                        if isDeduplicating {
-                            HStack {
-                                ProgressView()
-                                    .padding(.trailing, 4)
-                                Text("Scanning...")
-                            }
-                        } else {
-                            Text("Find & Merge Duplicates")
-                        }
-                    }
-                    .disabled(isDeduplicating)
-                } header: {
-                    Text("Deduplication")
-                } footer: {
-                    Text(
-                        "Find QSOs with same callsign, band, and mode within \(dedupeTimeWindow) min and merge."
-                    )
-                }
-
-                Section {
-                    Toggle("Debug Mode", isOn: $debugMode)
-
-                    if debugMode {
-                        Toggle("Read-Only Mode", isOn: $readOnlyMode)
-                        Toggle("Bypass POTA Maintenance", isOn: $bypassPOTAMaintenance)
-
-                        NavigationLink {
-                            SyncDebugView()
-                        } label: {
-                            Label("Sync Debug Log", systemImage: "doc.text.magnifyingglass")
-                        }
-
-                        Button(role: .destructive) {
-                            showingClearAllConfirmation = true
-                        } label: {
-                            if isClearingQSOs {
-                                HStack {
-                                    ProgressView()
-                                    Text("Clearing...")
-                                }
-                            } else {
-                                Text("Clear All QSOs")
-                            }
-                        }
-                        .disabled(isClearingQSOs)
-                    }
-                } header: {
-                    Text("Developer")
-                } footer: {
-                    if debugMode, bypassPOTAMaintenance {
-                        Text("POTA maintenance window bypass enabled. Uploads allowed 24/7.")
-                    } else if debugMode, readOnlyMode {
-                        Text(
-                            "Read-only mode: uploads disabled. Downloads and local changes still work."
-                        )
-                    } else {
-                        Text("Shows individual sync buttons on service cards and debug tools")
-                    }
-                }
-
-                Section {
-                    NavigationLink {
-                        ExternalDataView()
-                    } label: {
-                        Label("External Data", systemImage: "arrow.down.circle")
-                    }
-                } header: {
-                    Text("Data")
-                }
-
-                Section {
-                    HStack {
-                        Text("Version")
-                        Spacer()
-                        Text("1.8.0")
-                            .foregroundStyle(.secondary)
-                    }
-
-                    NavigationLink {
-                        AttributionsView()
-                    } label: {
-                        Label("Attributions", systemImage: "heart")
-                    }
-                } header: {
-                    Text("About")
-                }
+                SyncSourcesSection(
+                    potaAuth: potaAuth,
+                    lofiClient: lofiClient,
+                    qrzClient: qrzClient,
+                    hamrsClient: hamrsClient,
+                    lotwClient: lotwClient,
+                    iCloudMonitor: iCloudMonitor,
+                    qrzIsConfigured: qrzIsConfigured,
+                    qrzCallsign: qrzCallsign,
+                    lotwIsConfigured: lotwIsConfigured,
+                    lotwUsername: lotwUsername,
+                    challengeSources: challengeSources
+                )
+                deduplicationSection
+                developerSection
+                dataSection
+                aboutSection
             }
             .onAppear {
                 loadServiceStatus()
@@ -286,6 +81,149 @@ struct SettingsMainView: View {
             } message: {
                 Text(dedupeResultMessage)
             }
+            .sheet(
+                item: $exportedFile,
+                onDismiss: { isExportingDatabase = false },
+                content: { file in ShareSheet(activityItems: [file.url]) }
+            )
+        }
+    }
+
+    // MARK: - Sections
+
+    private var deduplicationSection: some View {
+        Section {
+            Stepper(
+                "Time window: \(dedupeTimeWindow) min", value: $dedupeTimeWindow, in: 1 ... 15
+            )
+
+            Button {
+                Task { await runDeduplication() }
+            } label: {
+                if isDeduplicating {
+                    HStack {
+                        ProgressView()
+                            .padding(.trailing, 4)
+                        Text("Scanning...")
+                    }
+                } else {
+                    Text("Find & Merge Duplicates")
+                }
+            }
+            .disabled(isDeduplicating)
+        } header: {
+            Text("Deduplication")
+        } footer: {
+            Text(
+                "Find QSOs with same callsign, band, and mode within \(dedupeTimeWindow) min and merge."
+            )
+        }
+    }
+
+    private var developerSection: some View {
+        Section {
+            Toggle("Debug Mode", isOn: $debugMode)
+
+            if debugMode {
+                Toggle("Read-Only Mode", isOn: $readOnlyMode)
+                Toggle("Bypass POTA Maintenance", isOn: $bypassPOTAMaintenance)
+
+                NavigationLink {
+                    SyncDebugView()
+                } label: {
+                    Label("Sync Debug Log", systemImage: "doc.text.magnifyingglass")
+                }
+
+                Button(role: .destructive) {
+                    showingClearAllConfirmation = true
+                } label: {
+                    if isClearingQSOs {
+                        HStack {
+                            ProgressView()
+                            Text("Clearing...")
+                        }
+                    } else {
+                        Text("Clear All QSOs")
+                    }
+                }
+                .disabled(isClearingQSOs)
+            }
+        } header: {
+            Text("Developer")
+        } footer: {
+            if debugMode, bypassPOTAMaintenance {
+                Text("POTA maintenance window bypass enabled. Uploads allowed 24/7.")
+            } else if debugMode, readOnlyMode {
+                Text(
+                    "Read-only mode: uploads disabled. Downloads and local changes still work."
+                )
+            } else {
+                Text("Shows individual sync buttons on service cards and debug tools")
+            }
+        }
+    }
+
+    private var dataSection: some View {
+        Section {
+            NavigationLink {
+                ExternalDataView()
+            } label: {
+                Label("External Data", systemImage: "arrow.down.circle")
+            }
+
+            Button {
+                isExportingDatabase = true
+                Task { await exportDatabase() }
+            } label: {
+                if isExportingDatabase {
+                    HStack {
+                        ProgressView()
+                            .padding(.trailing, 4)
+                        Text("Exporting...")
+                    }
+                } else {
+                    Label("Export SQLite Database", systemImage: "square.and.arrow.up")
+                }
+            }
+            .disabled(isExportingDatabase)
+        } header: {
+            Text("Data")
+        } footer: {
+            Text("Export a complete copy of the QSO database for backup or analysis.")
+        }
+    }
+
+    private var aboutSection: some View {
+        Section {
+            HStack {
+                Text("Version")
+                Spacer()
+                Text("1.8.1")
+                    .foregroundStyle(.secondary)
+            }
+
+            NavigationLink {
+                AttributionsView()
+            } label: {
+                Label("Attributions", systemImage: "heart")
+            }
+        } header: {
+            Text("About")
+        }
+    }
+
+    // MARK: - Actions
+
+    @MainActor
+    private func exportDatabase() async {
+        do {
+            try modelContext.save()
+            let exportURL = try await DatabaseExporter.export(from: modelContext.container)
+            exportedFile = ExportedFile(url: exportURL)
+        } catch {
+            isExportingDatabase = false
+            errorMessage = "Failed to export database: \(error.localizedDescription)"
+            showingError = true
         }
     }
 
@@ -343,5 +281,82 @@ struct SettingsMainView: View {
     }
 }
 
+// MARK: - ExportedFile
+
 // QRZApiKeySheet, QRZSettingsView, POTASettingsView are in ServiceSettingsViews.swift
 // ICloudSettingsView, LoFiSettingsView are in CloudSettingsViews.swift
+
+struct ExportedFile: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+// MARK: - DatabaseExporter
+
+enum DatabaseExporter {
+    enum ExportError: LocalizedError {
+        case storeNotFound
+
+        // MARK: Internal
+
+        var errorDescription: String? {
+            switch self {
+            case .storeNotFound:
+                "Could not locate the database file."
+            }
+        }
+    }
+
+    static func export(from container: ModelContainer) async throws -> URL {
+        guard let config = container.configurations.first else {
+            throw ExportError.storeNotFound
+        }
+        let storeURL = config.url
+
+        return try await Task.detached(priority: .userInitiated) {
+            let dateFormatter = DateFormatter()
+            dateFormatter.dateFormat = "yyyy-MM-dd_HHmmss"
+            let timestamp = dateFormatter.string(from: Date())
+            let exportFilename = "CarrierWave_QSO_Export_\(timestamp).sqlite"
+
+            let tempDir = FileManager.default.temporaryDirectory
+            let exportURL = tempDir.appendingPathComponent(exportFilename)
+
+            if FileManager.default.fileExists(atPath: exportURL.path) {
+                try FileManager.default.removeItem(at: exportURL)
+            }
+
+            try FileManager.default.copyItem(at: storeURL, to: exportURL)
+
+            // Copy WAL and SHM files if they exist for complete export
+            for ext in ["wal", "shm"] {
+                let sourceURL = storeURL.appendingPathExtension(ext)
+                let destURL = exportURL.appendingPathExtension(ext)
+                if FileManager.default.fileExists(atPath: sourceURL.path) {
+                    if FileManager.default.fileExists(atPath: destURL.path) {
+                        try FileManager.default.removeItem(at: destURL)
+                    }
+                    try FileManager.default.copyItem(at: sourceURL, to: destURL)
+                }
+            }
+
+            return exportURL
+        }.value
+    }
+}
+
+// MARK: - ShareSheet
+
+struct ShareSheet: UIViewControllerRepresentable {
+    let activityItems: [Any]
+    var applicationActivities: [UIActivity]?
+
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(
+            activityItems: activityItems,
+            applicationActivities: applicationActivities
+        )
+    }
+
+    func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}

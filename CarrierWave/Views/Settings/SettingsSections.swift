@@ -1,0 +1,152 @@
+import SwiftData
+import SwiftUI
+
+// MARK: - SyncSourcesSection
+
+struct SyncSourcesSection: View {
+    @ObservedObject var potaAuth: POTAAuthService
+    let lofiClient: LoFiClient
+    let qrzClient: QRZClient
+    let hamrsClient: HAMRSClient
+    let lotwClient: LoTWClient
+    @ObservedObject var iCloudMonitor: ICloudMonitor
+
+    let qrzIsConfigured: Bool
+    let qrzCallsign: String?
+    let lotwIsConfigured: Bool
+    let lotwUsername: String?
+    let challengeSources: [ChallengeSource]
+
+    var body: some View {
+        Section {
+            // QRZ
+            NavigationLink {
+                QRZSettingsView()
+            } label: {
+                HStack {
+                    Label("QRZ Logbook", systemImage: "globe")
+                    Spacer()
+                    if qrzIsConfigured {
+                        if let callsign = qrzCallsign {
+                            Text(callsign)
+                                .foregroundStyle(.secondary)
+                        }
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .accessibilityLabel("Connected")
+                    }
+                }
+            }
+
+            // POTA
+            NavigationLink {
+                POTASettingsView(potaAuth: potaAuth)
+            } label: {
+                HStack {
+                    Label("POTA", systemImage: "leaf")
+                    Spacer()
+                    if let token = potaAuth.currentToken, !token.isExpired {
+                        if let callsign = token.callsign {
+                            Text(callsign)
+                                .foregroundStyle(.secondary)
+                        }
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .accessibilityLabel("Logged in")
+                    }
+                }
+            }
+
+            // LoFi
+            NavigationLink {
+                LoFiSettingsView()
+            } label: {
+                HStack {
+                    Label("Ham2K LoFi", systemImage: "antenna.radiowaves.left.and.right")
+                    Spacer()
+                    if lofiClient.isConfigured {
+                        if let callsign = lofiClient.getCallsign() {
+                            Text(callsign)
+                                .foregroundStyle(.secondary)
+                        }
+                        if lofiClient.isLinked {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundStyle(.green)
+                                .accessibilityLabel("Connected")
+                        } else {
+                            Image(systemName: "clock")
+                                .foregroundStyle(.orange)
+                                .accessibilityLabel("Pending connection")
+                        }
+                    }
+                }
+            }
+
+            // HAMRS
+            NavigationLink {
+                HAMRSSettingsView()
+            } label: {
+                HStack {
+                    Label("HAMRS Pro", systemImage: "rectangle.stack")
+                    Spacer()
+                    if hamrsClient.isConfigured {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .accessibilityLabel("Connected")
+                    }
+                }
+            }
+
+            // LoTW
+            NavigationLink {
+                LoTWSettingsView()
+            } label: {
+                HStack {
+                    Label("LoTW", systemImage: "envelope.badge.shield.half.filled")
+                    Spacer()
+                    if lotwIsConfigured {
+                        if let username = lotwUsername {
+                            Text(username)
+                                .foregroundStyle(.secondary)
+                        }
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .accessibilityLabel("Connected")
+                    }
+                }
+            }
+
+            // iCloud
+            NavigationLink {
+                ICloudSettingsView()
+            } label: {
+                HStack {
+                    Label("iCloud Folder", systemImage: "icloud")
+                    Spacer()
+                    if iCloudMonitor.iCloudContainerURL != nil {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .accessibilityLabel("Available")
+                    }
+                }
+            }
+
+            // Challenges
+            NavigationLink {
+                ChallengesSettingsView()
+            } label: {
+                HStack {
+                    Label("Challenges", systemImage: "flag.2.crossed")
+                    Spacer()
+                    if challengeSources.contains(where: { $0.lastFetched != nil }) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .accessibilityLabel("Connected")
+                    }
+                }
+            }
+        } header: {
+            Text("Sync Sources")
+        }
+    }
+}
