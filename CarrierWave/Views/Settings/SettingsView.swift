@@ -18,6 +18,7 @@ struct SettingsMainView: View {
     @State private var dedupeResultMessage = ""
     @State private var isExportingDatabase = false
     @State private var exportedFile: ExportedFile?
+    @State private var showingBugReport = false
 
     @AppStorage("debugMode") private var debugMode = false
     @AppStorage("readOnlyMode") private var readOnlyMode = false
@@ -86,6 +87,9 @@ struct SettingsMainView: View {
                 onDismiss: { isExportingDatabase = false },
                 content: { file in ShareSheet(activityItems: [file.url]) }
             )
+            .sheet(isPresented: $showingBugReport) {
+                BugReportView(potaAuth: potaAuth, iCloudMonitor: iCloudMonitor)
+            }
         }
     }
 
@@ -200,6 +204,12 @@ struct SettingsMainView: View {
                 Spacer()
                 Text("1.8.1")
                     .foregroundStyle(.secondary)
+            }
+
+            Button {
+                showingBugReport = true
+            } label: {
+                Label("Report a Bug", systemImage: "ant")
             }
 
             NavigationLink {
