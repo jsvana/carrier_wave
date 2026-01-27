@@ -234,7 +234,7 @@ struct SettingsMainView: View {
                     .foregroundStyle(.secondary)
             }
 
-            Link(destination: URL(string: "https://discord.gg/qgWeQKZPHT")!) {
+            Link(destination: URL(string: "https://discord.gg/PqubUxWW62")!) {
                 Label("Join Discord", systemImage: "bubble.left.and.bubble.right")
             }
 

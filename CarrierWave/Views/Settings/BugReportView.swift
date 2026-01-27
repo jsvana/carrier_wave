@@ -43,7 +43,7 @@ struct BugReportView: View {
 
     // MARK: Private
 
-    private static let discordURL = "https://discord.gg/qgWeQKZPHT"
+    private static let discordURL = "https://discord.gg/PqubUxWW62"
 
     @Environment(\.dismiss) private var dismiss
 
