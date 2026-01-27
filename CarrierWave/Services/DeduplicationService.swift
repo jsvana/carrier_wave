@@ -90,6 +90,19 @@ actor DeduplicationService {
 
     // MARK: Private
 
+    // MARK: - Mode Equivalence
+
+    /// Generic mode names that should be replaced by specific modes when merging
+    private static let genericModes: Set<String> = ["PHONE", "DATA"]
+
+    /// Phone mode family - all considered equivalent for deduplication
+    private static let phoneModes: Set<String> = ["PHONE", "SSB", "USB", "LSB", "AM", "FM", "DV"]
+
+    /// Digital mode family - all considered equivalent for deduplication
+    private static let digitalModes: Set<String> = [
+        "DATA", "FT8", "FT4", "PSK31", "PSK", "RTTY", "JT65", "JT9", "MFSK", "OLIVIA",
+    ]
+
     private let modelContext: ModelContext
 
     /// Check if two QSOs are duplicates (same callsign, mode, park reference, and optionally band)
@@ -98,7 +111,7 @@ actor DeduplicationService {
     /// Park reference (your activation park) must match - different activations are not duplicates.
     private func isDuplicate(_ qso1: QSO, _ qso2: QSO) -> Bool {
         let callsignMatch = qso1.callsign.uppercased() == qso2.callsign.uppercased()
-        let modeMatch = qso1.mode.uppercased() == qso2.mode.uppercased()
+        let modeMatch = modesAreEquivalent(qso1.mode, qso2.mode)
 
         guard callsignMatch && modeMatch else {
             return false
@@ -194,6 +207,8 @@ actor DeduplicationService {
         if winnerBand.isEmpty, !loserBand.isEmpty {
             winner.band = loser.band
         }
+        // Prefer specific mode over generic (e.g., SSB over PHONE)
+        winner.mode = moreSpecificMode(winner.mode, loser.mode)
     }
 
     /// Transfer service presence records from loser to winner
@@ -213,5 +228,46 @@ actor DeduplicationService {
                 winner.servicePresence.append(presence)
             }
         }
+    }
+
+    /// Check if two modes are equivalent (handles PHONE/SSB/USB/LSB aliases and digital modes)
+    private func modesAreEquivalent(_ mode1: String, _ mode2: String) -> Bool {
+        let m1 = mode1.uppercased()
+        let m2 = mode2.uppercased()
+
+        // Direct match
+        if m1 == m2 {
+            return true
+        }
+
+        // Check if both are in the same mode family
+        if Self.phoneModes.contains(m1), Self.phoneModes.contains(m2) {
+            return true
+        }
+        if Self.digitalModes.contains(m1), Self.digitalModes.contains(m2) {
+            return true
+        }
+
+        return false
+    }
+
+    /// Returns the more specific of two equivalent modes (prefers SSB over PHONE, FT8 over DATA)
+    private func moreSpecificMode(_ mode1: String, _ mode2: String) -> String {
+        let m1 = mode1.uppercased()
+        let m2 = mode2.uppercased()
+
+        // If one is generic and the other isn't, prefer the specific one
+        let m1IsGeneric = Self.genericModes.contains(m1)
+        let m2IsGeneric = Self.genericModes.contains(m2)
+
+        if m1IsGeneric, !m2IsGeneric {
+            return mode2
+        }
+        if m2IsGeneric, !m1IsGeneric {
+            return mode1
+        }
+
+        // Both specific or both generic - keep the first one
+        return mode1
     }
 }

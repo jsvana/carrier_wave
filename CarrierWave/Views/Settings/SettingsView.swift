@@ -147,7 +147,11 @@ struct SettingsMainView: View {
             Text("Deduplication")
         } footer: {
             Text(
-                "Find QSOs with same callsign, band, and mode within \(dedupeTimeWindow) min and merge."
+                """
+                Find QSOs with same callsign, band, and mode within \(dedupeTimeWindow) min \
+                and merge. Mode families are treated as equivalent (e.g., PHONE/SSB/USB, \
+                DATA/FT8/PSK31).
+                """
             )
         }
     }
@@ -242,6 +246,10 @@ struct SettingsMainView: View {
                 showingBugReport = true
             } label: {
                 Label("Report a Bug", systemImage: "ant")
+            }
+
+            Link(destination: URL(string: "https://discord.gg/ksNb2jAeTR")!) {
+                Label("Request a Feature", systemImage: "lightbulb")
             }
 
             NavigationLink {
