@@ -210,11 +210,11 @@ struct BugReportView: View {
         }
 
         // No screenshot: prefer mailto: URL (opens user's default mail app: Gmail, Outlook, etc.)
-        // Just try to open it - iOS will handle showing an error if no mail app is configured
         if let mailtoURL = createMailtoURL() {
+            print("[BugReport] Opening mailto URL: \(mailtoURL.absoluteString.prefix(200))...")
             UIApplication.shared.open(mailtoURL) { success in
+                print("[BugReport] mailto open result: \(success)")
                 if !success {
-                    // mailto: failed, try fallbacks on main thread
                     DispatchQueue.main.async {
                         tryFallbackMailMethods()
                     }
@@ -224,30 +224,45 @@ struct BugReportView: View {
             return
         }
 
+        print("[BugReport] Failed to create mailto URL, trying fallbacks")
         tryFallbackMailMethods()
     }
 
     private func tryFallbackMailMethods() {
         // Try MFMailComposeViewController
         if BugReportService.canSendMail() {
+            print("[BugReport] Using MFMailComposeViewController fallback")
             showingMailComposer = true
             return
         }
 
         // Last resort: copy to clipboard
+        print("[BugReport] Copying to clipboard as last resort")
         UIPasteboard.general.string = emailBody
         showingCopiedAlert = true
     }
 
     private func createMailtoURL() -> URL? {
+        // mailto: URLs have length limits (~2000 chars), so truncate body if needed
+        let maxBodyLength = 1_500
+        var truncatedBody = emailBody
+        if truncatedBody.count > maxBodyLength {
+            truncatedBody = String(truncatedBody.prefix(maxBodyLength)) + "\n\n[Log truncated - full log in clipboard]"
+            // Also copy full body to clipboard
+            UIPasteboard.general.string = emailBody
+        }
+
         var components = URLComponents()
         components.scheme = "mailto"
         components.path = BugReportService.recipientEmail
         components.queryItems = [
             URLQueryItem(name: "subject", value: emailSubject),
-            URLQueryItem(name: "body", value: emailBody),
+            URLQueryItem(name: "body", value: truncatedBody),
         ]
-        return components.url
+
+        let url = components.url
+        print("[BugReport] Created mailto URL, length: \(url?.absoluteString.count ?? 0)")
+        return url
     }
 
     private func handleMailResult(_ result: MFMailComposeResult) {
