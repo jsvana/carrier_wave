@@ -8,35 +8,34 @@ struct QSOStatistics {
 
     let qsos: [QSO]
 
-    var totalQSOs: Int { qsos.count }
+    var totalQSOs: Int { realQSOs.count }
 
     var uniqueEntities: Int {
-        Set(qsos.compactMap { $0.dxccEntity?.number }).count
+        Set(realQSOs.compactMap { $0.dxccEntity?.number }).count
     }
 
     var uniqueGrids: Int {
-        Set(qsos.compactMap(\.theirGrid).filter { !$0.isEmpty }).count
+        Set(realQSOs.compactMap(\.theirGrid).filter { !$0.isEmpty }).count
     }
 
     var uniqueBands: Int {
-        Set(qsos.map(\.band)).count
+        Set(realQSOs.map(\.band)).count
     }
 
     var confirmedQSLs: Int {
-        qsos.filter(\.lotwConfirmed).count
+        realQSOs.filter(\.lotwConfirmed).count
     }
 
     var uniqueParks: Int {
-        Set(qsos.compactMap(\.parkReference).filter { !$0.isEmpty }).count
+        Set(realQSOs.compactMap(\.parkReference).filter { !$0.isEmpty }).count
     }
 
     /// Activations with 10+ QSOs (valid POTA activations)
     /// Each activation is a unique park+UTC date combination
     var successfulActivations: Int {
-        // Filter to QSOs with park references, excluding metadata modes
-        let parksOnly = qsos.filter {
+        // Filter to QSOs with park references (realQSOs already excludes metadata)
+        let parksOnly = realQSOs.filter {
             $0.parkReference != nil && !$0.parkReference!.isEmpty
-                && !Self.metadataModes.contains($0.mode.uppercased())
         }
         // Group by park + UTC date (each UTC day at a park is a separate activation)
         let grouped = Dictionary(grouping: parksOnly) { qso in
@@ -48,10 +47,9 @@ struct QSOStatistics {
     /// Activations with <10 QSOs (activation attempts)
     /// Each activation is a unique park+UTC date combination
     var attemptedActivations: Int {
-        // Filter to QSOs with park references, excluding metadata modes
-        let parksOnly = qsos.filter {
+        // Filter to QSOs with park references (realQSOs already excludes metadata)
+        let parksOnly = realQSOs.filter {
             $0.parkReference != nil && !$0.parkReference!.isEmpty
-                && !Self.metadataModes.contains($0.mode.uppercased())
         }
         // Group by park + UTC date (each UTC day at a park is a separate activation)
         let grouped = Dictionary(grouping: parksOnly) { qso in
@@ -62,7 +60,7 @@ struct QSOStatistics {
 
     var activityByDate: [Date: Int] {
         var activity: [Date: Int] = [:]
-        for qso in qsos {
+        for qso in realQSOs {
             let date = qso.dateOnly
             activity[date, default: 0] += 1
         }
@@ -87,12 +85,17 @@ struct QSOStatistics {
     // MARK: Private
 
     /// Modes that represent activation metadata, not actual QSOs (from Ham2K PoLo)
-    /// These should never be counted as QSOs for activation purposes
+    /// These should never be counted as QSOs for any statistics
     private static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
 
+    /// QSOs filtered to exclude metadata modes - use this for all stat calculations
+    private var realQSOs: [QSO] {
+        qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
+    }
+
     private func groupedByEntity() -> [StatCategoryItem] {
-        // Group by DXCC entity number
-        let withEntity = qsos.filter { $0.dxccEntity != nil }
+        // Group by DXCC entity number (realQSOs excludes metadata)
+        let withEntity = realQSOs.filter { $0.dxccEntity != nil }
         let grouped = Dictionary(grouping: withEntity) { $0.dxccEntity!.number }
         return grouped.map { entityNumber, qsos in
             let entity = qsos.first?.dxccEntity
@@ -105,7 +108,7 @@ struct QSOStatistics {
     }
 
     private func groupedByGrid() -> [StatCategoryItem] {
-        let gridsOnly = qsos.filter { $0.theirGrid != nil && !$0.theirGrid!.isEmpty }
+        let gridsOnly = realQSOs.filter { $0.theirGrid != nil && !$0.theirGrid!.isEmpty }
         let grouped = Dictionary(grouping: gridsOnly) { $0.theirGrid! }
         return grouped.map { grid, qsos in
             StatCategoryItem(
@@ -117,7 +120,7 @@ struct QSOStatistics {
     }
 
     private func groupedByBand() -> [StatCategoryItem] {
-        let grouped = Dictionary(grouping: qsos) { $0.band }
+        let grouped = Dictionary(grouping: realQSOs) { $0.band }
         return grouped.map { band, qsos in
             StatCategoryItem(
                 identifier: band,
@@ -128,7 +131,7 @@ struct QSOStatistics {
     }
 
     private func groupedByQSL() -> [StatCategoryItem] {
-        let confirmed = qsos.filter(\.lotwConfirmed)
+        let confirmed = realQSOs.filter(\.lotwConfirmed)
         // Group by DXCC entity for confirmed QSLs
         let withEntity = confirmed.filter { $0.dxccEntity != nil }
         let grouped = Dictionary(grouping: withEntity) { $0.dxccEntity!.number }
@@ -143,10 +146,9 @@ struct QSOStatistics {
     }
 
     private func groupedByPark() -> [StatCategoryItem] {
-        // Filter to QSOs with park references, excluding metadata modes
-        let parksOnly = qsos.filter {
+        // Filter to QSOs with park references (realQSOs already excludes metadata)
+        let parksOnly = realQSOs.filter {
             $0.parkReference != nil && !$0.parkReference!.isEmpty
-                && !Self.metadataModes.contains($0.mode.uppercased())
         }
         // Group by park + UTC date (each UTC day at a park is a separate activation)
         let grouped = Dictionary(grouping: parksOnly) { qso in

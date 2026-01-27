@@ -92,14 +92,28 @@ actor DeduplicationService {
 
     private let modelContext: ModelContext
 
-    /// Check if two QSOs are duplicates (same callsign, mode, and optionally band)
+    /// Check if two QSOs are duplicates (same callsign, mode, park reference, and optionally band)
     /// When either QSO has no band (empty string), matches on callsign+mode+time only.
     /// This handles POTA.app QSOs which don't include frequency/band info.
+    /// Park reference (your activation park) must match - different activations are not duplicates.
     private func isDuplicate(_ qso1: QSO, _ qso2: QSO) -> Bool {
         let callsignMatch = qso1.callsign.uppercased() == qso2.callsign.uppercased()
         let modeMatch = qso1.mode.uppercased() == qso2.mode.uppercased()
 
         guard callsignMatch && modeMatch else {
+            return false
+        }
+
+        // Park reference (your activation park) must match
+        // nil/nil = match, value/value = must match, nil/value = no match
+        let park1 = qso1.parkReference?.trimmingCharacters(in: .whitespaces).uppercased()
+        let park2 = qso2.parkReference?.trimmingCharacters(in: .whitespaces).uppercased()
+
+        // Normalize empty strings to nil for comparison
+        let normalizedPark1 = (park1?.isEmpty ?? true) ? nil : park1
+        let normalizedPark2 = (park2?.isEmpty ?? true) ? nil : park2
+
+        if normalizedPark1 != normalizedPark2 {
             return false
         }
 
