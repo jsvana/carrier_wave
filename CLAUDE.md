@@ -83,6 +83,7 @@
 | `ChallengesSyncService+Participation.swift` | Challenge participation, progress sync, leaderboards |
 | `ChallengeProgressEngine.swift` | Challenge progress calculation |
 | `ChallengeQSOMatcher.swift` | Match QSOs to challenge criteria |
+| `BugReportService.swift` | Collects device/app info for bug reports |
 
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |
@@ -133,11 +134,14 @@
 | `SyncDebugView.swift` | Sync debugging interface |
 | `AttributionsView.swift` | Third-party attributions |
 | `ExternalDataView.swift` | External data cache status and refresh (POTA parks) |
+| `BugReportView.swift` | Bug report form with mail composer |
+| `MailComposeView.swift` | MFMailComposeViewController wrapper |
 
 ### Utilities (`CarrierWave/Utilities/`)
 | File | Purpose |
 |------|---------|
 | `KeychainHelper.swift` | Secure credential storage |
+| `ShakeDetector.swift` | Shake gesture detection for bug reports |
 
 ## Building and Testing
 
