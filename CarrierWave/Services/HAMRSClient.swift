@@ -18,6 +18,10 @@ final class HAMRSClient {
         (try? keychain.readString(for: KeychainHelper.Keys.hamrsApiKey)) != nil
     }
 
+    func hasApiKey() -> Bool {
+        isConfigured
+    }
+
     func getApiKey() -> String? {
         try? keychain.readString(for: KeychainHelper.Keys.hamrsApiKey)
     }

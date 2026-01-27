@@ -70,6 +70,10 @@ final class LoFiClient {
         (try? keychain.readString(for: KeychainHelper.Keys.lofiAuthToken)) != nil
     }
 
+    func hasCredentials() -> Bool {
+        isConfigured && isLinked
+    }
+
     func getCallsign() -> String? {
         try? keychain.readString(for: KeychainHelper.Keys.lofiCallsign)
     }
