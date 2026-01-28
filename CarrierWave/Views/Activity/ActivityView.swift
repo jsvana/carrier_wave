@@ -45,6 +45,34 @@ struct ActivityView: View {
             } message: {
                 Text(errorMessage ?? "An unknown error occurred")
             }
+            .sheet(isPresented: $showingInviteSheet) {
+                if let invite = pendingInvite {
+                    InviteJoinSheet(
+                        invite: invite,
+                        syncService: syncService,
+                        isJoining: $isJoiningFromInvite,
+                        onComplete: { success in
+                            showingInviteSheet = false
+                            pendingInvite = nil
+                            if !success {
+                                errorMessage = "Failed to join challenge"
+                                showingError = true
+                            }
+                        }
+                    )
+                }
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(for: .didReceiveChallengeInvite)
+            ) { notification in
+                handleInviteNotification(notification)
+            }
+            .onReceive(
+                NotificationCenter.default.publisher(for: .didSyncQSOs)
+            ) { _ in
+                Task { await evaluateNewQSOs() }
+            }
+            .miniTour(.challenges, tourState: tourState)
         }
     }
 
@@ -58,6 +86,11 @@ struct ActivityView: View {
     @State private var syncService: ChallengesSyncService?
     @State private var errorMessage: String?
     @State private var showingError = false
+
+    // Invite handling
+    @State private var pendingInvite: PendingChallengeInvite?
+    @State private var showingInviteSheet = false
+    @State private var isJoiningFromInvite = false
 
     private var activeParticipations: [ChallengeParticipation] {
         allParticipations.filter { $0.status == .active }
@@ -165,6 +198,44 @@ struct ActivityView: View {
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
+        }
+    }
+
+    private func handleInviteNotification(_ notification: Notification) {
+        guard let userInfo = notification.userInfo,
+              let source = userInfo["source"] as? String,
+              let challengeId = userInfo["challengeId"] as? UUID
+        else {
+            return
+        }
+
+        let token = userInfo["token"] as? String
+
+        pendingInvite = PendingChallengeInvite(
+            sourceURL: source,
+            challengeId: challengeId,
+            token: token
+        )
+        showingInviteSheet = true
+    }
+
+    private func evaluateNewQSOs() async {
+        guard let syncService else {
+            return
+        }
+
+        let descriptor = FetchDescriptor<QSO>(
+            sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+        )
+
+        do {
+            let recentQSOs = try modelContext.fetch(descriptor)
+            for qso in recentQSOs.prefix(100) {
+                syncService.progressEngine.evaluateQSO(qso, notificationsEnabled: false)
+            }
+            try modelContext.save()
+        } catch {
+            // Silently fail - background operation
         }
     }
 }
