@@ -93,6 +93,8 @@
 | `CallsignAliasService.swift` | Manage current and previous callsigns for alias matching |
 | `ChallengesClient+Friends.swift` | Friend API endpoints extension |
 | `FriendsSyncService.swift` | Friend data synchronization and actions |
+| `ChallengesClient+Clubs.swift` | Club API endpoints extension |
+| `ClubsSyncService.swift` | Club data synchronization |
 
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |
@@ -139,6 +141,8 @@
 | `FilterBar.swift` | Feed filter chips (All/Friends/Clubs) |
 | `FriendsListView.swift` | Friends list with pending requests |
 | `FriendSearchView.swift` | Search and add friends |
+| `ClubsListView.swift` | List of clubs user belongs to |
+| `ClubDetailView.swift` | Club details and member list |
 
 ### Views - Tour (`CarrierWave/Views/Tour/`)
 | File | Purpose |
@@ -242,9 +246,9 @@ When releasing a new version, update **both** locations:
 2. **Settings view** (`CarrierWave/Views/Settings/SettingsView.swift`):
    - Update the hardcoded version string in the "About" section (~line 232)
 
-## Issue Tracking
+## Issue and feature ideas
 
-This project uses **bd** (beads). Work is NOT complete until `git push` succeeds.
+I'll occasionally store human-generated plans/bugs/etc in `docs/plans/human` and `docs/bugs`. Look through these to find new work to do. Mark the documents as done in a way that you can easily find once they're completed.
 
 ## Git Workflow
 
