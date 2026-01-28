@@ -2,6 +2,20 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
+## [1.11.0] - 2026-01-28
+
+### Added
+- "Ready to Upload" section in POTA Activations view
+  - Pending activations pinned to top, sorted by date descending
+  - Park reference shown in each row for easy identification
+  - Existing "grouped by park" sections remain below
+
+### Fixed
+- POTA tour text changed from "AWS Cognito" to "External Logins (Google, Apple, etc.)" for clarity
+- Map confirmed filter now includes QSOs confirmed by either QRZ or LoTW (union)
+- Crash after device sleep when evaluating challenge progress
+  - ChallengesView now uses fresh ModelContext instead of cached reference
+
 ## [1.10.0] - 2026-01-28
 
 ### Added
