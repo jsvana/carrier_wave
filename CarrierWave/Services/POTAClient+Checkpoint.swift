@@ -6,6 +6,25 @@ import Foundation
 struct POTADownloadCheckpoint: Codable {
     let processedActivationKeys: Set<String>
     let lastBatchDate: Date
+    let adaptiveBatchSize: Int?
+}
+
+// MARK: - POTADownloadConfig
+
+/// Configuration for adaptive POTA downloads
+enum POTADownloadConfig {
+    /// Starting batch size (number of activations per batch)
+    static let initialBatchSize = 25
+    /// Minimum batch size when adapting down
+    static let minimumBatchSize = 5
+    /// Maximum batch size
+    static let maximumBatchSize = 50
+    /// Delay between activations in nanoseconds
+    static let interActivationDelay: UInt64 = 100_000_000 // 100ms
+    /// Delay after timeout before retry in nanoseconds
+    static let timeoutRetryDelay: UInt64 = 2_000_000_000 // 2s
+    /// Per-activation timeout in seconds
+    static let perActivationTimeout: TimeInterval = 30
 }
 
 // MARK: - POTAClient Checkpoint Methods
@@ -33,59 +52,155 @@ extension POTAClient {
 
     // MARK: - Fetch All QSOs
 
+    /// Fetch all QSOs with adaptive batching
+    /// Adjusts batch size based on timeouts and API responsiveness
     func fetchAllQSOs() async throws -> [POTAFetchedQSO] {
+        let debugLog = SyncDebugLog.shared
         let activations = try await fetchActivations()
-        var allFetched: [POTAFetchedQSO] = []
+        var state = POTADownloadState(checkpoint: loadDownloadCheckpoint())
 
-        // Load checkpoint if exists
-        let checkpoint = loadDownloadCheckpoint()
-        var processedKeys = checkpoint?.processedActivationKeys ?? Set<String>()
-        let batchSize = 25
+        logDownloadStart(activations: activations, state: state)
 
-        NSLog(
-            "[POTA] Starting download: %d activations, %d already processed",
-            activations.count, processedKeys.count
-        )
-
-        // Process in batches for checkpoint resilience
-        let remainingActivations = activations.filter { activation in
-            let key = "\(activation.reference)|\(activation.date)"
-            return !processedKeys.contains(key)
+        let remainingActivations = filterRemainingActivations(activations, state: state)
+        guard !remainingActivations.isEmpty else {
+            debugLog.info("No remaining activations to process", service: .pota)
+            clearDownloadCheckpoint()
+            return state.allFetched
         }
 
-        for (batchIndex, batch) in remainingActivations.chunked(into: batchSize).enumerated() {
-            NSLog("[POTA] Processing batch %d: %d activations", batchIndex + 1, batch.count)
+        debugLog.info("Processing \(remainingActivations.count) remaining activations", service: .pota)
 
-            for activation in batch {
-                let key = "\(activation.reference)|\(activation.date)"
-                do {
-                    let qsos = try await fetchAllActivationQSOs(
-                        reference: activation.reference, date: activation.date
-                    )
-                    for qso in qsos {
-                        if let fetched = convertToFetchedQSO(qso, activation: activation) {
-                            allFetched.append(fetched)
-                        }
-                    }
-                    processedKeys.insert(key)
-                } catch {
-                    NSLog(
-                        "[POTA] WARNING: Failed to fetch %@ %@: %@",
-                        activation.reference, activation.date, error.localizedDescription
-                    )
-                }
-                try await Task.sleep(nanoseconds: 100_000_000)
+        var activationIndex = 0
+        while activationIndex < remainingActivations.count {
+            let batchEnd = min(activationIndex + state.currentBatchSize, remainingActivations.count)
+            let batch = Array(remainingActivations[activationIndex ..< batchEnd])
+
+            logBatchStart(index: activationIndex, batchEnd: batchEnd, total: remainingActivations.count, state: state)
+
+            let result = try await processBatch(batch, state: &state)
+
+            if result.succeeded {
+                handleBatchSuccess(batchCount: batch.count, batchElapsed: result.elapsed, state: &state)
+                activationIndex = batchEnd
             }
 
-            saveDownloadCheckpoint(POTADownloadCheckpoint(
-                processedActivationKeys: processedKeys,
-                lastBatchDate: Date()
-            ))
+            if state.consecutiveFailures >= 5 {
+                logAbort(state: state)
+                break
+            }
         }
 
         clearDownloadCheckpoint()
-        NSLog("[POTA] Download complete: %d total QSOs fetched", allFetched.count)
-        return allFetched
+        debugLog.info(
+            "Download complete: \(state.allFetched.count) total QSOs from \(state.processedKeys.count) activations",
+            service: .pota
+        )
+        return state.allFetched
+    }
+
+    // MARK: - Batch Processing Helpers
+
+    private func processBatch(
+        _ batch: [POTARemoteActivation],
+        state: inout POTADownloadState
+    ) async throws -> (succeeded: Bool, elapsed: TimeInterval) {
+        let batchStartTime = Date()
+
+        for activation in batch {
+            let result = try await processActivation(activation, state: &state)
+
+            switch result {
+            case let .success(fetched):
+                state.allFetched.append(contentsOf: fetched)
+            case .timeout:
+                try await handleTimeout(state: &state)
+                return (false, Date().timeIntervalSince(batchStartTime))
+            case .skipped:
+                break
+            }
+
+            try await Task.sleep(nanoseconds: POTADownloadConfig.interActivationDelay)
+        }
+
+        return (true, Date().timeIntervalSince(batchStartTime))
+    }
+
+    private func filterRemainingActivations(
+        _ activations: [POTARemoteActivation],
+        state: POTADownloadState
+    ) -> [POTARemoteActivation] {
+        activations.filter { activation in
+            let key = "\(activation.reference)|\(activation.date)"
+            return !state.processedKeys.contains(key)
+        }
+    }
+
+    private func logDownloadStart(activations: [POTARemoteActivation], state: POTADownloadState) {
+        let debugLog = SyncDebugLog.shared
+        let count = activations.count
+        let processed = state.processedKeys.count
+        debugLog.info(
+            "Starting adaptive download: \(count) activations, \(processed) already processed",
+            service: .pota
+        )
+        let minB = POTADownloadConfig.minimumBatchSize
+        let maxB = POTADownloadConfig.maximumBatchSize
+        let timeout = POTADownloadConfig.perActivationTimeout
+        debugLog.debug(
+            "Adaptive: batch=\(state.currentBatchSize), min=\(minB), max=\(maxB), timeout=\(timeout)s",
+            service: .pota
+        )
+    }
+
+    private func logBatchStart(index: Int, batchEnd: Int, total: Int, state: POTADownloadState) {
+        let debugLog = SyncDebugLog.shared
+        let batchNum = index / state.currentBatchSize + 1
+        let ok = state.consecutiveSuccesses
+        let fail = state.consecutiveFailures
+        debugLog.debug(
+            "Batch \(batchNum): \(index + 1)-\(batchEnd)/\(total), ok=\(ok), fail=\(fail)",
+            service: .pota
+        )
+    }
+
+    private func logAbort(state: POTADownloadState) {
+        let debugLog = SyncDebugLog.shared
+        let processed = state.processedKeys.count
+        let qsoCount = state.allFetched.count
+        debugLog.error(
+            "Aborting: \(state.consecutiveFailures) failures (processed \(processed) activations, \(qsoCount) QSOs)",
+            service: .pota
+        )
+    }
+
+    /// Fetch a single activation with timeout
+    func fetchActivationWithTimeout(_ activation: POTARemoteActivation) async throws -> [POTARemoteQSO] {
+        try await withThrowingTaskGroup(of: [POTARemoteQSO].self) { group in
+            group.addTask {
+                try await self.fetchAllActivationQSOs(
+                    reference: activation.reference, date: activation.date
+                )
+            }
+
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(POTADownloadConfig.perActivationTimeout * 1_000_000_000))
+                throw POTAError.fetchFailed("Activation fetch timed out")
+            }
+
+            let result = try await group.next()!
+            group.cancelAll()
+            return result
+        }
+    }
+
+    /// Check if error indicates timeout or rate limiting
+    func isTimeoutOrRateLimitError(_ error: Error) -> Bool {
+        let desc = error.localizedDescription.lowercased()
+        return desc.contains("timed out")
+            || desc.contains("timeout")
+            || desc.contains("rate limit")
+            || desc.contains("too many requests")
+            || (error as NSError).code == NSURLErrorTimedOut
     }
 
     // MARK: - Job Status Methods

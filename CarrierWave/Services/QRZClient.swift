@@ -277,10 +277,11 @@ final class QRZClient {
     }
 
     /// Fetch QSOs from QRZ logbook with pagination
+    /// Uses AFTERLOGID for pagination (not OFFSET which doesn't work)
     func fetchQSOs(since: Date? = nil) async throws -> [QRZFetchedQSO] {
         let apiKey = try getApiKey()
         var allQSOs: [QRZFetchedQSO] = []
-        var offset = 0
+        var afterLogId: Int64 = 0
         let pageSize = 2_000
 
         guard let url = URL(string: baseURL) else {
@@ -289,15 +290,23 @@ final class QRZClient {
 
         while true {
             let request = buildFetchRequest(
-                url: url, apiKey: apiKey, offset: offset, pageSize: pageSize, since: since
+                url: url, apiKey: apiKey, afterLogId: afterLogId, pageSize: pageSize, since: since
             )
             let (pageQSOs, responseCount) = try await fetchQSOPage(request: request)
+
+            // Find max log_id for pagination
+            var maxLogId: Int64 = 0
+            for qso in pageQSOs {
+                if let logIdStr = qso.qrzLogId, let logId = Int64(logIdStr) {
+                    maxLogId = max(maxLogId, logId)
+                }
+            }
 
             allQSOs.append(contentsOf: pageQSOs)
 
             NSLog(
-                "[QRZ] Pagination: offset=%d, pageQSOs=%d, responseCount=%d, total=%d",
-                offset, pageQSOs.count, responseCount, allQSOs.count
+                "[QRZ] Pagination: afterLogId=%lld, pageQSOs=%d, responseCount=%d, maxLogId=%lld, total=%d",
+                afterLogId, pageQSOs.count, responseCount, maxLogId, allQSOs.count
             )
 
             // Use actual parsed QSO count, not API metadata count
@@ -305,7 +314,14 @@ final class QRZClient {
             if pageQSOs.count < pageSize {
                 break
             }
-            offset += pageSize
+
+            // Can't paginate without log IDs
+            if maxLogId == 0 {
+                NSLog("[QRZ] WARNING: No log IDs found, cannot continue pagination")
+                break
+            }
+
+            afterLogId = maxLogId + 1
             try await Task.sleep(nanoseconds: 200_000_000)
         }
 
@@ -396,12 +412,10 @@ final class QRZClient {
     }
 
     private func buildFetchRequest(
-        url: URL, apiKey: String, offset: Int, pageSize: Int, since: Date?
+        url: URL, apiKey: String, afterLogId: Int64, pageSize: Int, since: Date?
     ) -> URLRequest {
-        var optionParts = ["MAX:\(pageSize)"]
-        if offset > 0 {
-            optionParts.append("OFFSET:\(offset)")
-        }
+        // Use AFTERLOGID for pagination (OFFSET doesn't work in QRZ API)
+        var optionParts = ["MAX:\(pageSize)", "AFTERLOGID:\(afterLogId)"]
         if let since {
             let formatter = DateFormatter()
             formatter.dateFormat = "yyyy-MM-dd"

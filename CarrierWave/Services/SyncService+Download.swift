@@ -6,6 +6,7 @@ import SwiftData
 extension SyncService {
     func downloadFromAllSources() async -> [ServiceType: Result<[FetchedQSO], Error>] {
         let timeout = syncTimeoutSeconds
+        let extendedTimeout = extendedSyncTimeoutSeconds
 
         // Capture service configuration state before entering task group
         let qrzHasKey = qrzClient.hasApiKey()
@@ -24,9 +25,10 @@ extension SyncService {
             }
 
             // POTA download (skip during maintenance window)
+            // Uses extended timeout - POTA handles its own per-activation timeouts
             if potaIsAuth, !potaInMaintenance {
                 group.addTask {
-                    await self.downloadFromPOTA(timeout: timeout)
+                    await self.downloadFromPOTA(timeout: extendedTimeout)
                 }
             }
 
@@ -45,9 +47,10 @@ extension SyncService {
             }
 
             // LoTW download
+            // Uses extended timeout - LoTW handles its own adaptive windowing
             if lotwHasCreds {
                 group.addTask {
-                    await self.downloadFromLoTW(timeout: timeout)
+                    await self.downloadFromLoTW(timeout: extendedTimeout)
                 }
             }
 

@@ -38,6 +38,9 @@ final class LoTWClient {
 
     let keychain = KeychainHelper.shared
 
+    let baseURL = "https://lotw.arrl.org/lotwuser/lotwreport.adi"
+    let userAgent = "CarrierWave/1.0"
+
     // MARK: - Configuration
 
     var isConfigured: Bool {
@@ -91,54 +94,32 @@ final class LoTWClient {
 
     // MARK: - API Methods
 
+    /// Fetch QSOs with adaptive date windowing to handle rate limits
+    /// If a request fails with rate limit, progressively shrinks the date window
     func fetchQSOs(qsoRxSince: Date? = nil) async throws -> LoTWResponse {
         let credentials = try getCredentials()
 
-        var components = URLComponents(string: baseURL)!
-
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateFormat = "yyyy-MM-dd"
-        dateFormatter.timeZone = TimeZone(identifier: "UTC")
-
-        // Use provided date or default to 2000-01-01 for first sync to get all QSOs
-        let rxSinceDate =
+        // Use provided date or default to 2000-01-01 for first sync
+        let startDate =
             qsoRxSince ?? DateComponents(
                 calendar: Calendar(identifier: .gregorian),
                 year: 2_000, month: 1, day: 1
             ).date!
 
-        let queryItems: [URLQueryItem] = [
-            URLQueryItem(name: "login", value: credentials.username),
-            URLQueryItem(name: "password", value: credentials.password),
-            URLQueryItem(name: "qso_query", value: "1"),
-            URLQueryItem(name: "qso_qsl", value: "no"), // Fetch all QSOs, not just confirmed QSLs
-            URLQueryItem(name: "qso_qsorxsince", value: dateFormatter.string(from: rxSinceDate)),
-            URLQueryItem(name: "qso_mydetail", value: "yes"),
-            URLQueryItem(name: "qso_qsldetail", value: "yes"),
-            URLQueryItem(name: "qso_withown", value: "yes"),
-        ]
+        let endDate = Date()
 
-        components.queryItems = queryItems
-
-        var request = URLRequest(url: components.url!)
-        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-
-        let (data, _) = try await URLSession.shared.data(for: request)
-
-        guard let responseString = String(data: data, encoding: .utf8) else {
-            throw LoTWError.invalidResponse("Cannot decode response as UTF-8")
+        // If date range is small (< 30 days), just do a single request
+        let daysBetween = Calendar.current.dateComponents([.day], from: startDate, to: endDate).day ?? 0
+        if daysBetween <= 30 {
+            return try await fetchQSOsForDateRange(
+                credentials: credentials, startDate: startDate, endDate: nil
+            )
         }
 
-        // Check for EOH tag to verify success
-        guard responseString.contains("<EOH>") || responseString.contains("<eoh>") else {
-            // Check for common error patterns
-            if isAuthenticationError(responseString) {
-                throw LoTWError.authenticationFailed
-            }
-            throw LoTWError.serviceError(String(responseString.prefix(200)))
-        }
-
-        return parseADIFResponse(responseString)
+        // For larger ranges, use adaptive windowing
+        return try await fetchQSOsWithAdaptiveWindowing(
+            credentials: credentials, startDate: startDate, endDate: endDate
+        )
     }
 
     /// Test credentials by fetching recent QSLs only
@@ -176,149 +157,82 @@ final class LoTWClient {
         }
     }
 
-    // MARK: Private
+    /// Fetch QSOs for a specific date range
+    func fetchQSOsForDateRange(
+        credentials: (username: String, password: String),
+        startDate: Date,
+        endDate: Date?
+    ) async throws -> LoTWResponse {
+        var components = URLComponents(string: baseURL)!
 
-    private let baseURL = "https://lotw.arrl.org/lotwuser/lotwreport.adi"
-    private let userAgent = "CarrierWave/1.0"
+        let dateFormatter = DateFormatter()
+        dateFormatter.dateFormat = "yyyy-MM-dd"
+        dateFormatter.timeZone = TimeZone(identifier: "UTC")
+
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "login", value: credentials.username),
+            URLQueryItem(name: "password", value: credentials.password),
+            URLQueryItem(name: "qso_query", value: "1"),
+            URLQueryItem(name: "qso_qsl", value: "no"),
+            URLQueryItem(name: "qso_qsorxsince", value: dateFormatter.string(from: startDate)),
+            URLQueryItem(name: "qso_mydetail", value: "yes"),
+            URLQueryItem(name: "qso_qsldetail", value: "yes"),
+            URLQueryItem(name: "qso_withown", value: "yes"),
+        ]
+
+        // Add end date filter if specified (for windowed requests)
+        if let endDate {
+            // LoTW uses qso_enddate for the QSO date, not upload date
+            // We'll filter by upload date range using qso_qsorxsince already
+            // For windowing, we track progress by startDate advancement
+            queryItems.append(URLQueryItem(name: "qso_enddate", value: dateFormatter.string(from: endDate)))
+        }
+
+        components.queryItems = queryItems
+
+        var request = URLRequest(url: components.url!)
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+
+        let (data, _) = try await URLSession.shared.data(for: request)
+
+        guard let responseString = String(data: data, encoding: .utf8) else {
+            throw LoTWError.invalidResponse("Cannot decode response as UTF-8")
+        }
+
+        // Check for EOH tag to verify success
+        guard responseString.contains("<EOH>") || responseString.contains("<eoh>") else {
+            if isAuthenticationError(responseString) {
+                throw LoTWError.authenticationFailed
+            }
+            throw LoTWError.serviceError(String(responseString.prefix(200)))
+        }
+
+        return parseADIFResponse(responseString)
+    }
+
+    /// Check if error message indicates rate limiting
+    func isRateLimitError(_ message: String) -> Bool {
+        let lowercased = message.lowercased()
+        return lowercased.contains("page request limit")
+            || lowercased.contains("rate limit")
+            || lowercased.contains("too many requests")
+            || lowercased.contains("503")
+            || lowercased.contains("error 503")
+    }
+
+    /// Format date for logging
+    func formatDate(_ date: Date) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter.string(from: date)
+    }
+
+    // MARK: Private
 
     private func isAuthenticationError(_ response: String) -> Bool {
         let lowercased = response.lowercased()
         return lowercased.contains("password incorrect")
             || lowercased.contains("username not found")
-    }
-
-    // MARK: - ADIF Parsing
-
-    private func parseADIFResponse(_ adif: String) -> LoTWResponse {
-        var qsos: [LoTWFetchedQSO] = []
-        var lastQSL: Date?
-        var lastQSORx: Date?
-        var recordCount = 0
-
-        // Parse header for metadata
-        if let headerEnd = adif.range(of: "<EOH>", options: .caseInsensitive) {
-            let header = String(adif[..<headerEnd.lowerBound])
-            lastQSL = parseHeaderDate(header, field: "APP_LoTW_LASTQSL")
-            lastQSORx = parseHeaderDate(header, field: "APP_LoTW_LASTQSORX")
-            if let count = parseHeaderField(header, field: "APP_LoTW_NUMREC") {
-                recordCount = Int(count) ?? 0
-            }
-        }
-
-        // Split into records (case-insensitive - LoTW uses lowercase <eor>)
-        let records = adif.components(separatedBy: "<eor>")
-            .flatMap { $0.components(separatedBy: "<EOR>") }
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty && $0.contains("<") }
-
-        for record in records {
-            // Skip header
-            if record.uppercased().contains("<EOH>") {
-                continue
-            }
-
-            if let qso = parseQSORecord(record) {
-                qsos.append(qso)
-            }
-        }
-
-        return LoTWResponse(
-            qsos: qsos,
-            lastQSL: lastQSL,
-            lastQSORx: lastQSORx,
-            recordCount: recordCount
-        )
-    }
-
-    private func parseHeaderField(_ header: String, field: String) -> String? {
-        let pattern = "<\(field):([0-9]+)>([^<]*)"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-              let match = regex.firstMatch(
-                  in: header, range: NSRange(header.startIndex..., in: header)
-              ),
-              let valueRange = Range(match.range(at: 2), in: header)
-        else {
-            return nil
-        }
-        return String(header[valueRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-    }
-
-    private func parseHeaderDate(_ header: String, field: String) -> Date? {
-        guard let value = parseHeaderField(header, field: field) else {
-            return nil
-        }
-        // Format: YYYY-MM-DD HH:MM:SS
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter.date(from: value)
-    }
-
-    private func extractField(_ name: String, from record: String) -> String? {
-        let pattern = "<\(name):([0-9]+)>([^<]*)"
-        guard let regex = try? NSRegularExpression(pattern: pattern, options: .caseInsensitive),
-              let match = regex.firstMatch(
-                  in: record, range: NSRange(record.startIndex..., in: record)
-              ),
-              let valueRange = Range(match.range(at: 2), in: record)
-        else {
-            return nil
-        }
-        let value = String(record[valueRange]).trimmingCharacters(in: .whitespacesAndNewlines)
-        return value.isEmpty ? nil : value
-    }
-
-    private func parseQSOTimestamp(dateStr: String, timeStr: String?) -> Date? {
-        let dateFormatter = DateFormatter()
-        dateFormatter.timeZone = TimeZone(identifier: "UTC")
-        dateFormatter.dateFormat = "yyyyMMddHHmm"
-        let timeOnStr = timeStr ?? "0000"
-        let dateTimeStr = dateStr + timeOnStr.prefix(4)
-        return dateFormatter.date(from: dateTimeStr)
-    }
-
-    private func parseQSLReceivedDate(_ record: String) -> Date? {
-        guard let qslDateStr = extractField("QSLRDATE", from: record) else {
-            return nil
-        }
-        let dateFormatter = DateFormatter()
-        dateFormatter.timeZone = TimeZone(identifier: "UTC")
-        dateFormatter.dateFormat = "yyyyMMdd"
-        return dateFormatter.date(from: qslDateStr)
-    }
-
-    private func parseQSORecord(_ record: String) -> LoTWFetchedQSO? {
-        guard let callsign = extractField("CALL", from: record),
-              let band = extractField("BAND", from: record),
-              let mode = extractField("MODE", from: record),
-              let qsoDateStr = extractField("QSO_DATE", from: record),
-              let timestamp = parseQSOTimestamp(
-                  dateStr: qsoDateStr, timeStr: extractField("TIME_ON", from: record)
-              )
-        else {
-            return nil
-        }
-
-        let qslReceived = extractField("QSL_RCVD", from: record)?.uppercased() == "Y"
-
-        return LoTWFetchedQSO(
-            callsign: callsign,
-            band: band,
-            mode: mode,
-            frequency: extractField("FREQ", from: record).flatMap { Double($0) },
-            timestamp: timestamp,
-            rstSent: extractField("RST_SENT", from: record),
-            rstReceived: extractField("RST_RCVD", from: record),
-            myCallsign: extractField("STATION_CALLSIGN", from: record)
-                ?? extractField("APP_LoTW_OWNCALL", from: record),
-            myGrid: extractField("MY_GRIDSQUARE", from: record),
-            theirGrid: extractField("GRIDSQUARE", from: record),
-            state: extractField("STATE", from: record),
-            country: extractField("COUNTRY", from: record),
-            dxcc: extractField("DXCC", from: record).flatMap { Int($0) },
-            qslReceived: qslReceived,
-            qslReceivedDate: parseQSLReceivedDate(record),
-            rawADIF: record
-        )
     }
 }
