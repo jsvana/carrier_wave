@@ -35,12 +35,37 @@ struct ActivityView: View {
                     .accessibilityLabel("Refresh")
                 }
             }
+            .onAppear {
+                if syncService == nil {
+                    syncService = ChallengesSyncService(modelContext: modelContext)
+                }
+            }
+            .alert("Error", isPresented: $showingError) {
+                Button("OK") { showingError = false }
+            } message: {
+                Text(errorMessage ?? "An unknown error occurred")
+            }
         }
     }
 
     // MARK: Private
 
     @State private var isRefreshing = false
+
+    @Query(sort: \ChallengeParticipation.joinedAt, order: .reverse)
+    private var allParticipations: [ChallengeParticipation]
+
+    @State private var syncService: ChallengesSyncService?
+    @State private var errorMessage: String?
+    @State private var showingError = false
+
+    private var activeParticipations: [ChallengeParticipation] {
+        allParticipations.filter { $0.status == .active }
+    }
+
+    private var completedParticipations: [ChallengeParticipation] {
+        allParticipations.filter { $0.status == .completed }
+    }
 
     // MARK: - Challenges Section
 
@@ -58,11 +83,53 @@ struct ActivityView: View {
                 }
             }
 
-            // Placeholder - will embed challenge content
-            Text("Challenge cards will appear here")
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            if activeParticipations.isEmpty, completedParticipations.isEmpty {
+                challengesEmptyState
+            } else {
+                if !activeParticipations.isEmpty {
+                    ForEach(activeParticipations) { participation in
+                        NavigationLink {
+                            ChallengeDetailView(participation: participation)
+                        } label: {
+                            ChallengeProgressCard(participation: participation)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+
+                if !completedParticipations.isEmpty {
+                    DisclosureGroup("Completed (\(completedParticipations.count))") {
+                        ForEach(completedParticipations) { participation in
+                            NavigationLink {
+                                ChallengeDetailView(participation: participation)
+                            } label: {
+                                CompletedChallengeCard(participation: participation)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .foregroundStyle(.primary)
+                }
+            }
         }
+    }
+
+    private var challengesEmptyState: some View {
+        VStack(spacing: 8) {
+            Text("No active challenges")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+
+            NavigationLink {
+                BrowseChallengesView()
+            } label: {
+                Text("Browse Challenges")
+                    .font(.subheadline)
+                    .fontWeight(.medium)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
     }
 
     // MARK: - Activity Feed Section
@@ -82,11 +149,23 @@ struct ActivityView: View {
     }
 
     private func refresh() async {
+        guard let syncService else {
+            return
+        }
+
         isRefreshing = true
         defer { isRefreshing = false }
 
-        // Placeholder: will refresh challenges and activity feed
-        try? await Task.sleep(nanoseconds: 500_000_000)
+        do {
+            try await syncService.refreshChallenges(forceUpdate: true)
+            for participation in activeParticipations {
+                syncService.progressEngine.reevaluateAllQSOs(for: participation)
+            }
+            try modelContext.save()
+        } catch {
+            errorMessage = error.localizedDescription
+            showingError = true
+        }
     }
 }
 
