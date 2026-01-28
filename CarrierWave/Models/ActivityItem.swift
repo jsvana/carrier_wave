@@ -42,17 +42,17 @@ final class ActivityItem {
 
     var details: ActivityDetails? {
         get {
-            try? JSONDecoder().decode(ActivityDetails.self, from: detailsData)
+            ActivityDetails.decode(from: detailsData)
         }
         set {
-            detailsData = (try? JSONEncoder().encode(newValue)) ?? Data()
+            detailsData = newValue?.encode() ?? Data()
         }
     }
 }
 
 // MARK: - ActivityDetails
 
-struct ActivityDetails: Codable {
+struct ActivityDetails: Codable, Sendable {
     // Generic fields that apply to multiple activity types
     var entityName: String? // DXCC entity name
     var entityCode: String? // DXCC entity code
@@ -68,4 +68,16 @@ struct ActivityDetails: Codable {
     var tierName: String? // For tier unlock
     var recordType: String? // For personal bests (e.g., "distance", "qsos_in_day")
     var recordValue: String? // The record value as display string
+
+    // MARK: - Nonisolated Codable Helpers
+
+    /// Decode from data in a nonisolated context (for use with @Model classes)
+    static func decode(from data: Data) -> ActivityDetails? {
+        try? JSONDecoder().decode(ActivityDetails.self, from: data)
+    }
+
+    /// Encode to data in a nonisolated context (for use with @Model classes)
+    func encode() -> Data {
+        (try? JSONEncoder().encode(self)) ?? Data()
+    }
 }

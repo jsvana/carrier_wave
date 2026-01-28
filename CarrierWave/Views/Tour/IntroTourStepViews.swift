@@ -248,6 +248,39 @@ struct IntroTourMapStep: View {
     }
 }
 
+// MARK: - IntroTourActivityStep
+
+struct IntroTourActivityStep: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "person.2.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(.indigo)
+
+            Text("Connect with the Community")
+                .font(.title)
+                .fontWeight(.bold)
+                .multilineTextAlignment(.center)
+
+            Text(
+                "Join challenges, connect with friends, and see what the ham radio community is up to. " +
+                    "More social features are coming soon!"
+            )
+            .font(.body)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+
+            VStack(alignment: .leading, spacing: 12) {
+                IntroTourFeatureRow(icon: "flag.2.crossed.fill", text: "Join challenges and track progress")
+                IntroTourFeatureRow(icon: "person.badge.plus", text: "Add friends and follow their activity")
+                IntroTourFeatureRow(icon: "person.3.fill", text: "Join clubs and see member activity")
+                IntroTourFeatureRow(icon: "bell.fill", text: "Activity feed with milestones")
+            }
+            .padding(.top, 8)
+        }
+    }
+}
+
 // MARK: - IntroTourFeedbackStep
 
 struct IntroTourFeedbackStep: View {

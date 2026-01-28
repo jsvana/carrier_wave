@@ -49,11 +49,27 @@ enum MiniTourContent {
 
     static let challenges: [TourPage] = [
         TourPage(
-            icon: "flag.2.crossed",
-            title: "Challenges Coming Soon",
+            icon: "person.2",
+            title: "Activity & Social",
             body: """
-            We're building something exciting here - track your progress toward awards, \
-            compete on leaderboards, and join community events. Stay tuned!
+            This is your social hub. Join challenges to track progress toward awards, \
+            compete on leaderboards, and connect with the ham radio community.
+            """
+        ),
+        TourPage(
+            icon: "flag.2.crossed",
+            title: "Challenges",
+            body: """
+            Browse and join challenges, then watch your progress as you make QSOs. \
+            Compete with others on leaderboards and earn recognition for your achievements.
+            """
+        ),
+        TourPage(
+            icon: "person.badge.plus",
+            title: "Friends & Clubs",
+            body: """
+            Add friends to see their activity, or join clubs to connect with groups. \
+            Use the toolbar buttons to manage your connections. More social features coming soon!
             """
         ),
     ]

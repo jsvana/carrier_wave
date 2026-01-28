@@ -9,6 +9,7 @@ enum IntroTourStep: Int, CaseIterable {
     case otherServices
     case statistics
     case mapView
+    case activity
     case feedback
 
     // MARK: Internal
@@ -21,6 +22,7 @@ enum IntroTourStep: Int, CaseIterable {
         case .otherServices: "More Services Available"
         case .statistics: "Track Your Progress"
         case .mapView: "See Your Contacts"
+        case .activity: "Connect with the Community"
         case .feedback: "You're All Set!"
         }
     }
@@ -102,6 +104,8 @@ struct IntroTourView: View {
                     IntroTourStatisticsStep()
                 case .mapView:
                     IntroTourMapStep()
+                case .activity:
+                    IntroTourActivityStep()
                 case .feedback:
                     IntroTourFeedbackStep()
                 }
@@ -142,7 +146,8 @@ struct IntroTourView: View {
              .syncExplanation,
              .otherServices,
              .statistics,
-             .mapView:
+             .mapView,
+             .activity:
             nextButton
         case .qrzSetup:
             qrzSetupButton
