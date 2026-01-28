@@ -6,6 +6,7 @@ import SwiftUI
 enum AppTab: Hashable {
     case dashboard
     case logs
+    case map
     case challenges
     case settings
 }
@@ -64,6 +65,14 @@ struct ContentView: View {
                 Label("Logs", systemImage: "list.bullet")
             }
             .tag(AppTab.logs)
+
+            NavigationStack {
+                QSOMapView()
+            }
+            .tabItem {
+                Label("Map", systemImage: "map")
+            }
+            .tag(AppTab.map)
 
             ChallengesView(tourState: tourState)
                 .tabItem {

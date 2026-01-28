@@ -67,6 +67,8 @@ struct QSOStatistics {
         return activity
     }
 
+    // MARK: - Streak Calculations
+
     func items(for category: StatCategoryType) -> [StatCategoryItem] {
         switch category {
         case .qsls:
@@ -220,6 +222,110 @@ struct ActivationsStatBox: View {
         .padding(.vertical, 8)
         .background(Color(.systemGray5))
         .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+}
+
+// MARK: - StreakStatBox
+
+struct StreakStatBox: View {
+    // MARK: Lifecycle
+
+    init(streak: StreakInfo, showLongest: Bool = false) {
+        self.streak = streak
+        self.showLongest = showLongest
+    }
+
+    // MARK: Internal
+
+    let streak: StreakInfo
+    let showLongest: Bool
+
+    var body: some View {
+        VStack(spacing: 4) {
+            HStack(spacing: 2) {
+                Image(systemName: "flame.fill")
+                    .font(.title3)
+                    .foregroundStyle(streakColor)
+                if streak.isAtRisk {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+            Text("\(showLongest ? streak.longestStreak : streak.currentStreak)")
+                .font(.title2)
+                .fontWeight(.bold)
+            Text(showLongest ? "Best" : "Current")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 8)
+        .background(Color(.systemGray5))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    // MARK: Private
+
+    private var streakColor: Color {
+        if streak.currentStreak == 0 {
+            .gray
+        } else if streak.isAtRisk {
+            .orange
+        } else if streak.currentStreak >= streak.longestStreak, streak.currentStreak > 0 {
+            .red // At or beating personal best
+        } else {
+            .orange
+        }
+    }
+}
+
+// MARK: - StreaksCard
+
+struct StreaksCard: View {
+    let dailyStreak: StreakInfo
+    let potaStreak: StreakInfo
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("Streaks")
+                    .font(.headline)
+                Spacer()
+                if dailyStreak.isAtRisk || potaStreak.isAtRisk {
+                    Label("At Risk", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            HStack(spacing: 12) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Daily QSOs")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 16) {
+                        StreakStatBox(streak: dailyStreak)
+                        StreakStatBox(streak: dailyStreak, showLongest: true)
+                    }
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("POTA Activations")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                    HStack(spacing: 16) {
+                        StreakStatBox(streak: potaStreak)
+                        StreakStatBox(streak: potaStreak, showLongest: true)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 }
 

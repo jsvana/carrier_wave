@@ -43,6 +43,7 @@
 | `LeaderboardCache.swift` | Cached leaderboard data |
 | `POTAActivation.swift` | POTA activation grouping view model |
 | `TourState.swift` | UserDefaults-backed tour progress tracking |
+| `StreakInfo.swift` | Streak data model and calculation utilities |
 
 ### Services (`CarrierWave/Services/`)
 | File | Purpose |
@@ -93,11 +94,12 @@
 | `DashboardView.swift` | Main dashboard with stats grid and services list |
 | `DashboardView+Actions.swift` | Dashboard action handlers (sync, clear data) |
 | `DashboardView+Services.swift` | Services list builder and detail sheet builders |
-| `DashboardHelperViews.swift` | Reusable dashboard components (StatBox, ActivityGrid, QSOStatistics) |
+| `DashboardHelperViews.swift` | Reusable dashboard components (StatBox, ActivityGrid, QSOStatistics, StreaksCard) |
 | `ServiceListView.swift` | Vertical stacked service list with status indicators |
 | `ServiceDetailSheet.swift` | Service detail sheet for tap-through actions |
 | `StatDetailView.swift` | Drilldown view for stat categories |
 | `StatItemRow.swift` | Individual stat row with expandable QSOs |
+| `StreakDetailView.swift` | Streak statistics detail view with mode/band breakdowns |
 
 ### Views - Logs (`CarrierWave/Views/Logs/`)
 | File | Purpose |
@@ -149,10 +151,19 @@
 | `CallsignAliasesSettingsView.swift` | Manage current and previous callsigns |
 | `SettingsSections.swift` | Sync Sources section with service navigation links |
 
+### Views - Map (`CarrierWave/Views/Map/`)
+| File | Purpose |
+|------|---------|
+| `QSOMapView.swift` | Main map view showing QSO locations |
+| `QSOMapHelperViews.swift` | Map markers, filter sheet, callout views |
+| `MapFilterState.swift` | Observable filter state for map |
+| `QSOAnnotation.swift` | Annotation model for map markers and arcs |
+
 ### Utilities (`CarrierWave/Utilities/`)
 | File | Purpose |
 |------|---------|
 | `KeychainHelper.swift` | Secure credential storage |
+| `MaidenheadConverter.swift` | Grid square to coordinate conversion |
 
 ## Building and Testing
 
@@ -219,3 +230,7 @@ When releasing a new version, update **both** locations:
 ## Issue Tracking
 
 This project uses **bd** (beads). Work is NOT complete until `git push` succeeds.
+
+## Git Workflow
+
+**Do NOT use git worktrees.** All work should be done on the main branch or feature branches in the primary working directory.

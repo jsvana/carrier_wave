@@ -395,7 +395,15 @@ final class POTAClient {
                 reference: reference, date: date, page: page, pageSize: pageSize
             )
             allQSOs.append(contentsOf: response.entries)
-            if response.entries.count < pageSize || page >= 10 {
+
+            NSLog(
+                "[POTA] Pagination %@ %@: page=%d, fetched=%d, total=%d",
+                reference, date, page, response.entries.count, allQSOs.count
+            )
+
+            // Use actual count, not hardcoded page limit
+            // Previous 10-page cap silently truncated activations with >1000 QSOs
+            if response.entries.count < pageSize {
                 break
             }
             page += 1
@@ -404,69 +412,9 @@ final class POTAClient {
         return allQSOs
     }
 
-    func fetchAllQSOs() async throws -> [POTAFetchedQSO] {
-        let activations = try await fetchActivations()
-        var allFetched: [POTAFetchedQSO] = []
+    // fetchAllQSOs, checkpoint methods, and fetchJobs are in POTAClient+Checkpoint.swift
 
-        for activation in activations {
-            let qsos = try await fetchAllActivationQSOs(
-                reference: activation.reference, date: activation.date
-            )
-            for qso in qsos {
-                if let fetched = convertToFetchedQSO(qso, activation: activation) {
-                    allFetched.append(fetched)
-                }
-            }
-            try await Task.sleep(nanoseconds: 100_000_000)
-        }
-
-        return allFetched
-    }
-
-    // MARK: - Job Status Methods
-
-    func fetchJobs() async throws -> [POTAJob] {
-        let debugLog = SyncDebugLog.shared
-        let token = try await authService.ensureValidToken()
-
-        guard let url = URL(string: "\(baseURL)/user/jobs") else {
-            debugLog.error("Invalid URL for POTA jobs", service: .pota)
-            throw POTAError.fetchFailed("Invalid URL")
-        }
-
-        var request = URLRequest(url: url)
-        request.setValue(token, forHTTPHeaderField: "Authorization")
-
-        debugLog.debug("GET /user/jobs", service: .pota)
-
-        let (data, response) = try await URLSession.shared.data(for: request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            debugLog.error("Invalid response (not HTTP)", service: .pota)
-            throw POTAError.fetchFailed("Invalid response")
-        }
-
-        debugLog.debug("Jobs response: \(httpResponse.statusCode)", service: .pota)
-
-        guard httpResponse.statusCode == 200 else {
-            if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                throw POTAError.notAuthenticated
-            }
-            let body = String(data: data, encoding: .utf8) ?? ""
-            debugLog.error(
-                "Jobs fetch failed: \(httpResponse.statusCode) - \(body)", service: .pota
-            )
-            throw POTAError.fetchFailed("HTTP \(httpResponse.statusCode): \(body)")
-        }
-
-        let jobs = try JSONDecoder().decode([POTAJob].self, from: data)
-        debugLog.info("Fetched \(jobs.count) POTA jobs", service: .pota)
-        return jobs
-    }
-
-    // MARK: Private
-
-    private func convertToFetchedQSO(
+    func convertToFetchedQSO(
         _ qso: POTARemoteQSO, activation: POTARemoteActivation
     ) -> POTAFetchedQSO? {
         guard let band = qso.band, let mode = qso.mode else {
@@ -495,3 +443,4 @@ final class POTAClient {
 // Grid lookup in POTAClient+GridLookup.swift
 // ADIF generation in POTAClient+ADIF.swift
 // Upload helpers in POTAClient+Upload.swift
+// Checkpoint methods in POTAClient+Checkpoint.swift

@@ -81,6 +81,7 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     activityCard
+                    streaksCard
                     summaryCard
                     servicesList
                 }
@@ -165,6 +166,17 @@ struct DashboardView: View {
         .padding()
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Streaks Card
+
+    private var streaksCard: some View {
+        NavigationLink {
+            StreakDetailView(stats: stats, tourState: tourState)
+        } label: {
+            StreaksCard(dailyStreak: stats.dailyStreak, potaStreak: stats.potaActivationStreak)
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: - Summary Card

@@ -295,13 +295,21 @@ final class QRZClient {
 
             allQSOs.append(contentsOf: pageQSOs)
 
-            if responseCount < pageSize {
+            NSLog(
+                "[QRZ] Pagination: offset=%d, pageQSOs=%d, responseCount=%d, total=%d",
+                offset, pageQSOs.count, responseCount, allQSOs.count
+            )
+
+            // Use actual parsed QSO count, not API metadata count
+            // API COUNT may be inconsistent, causing premature pagination exit
+            if pageQSOs.count < pageSize {
                 break
             }
             offset += pageSize
             try await Task.sleep(nanoseconds: 200_000_000)
         }
 
+        NSLog("[QRZ] Fetch complete: total=%d QSOs", allQSOs.count)
         return allQSOs
     }
 

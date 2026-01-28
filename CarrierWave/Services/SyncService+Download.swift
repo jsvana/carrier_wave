@@ -282,6 +282,9 @@ extension SyncService {
         let debugLog = SyncDebugLog.shared
         debugLog.info("Force re-downloading from POTA", service: .pota)
 
+        // Clear any existing checkpoint to ensure full re-download
+        potaClient.clearDownloadCheckpoint()
+
         let qsos = try await potaClient.fetchAllQSOs()
         let fetched = qsos.map { FetchedQSO.fromPOTA($0) }
 

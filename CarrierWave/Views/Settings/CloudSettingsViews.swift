@@ -197,6 +197,21 @@ struct LoFiSettingsView: View {
             }
             .disabled(callsign.isEmpty || email.isEmpty || isLoading)
         }
+
+        Section {
+            Text("Download access must be enabled by Ham2K staff.")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Link(
+                destination: URL(string: "https://discord.gg/K29T3Njh4U")!
+            ) {
+                Label("Request on Discord (contact KI2D)", systemImage: "arrow.up.right.square")
+            }
+        } header: {
+            Text("Download Permission")
+        } footer: {
+            Text("If you see 0 QSOs downloaded after syncing, you may need to request access.")
+        }
     }
 
     private func checkStatus() {

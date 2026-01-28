@@ -418,7 +418,8 @@ final class LoFiClient {
 
         if qsos.count != operation.qsoCount {
             NSLog(
-                "[LoFi] Operation %@: expected %d QSOs, got %d",
+                "[LoFi] WARNING: Operation %@ QSO count mismatch - expected %d, got %d. "
+                    + "If you see 0 QSOs, download access may need to be enabled by Ham2K staff.",
                 operation.uuid, operation.qsoCount, qsos.count
             )
         }
