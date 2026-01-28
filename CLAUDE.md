@@ -58,6 +58,8 @@
 | `POTAClient+Upload.swift` | POTA multipart ADIF upload |
 | `POTAClient+ADIF.swift` | POTA ADIF formatting |
 | `POTAClient+GridLookup.swift` | POTA grid square lookup |
+| `POTAClient+Checkpoint.swift` | POTA resumable download checkpoints |
+| `POTAClient+Adaptive.swift` | POTA adaptive batch processing for rate limiting |
 | `POTAParksCache.swift` | POTA park reference to name lookup cache |
 | `POTAAuthService.swift` | POTA OAuth flow handling (main service) |
 | `POTAAuthService+JavaScript.swift` | JavaScript helpers for POTA WebView auth |
@@ -66,6 +68,8 @@
 | `LoFiClient+Helpers.swift` | LoFi helper methods |
 | `LoFiModels.swift` | LoFi API response models |
 | `LoTWClient.swift` | LoTW API client (download-only, username/password auth) |
+| `LoTWClient+Parsing.swift` | LoTW ADIF parsing methods |
+| `LoTWClient+Adaptive.swift` | LoTW adaptive date windowing for rate limiting |
 | `LoTWError.swift` | LoTW-specific errors |
 | `HAMRSClient.swift` | HAMRS sync client |
 | `HAMRSModels.swift` | HAMRS API models |
@@ -95,6 +99,12 @@
 | `FriendsSyncService.swift` | Friend data synchronization and actions |
 | `ChallengesClient+Clubs.swift` | Club API endpoints extension |
 | `ClubsSyncService.swift` | Club data synchronization |
+| `ActivityDetector.swift` | Detect notable activities from QSOs |
+| `ActivityDetector+Detection.swift` | Activity detection methods (DXCC, bands, modes, DX, streaks) |
+| `ChallengesClient+Activities.swift` | Activity API endpoints (report, feed) |
+| `ActivityReporter.swift` | Report detected activities to server |
+| `SyncService+Activity.swift` | Hook activity detection into sync flow |
+| `ActivityFeedSyncService.swift` | Sync activity feed from server |
 
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |
@@ -102,7 +112,8 @@
 | `DashboardView.swift` | Main dashboard with stats grid and services list |
 | `DashboardView+Actions.swift` | Dashboard action handlers (sync, clear data) |
 | `DashboardView+Services.swift` | Services list builder and detail sheet builders |
-| `DashboardHelperViews.swift` | Reusable dashboard components (StatBox, ActivityGrid, QSOStatistics, StreaksCard) |
+| `DashboardHelperViews.swift` | Reusable dashboard components (StatBox, ActivityGrid, StreaksCard) |
+| `QSOStatistics.swift` | QSO statistics calculations (entities, grids, bands, parks, frequencies) |
 | `ServiceListView.swift` | Vertical stacked service list with status indicators |
 | `ServiceDetailSheet.swift` | Service detail sheet for tap-through actions |
 | `StatDetailView.swift` | Drilldown view for stat categories |
@@ -143,6 +154,9 @@
 | `FriendSearchView.swift` | Search and add friends |
 | `ClubsListView.swift` | List of clubs user belongs to |
 | `ClubDetailView.swift` | Club details and member list |
+| `ShareCardView.swift` | Branded share card templates |
+| `ShareCardRenderer.swift` | Render share cards to UIImage |
+| `SummaryCardSheet.swift` | Configure and generate summary cards |
 
 ### Views - Tour (`CarrierWave/Views/Tour/`)
 | File | Purpose |

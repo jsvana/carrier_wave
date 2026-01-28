@@ -83,6 +83,7 @@ struct DashboardView: View {
                     activityCard
                     streaksCard
                     summaryCard
+                    favoritesCard
                     servicesList
                 }
                 .padding()
@@ -199,6 +200,12 @@ struct DashboardView: View {
         .padding()
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Favorites Card
+
+    private var favoritesCard: some View {
+        FavoritesCard(stats: stats, tourState: tourState)
     }
 
     private var statsGrid: some View {

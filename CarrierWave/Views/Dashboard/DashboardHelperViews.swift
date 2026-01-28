@@ -1,179 +1,4 @@
-import SwiftData
 import SwiftUI
-
-// MARK: - QSOStatistics
-
-struct QSOStatistics {
-    // MARK: Internal
-
-    let qsos: [QSO]
-
-    var totalQSOs: Int { realQSOs.count }
-
-    var uniqueEntities: Int {
-        Set(realQSOs.compactMap { $0.dxccEntity?.number }).count
-    }
-
-    var uniqueGrids: Int {
-        Set(realQSOs.compactMap(\.theirGrid).filter { !$0.isEmpty }).count
-    }
-
-    var uniqueBands: Int {
-        Set(realQSOs.map { $0.band.lowercased() }).count
-    }
-
-    var confirmedQSLs: Int {
-        realQSOs.filter(\.lotwConfirmed).count
-    }
-
-    var uniqueParks: Int {
-        Set(realQSOs.compactMap(\.parkReference).filter { !$0.isEmpty }).count
-    }
-
-    /// Activations with 10+ QSOs (valid POTA activations)
-    /// Each activation is a unique park+UTC date combination
-    var successfulActivations: Int {
-        // Filter to QSOs with park references (realQSOs already excludes metadata)
-        let parksOnly = realQSOs.filter {
-            $0.parkReference != nil && !$0.parkReference!.isEmpty
-        }
-        // Group by park + UTC date (each UTC day at a park is a separate activation)
-        let grouped = Dictionary(grouping: parksOnly) { qso in
-            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
-        }
-        return grouped.values.filter { $0.count >= 10 }.count
-    }
-
-    /// Activations with <10 QSOs (activation attempts)
-    /// Each activation is a unique park+UTC date combination
-    var attemptedActivations: Int {
-        // Filter to QSOs with park references (realQSOs already excludes metadata)
-        let parksOnly = realQSOs.filter {
-            $0.parkReference != nil && !$0.parkReference!.isEmpty
-        }
-        // Group by park + UTC date (each UTC day at a park is a separate activation)
-        let grouped = Dictionary(grouping: parksOnly) { qso in
-            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
-        }
-        return grouped.values.filter { $0.count < 10 }.count
-    }
-
-    var activityByDate: [Date: Int] {
-        var activity: [Date: Int] = [:]
-        for qso in realQSOs {
-            let date = qso.dateOnly
-            activity[date, default: 0] += 1
-        }
-        return activity
-    }
-
-    // MARK: - Streak Calculations
-
-    func items(for category: StatCategoryType) -> [StatCategoryItem] {
-        switch category {
-        case .qsls:
-            groupedByQSL()
-        case .entities:
-            groupedByEntity()
-        case .grids:
-            groupedByGrid()
-        case .bands:
-            groupedByBand()
-        case .parks:
-            groupedByPark()
-        }
-    }
-
-    // MARK: Private
-
-    /// Modes that represent activation metadata, not actual QSOs (from Ham2K PoLo)
-    /// These should never be counted as QSOs for any statistics
-    private static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
-
-    /// QSOs filtered to exclude metadata modes - use this for all stat calculations
-    private var realQSOs: [QSO] {
-        qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
-    }
-
-    private func groupedByEntity() -> [StatCategoryItem] {
-        // Group by DXCC entity number (realQSOs excludes metadata)
-        let withEntity = realQSOs.filter { $0.dxccEntity != nil }
-        let grouped = Dictionary(grouping: withEntity) { $0.dxccEntity!.number }
-        return grouped.map { entityNumber, qsos in
-            let entity = qsos.first?.dxccEntity
-            return StatCategoryItem(
-                identifier: entity?.name ?? "Unknown",
-                description: "DXCC #\(entityNumber)",
-                qsos: qsos
-            )
-        }
-    }
-
-    private func groupedByGrid() -> [StatCategoryItem] {
-        let gridsOnly = realQSOs.filter { $0.theirGrid != nil && !$0.theirGrid!.isEmpty }
-        let grouped = Dictionary(grouping: gridsOnly) { $0.theirGrid! }
-        return grouped.map { grid, qsos in
-            StatCategoryItem(
-                identifier: grid,
-                description: DescriptionLookup.gridDescription(for: grid),
-                qsos: qsos
-            )
-        }
-    }
-
-    private func groupedByBand() -> [StatCategoryItem] {
-        let grouped = Dictionary(grouping: realQSOs) { $0.band.lowercased() }
-        return grouped.map { band, qsos in
-            StatCategoryItem(
-                identifier: band,
-                description: DescriptionLookup.bandDescription(for: band),
-                qsos: qsos
-            )
-        }
-    }
-
-    private func groupedByQSL() -> [StatCategoryItem] {
-        let confirmed = realQSOs.filter(\.lotwConfirmed)
-        // Group by DXCC entity for confirmed QSLs
-        let withEntity = confirmed.filter { $0.dxccEntity != nil }
-        let grouped = Dictionary(grouping: withEntity) { $0.dxccEntity!.number }
-        return grouped.map { entityNumber, qsos in
-            let entity = qsos.first?.dxccEntity
-            return StatCategoryItem(
-                identifier: entity?.name ?? "Unknown",
-                description: "DXCC #\(entityNumber) - \(qsos.count) confirmed",
-                qsos: qsos
-            )
-        }
-    }
-
-    private func groupedByPark() -> [StatCategoryItem] {
-        // Filter to QSOs with park references (realQSOs already excludes metadata)
-        let parksOnly = realQSOs.filter {
-            $0.parkReference != nil && !$0.parkReference!.isEmpty
-        }
-        // Group by park + UTC date (each UTC day at a park is a separate activation)
-        let grouped = Dictionary(grouping: parksOnly) { qso in
-            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
-        }
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .medium
-        dateFormatter.timeStyle = .none
-        dateFormatter.timeZone = TimeZone(identifier: "UTC")
-        return grouped.map { _, qsos in
-            let park = qsos.first?.parkReference ?? "Unknown"
-            let date = qsos.first?.utcDateOnly ?? Date()
-            let status = qsos.count >= 10 ? "Valid" : "\(qsos.count)/10 QSOs"
-            return StatCategoryItem(
-                identifier: "\(park) - \(dateFormatter.string(from: date))",
-                description: status,
-                qsos: qsos,
-                date: date,
-                parkReference: park
-            )
-        }
-    }
-}
 
 // MARK: - StatBox
 
@@ -465,5 +290,113 @@ struct ActivityGrid: View {
         }
         let intensity = min(Double(count) / Double(max(maxCount, 1)), 1.0)
         return Color.green.opacity(0.3 + intensity * 0.7)
+    }
+}
+
+// MARK: - FavoritesCard
+
+struct FavoritesCard: View {
+    let stats: QSOStatistics
+    let tourState: TourState
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Favorites")
+                .font(.headline)
+
+            VStack(spacing: 0) {
+                // Top Frequency
+                FavoriteRow(
+                    title: "Top Frequency",
+                    icon: "dial.medium.fill",
+                    topItem: stats.topFrequencies(limit: 1).first,
+                    category: .frequencies,
+                    allItems: stats.items(for: .frequencies),
+                    tourState: tourState
+                )
+
+                Divider()
+                    .padding(.leading, 44)
+
+                // Best Friend
+                FavoriteRow(
+                    title: "Best Friend",
+                    icon: "person.2.fill",
+                    topItem: stats.topFriends(limit: 1).first,
+                    category: .bestFriends,
+                    allItems: stats.items(for: .bestFriends),
+                    tourState: tourState
+                )
+
+                Divider()
+                    .padding(.leading, 44)
+
+                // Best Hunter
+                FavoriteRow(
+                    title: "Best Hunter",
+                    icon: "scope",
+                    topItem: stats.topHunters(limit: 1).first,
+                    category: .bestHunters,
+                    allItems: stats.items(for: .bestHunters),
+                    tourState: tourState
+                )
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+}
+
+// MARK: - FavoriteRow
+
+private struct FavoriteRow: View {
+    let title: String
+    let icon: String
+    let topItem: StatCategoryItem?
+    let category: StatCategoryType
+    let allItems: [StatCategoryItem]
+    let tourState: TourState
+
+    var body: some View {
+        NavigationLink {
+            StatDetailView(category: category, items: allItems, tourState: tourState)
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .foregroundStyle(.blue)
+                    .frame(width: 32)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    if let item = topItem {
+                        Text(item.identifier)
+                            .font(.subheadline)
+                            .fontWeight(.medium)
+                    } else {
+                        Text("No data yet")
+                            .font(.subheadline)
+                            .foregroundStyle(.tertiary)
+                    }
+                }
+
+                Spacer()
+
+                if let item = topItem {
+                    Text("\(item.count)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.tertiary)
+            }
+            .padding(.vertical, 8)
+        }
+        .buttonStyle(.plain)
     }
 }

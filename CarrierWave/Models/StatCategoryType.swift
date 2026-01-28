@@ -6,6 +6,9 @@ enum StatCategoryType: String, CaseIterable, Identifiable {
     case grids
     case bands
     case parks
+    case frequencies
+    case bestFriends
+    case bestHunters
 
     // MARK: Internal
 
@@ -18,6 +21,9 @@ enum StatCategoryType: String, CaseIterable, Identifiable {
         case .grids: "Grids"
         case .bands: "Bands"
         case .parks: "Activations"
+        case .frequencies: "Favorite Frequencies"
+        case .bestFriends: "Best Friends"
+        case .bestHunters: "Best Hunters"
         }
     }
 
@@ -28,6 +34,9 @@ enum StatCategoryType: String, CaseIterable, Identifiable {
         case .grids: "square.grid.3x3"
         case .bands: "waveform"
         case .parks: "leaf"
+        case .frequencies: "dial.medium.fill"
+        case .bestFriends: "person.2.fill"
+        case .bestHunters: "scope"
         }
     }
 }

@@ -49,6 +49,13 @@ struct ActivityView: View {
                     .disabled(isRefreshing)
                     .accessibilityLabel("Refresh")
                 }
+                ToolbarItem(placement: .secondaryAction) {
+                    Button {
+                        showingSummarySheet = true
+                    } label: {
+                        Label("Share Summary", systemImage: "square.and.arrow.up")
+                    }
+                }
             }
             .onAppear {
                 if syncService == nil {
@@ -85,6 +92,14 @@ struct ActivityView: View {
                         }
                     )
                 }
+            }
+            .sheet(isPresented: $showingShareSheet) {
+                if let item = itemToShare {
+                    ShareSheetView(item: item)
+                }
+            }
+            .sheet(isPresented: $showingSummarySheet) {
+                SummaryCardSheet(callsign: currentCallsign)
             }
             .onReceive(
                 NotificationCenter.default.publisher(for: .didReceiveChallengeInvite)
@@ -129,12 +144,28 @@ struct ActivityView: View {
     @State private var showingInviteSheet = false
     @State private var isJoiningFromInvite = false
 
+    // Sharing
+    @State private var itemToShare: ActivityItem?
+    @State private var showingShareSheet = false
+    @State private var showingSummarySheet = false
+
     private var activeParticipations: [ChallengeParticipation] {
         allParticipations.filter { $0.status == .active }
     }
 
     private var completedParticipations: [ChallengeParticipation] {
         allParticipations.filter { $0.status == .completed }
+    }
+
+    private var currentCallsign: String {
+        // Try to get from keychain first
+        if let callsign = try? KeychainHelper.shared.readString(for: KeychainHelper.Keys.currentCallsign),
+           !callsign.isEmpty
+        {
+            return callsign
+        }
+        // Fall back to "Me" if not configured
+        return "Me"
     }
 
     private var filteredActivityItems: [ActivityItem] {
@@ -250,8 +281,8 @@ struct ActivityView: View {
     }
 
     private func shareActivity(_ item: ActivityItem) {
-        // Sharing will be implemented in Phase 7
-        print("Share activity: \(item.callsign) - \(item.activityType.displayName)")
+        itemToShare = item
+        showingShareSheet = true
     }
 
     private func refresh() async {

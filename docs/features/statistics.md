@@ -13,6 +13,18 @@ The dashboard displays QSO statistics with drilldown capability for detailed exp
 | DXCC Entities | Country/entity from callsign prefix |
 | Parks | POTA park references |
 
+## Favorites
+
+The dashboard includes a "Favorites" card showing the #1 item in three categories:
+
+| Category | Description |
+|----------|-------------|
+| Top Frequency | Most used frequency, deduplicated to nearest 100Hz |
+| Best Friend | Most frequent QSO partner (callsign you contact most) |
+| Best Hunter | Most frequent hunter during POTA activations |
+
+Each row shows the top item with its count and taps through to a full ranked list.
+
 ## View Components
 
 ### DashboardView
