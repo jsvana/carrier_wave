@@ -125,6 +125,11 @@
 | `ChallengeProgressCard.swift` | Progress visualization card |
 | `LeaderboardView.swift` | Challenge leaderboard display |
 
+### Views - Activity (`CarrierWave/Views/Activity/`)
+| File | Purpose |
+|------|---------|
+| `ActivityView.swift` | Main activity tab with challenges section and activity feed |
+
 ### Views - Tour (`CarrierWave/Views/Tour/`)
 | File | Purpose |
 |------|---------|
