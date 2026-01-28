@@ -74,7 +74,7 @@ struct ContentView: View {
             }
             .tag(AppTab.map)
 
-            ChallengesView(tourState: tourState)
+            ActivityView(tourState: tourState)
                 .tabItem {
                     Label("Activity", systemImage: "person.2")
                 }
