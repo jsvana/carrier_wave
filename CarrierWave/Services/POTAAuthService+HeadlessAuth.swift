@@ -40,9 +40,7 @@ extension POTAAuthService {
         try await waitForPOTARedirect(webView: headlessWebView, timeout: 30)
 
         // 7. Extract token
-        let token = try await extractTokenFromWebView(headlessWebView)
-
-        return token
+        return try await extractTokenFromWebView(headlessWebView)
     }
 
     // MARK: - Helper Methods
@@ -200,8 +198,7 @@ extension POTAAuthService {
         for _ in 0 ..< 5 {
             let result = try await webView.evaluateJavaScript(POTAAuthJavaScript.extractToken)
             if let tokenString = result as? String, !tokenString.isEmpty {
-                let token = try decodeAndSaveToken(tokenString)
-                return token
+                return try decodeAndSaveToken(tokenString)
             }
             try await Task.sleep(nanoseconds: 1_000_000_000)
         }

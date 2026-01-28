@@ -41,7 +41,6 @@ struct LogsContainerView: View {
         LogsSegment.allCases
     }
 
-    @ViewBuilder
     private var segmentedPicker: some View {
         Picker("Log Type", selection: $selectedSegment) {
             ForEach(availableSegments, id: \.self) { segment in

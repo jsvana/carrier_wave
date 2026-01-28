@@ -10,7 +10,9 @@ enum StreakCategory: String, Identifiable, CaseIterable {
 
     // MARK: Internal
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var icon: String {
         switch self {

@@ -82,7 +82,6 @@ struct IntroTourView: View {
 
     private let qrzClient = QRZClient()
 
-    @ViewBuilder
     private var stepContent: some View {
         ScrollView {
             VStack(spacing: 24) {

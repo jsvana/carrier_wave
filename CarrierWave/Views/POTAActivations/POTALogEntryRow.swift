@@ -37,7 +37,6 @@ struct POTALogEntryRow: View {
         return formatter
     }
 
-    @ViewBuilder
     private var collapsedContent: some View {
         HStack(spacing: 8) {
             entryIcon
@@ -141,7 +140,6 @@ struct POTALogEntryRow: View {
         }
     }
 
-    @ViewBuilder
     private var expandedContent: some View {
         VStack(alignment: .leading, spacing: 12) {
             switch entry {
@@ -162,7 +160,6 @@ struct POTALogEntryRow: View {
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 
-    @ViewBuilder
     private func jobStatusBadge(_ status: POTAJobStatus) -> some View {
         Text(status.displayName)
             .font(.caption)
@@ -173,7 +170,6 @@ struct POTALogEntryRow: View {
             .clipShape(Capsule())
     }
 
-    @ViewBuilder
     private func localAttemptDetails(_ attempt: POTAUploadAttempt) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Local Upload Attempt")
@@ -188,7 +184,6 @@ struct POTALogEntryRow: View {
         }
     }
 
-    @ViewBuilder
     private func attemptBasicInfo(_ attempt: POTAUploadAttempt) -> some View {
         Group {
             detailRow("Callsign", attempt.callsign)
@@ -243,7 +238,6 @@ struct POTALogEntryRow: View {
         }
     }
 
-    @ViewBuilder
     private func attemptADIFSection(_ attempt: POTAUploadAttempt) -> some View {
         DisclosureGroup("ADIF Content") {
             ScrollView {
@@ -258,7 +252,6 @@ struct POTALogEntryRow: View {
         .font(.caption2)
     }
 
-    @ViewBuilder
     private func jobDetails(_ job: POTAJob) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("POTA Job #\(job.jobId)")
@@ -290,7 +283,6 @@ struct POTALogEntryRow: View {
         }
     }
 
-    @ViewBuilder
     private func detailRow(_ label: String, _ value: String) -> some View {
         HStack(alignment: .top) {
             Text(label)

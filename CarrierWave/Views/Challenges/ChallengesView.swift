@@ -304,16 +304,15 @@ struct PendingChallengeInvite {
 // MARK: - InviteJoinSheet
 
 struct InviteJoinSheet: View {
+    // MARK: Internal
+
     @Environment(\.modelContext) var modelContext
 
     let invite: PendingChallengeInvite
     let syncService: ChallengesSyncService?
     @Binding var isJoining: Bool
-    let onComplete: (Bool) -> Void
 
-    @State private var challengeDTO: ChallengeDefinitionDTO?
-    @State private var isLoading = true
-    @State private var loadError: String?
+    let onComplete: (Bool) -> Void
 
     var body: some View {
         NavigationStack {
@@ -353,6 +352,12 @@ struct InviteJoinSheet: View {
             }
         }
     }
+
+    // MARK: Private
+
+    @State private var challengeDTO: ChallengeDefinitionDTO?
+    @State private var isLoading = true
+    @State private var loadError: String?
 
     private func challengePreview(_ dto: ChallengeDefinitionDTO) -> some View {
         VStack(spacing: 20) {

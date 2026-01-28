@@ -69,7 +69,6 @@ struct FriendsListView: View {
         friendships.filter { $0.isPending && $0.isOutgoing }
     }
 
-    @ViewBuilder
     private var friendsList: some View {
         List {
             if !incomingRequests.isEmpty {

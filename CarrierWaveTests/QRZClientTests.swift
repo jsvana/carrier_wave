@@ -2,7 +2,7 @@ import XCTest
 @testable import CarrierWave
 
 final class QRZClientTests: XCTestCase {
-    func testParseLoginResponse() throws {
+    func testParseLoginResponse() {
         let response = "RESULT=OK&KEY=abc123&COUNT=1"
 
         let result = QRZClient.parseResponse(response)
@@ -11,7 +11,7 @@ final class QRZClientTests: XCTestCase {
         XCTAssertEqual(result["KEY"], "abc123")
     }
 
-    func testParseErrorResponse() throws {
+    func testParseErrorResponse() {
         let response = "RESULT=FAIL&REASON=Invalid credentials"
 
         let result = QRZClient.parseResponse(response)
@@ -20,7 +20,7 @@ final class QRZClientTests: XCTestCase {
         XCTAssertEqual(result["REASON"], "Invalid credentials")
     }
 
-    func testParseStatusResponse() throws {
+    func testParseStatusResponse() {
         let response = "RESULT=OK&CALLSIGN=W1ABC&COUNT=1234&CONFIRMED=567"
 
         let result = QRZClient.parseResponse(response)

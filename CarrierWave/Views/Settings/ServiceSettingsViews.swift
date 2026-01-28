@@ -127,7 +127,8 @@ struct QRZSettingsView: View {
                     Link(
                         destination: URL(
                             string: "https://shop.qrz.com/collections/subscriptions/products/"
-                                + "xml-logbook-data-subscription-1-year")!
+                                + "xml-logbook-data-subscription-1-year"
+                        )!
                     ) {
                         Label("Get QRZ Subscription", systemImage: "arrow.up.right.square")
                     }

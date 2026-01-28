@@ -93,7 +93,7 @@ struct ServiceInfo: Identifiable {
 /// A single row in the services list following HIG grouped list style
 struct ServiceRow: View {
     let service: ServiceInfo
-    let syncPhase: SyncService.SyncPhase?
+    let syncPhase: SyncPhase?
 
     var body: some View {
         HStack(spacing: 12) {
@@ -159,7 +159,7 @@ struct ServiceRow: View {
 struct SyncingIndicator: View {
     // MARK: Internal
 
-    let phase: SyncService.SyncPhase
+    let phase: SyncPhase
     let serviceType: ServiceType
 
     var body: some View {
@@ -212,7 +212,7 @@ struct SyncingIndicator: View {
 /// Vertical stacked list of all services following HIG grouped list style
 struct ServiceListView: View {
     let services: [ServiceInfo]
-    let syncPhase: SyncService.SyncPhase?
+    let syncPhase: SyncPhase?
     let onServiceTap: (ServiceIdentifier) -> Void
 
     var body: some View {

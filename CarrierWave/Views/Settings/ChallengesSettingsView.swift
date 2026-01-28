@@ -132,14 +132,9 @@ struct ChallengesSettingsView: View {
 // MARK: - AddChallengeServerSheet
 
 struct AddChallengeServerSheet: View {
-    @Environment(\.dismiss) private var dismiss
+    // MARK: Internal
 
     let syncService: ChallengesSyncService?
-
-    @State private var url = ""
-    @State private var name = ""
-    @State private var isAdding = false
-    @State private var errorMessage: String?
 
     var body: some View {
         NavigationStack {
@@ -181,6 +176,15 @@ struct AddChallengeServerSheet: View {
             }
         }
     }
+
+    // MARK: Private
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var url = ""
+    @State private var name = ""
+    @State private var isAdding = false
+    @State private var errorMessage: String?
 
     private func addSource() {
         guard let syncService else {

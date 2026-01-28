@@ -481,7 +481,8 @@ final class QRZClient {
         }
         let firstBytes = data.prefix(20).map { String(format: "%02x", $0) }.joined(separator: " ")
         throw QRZError.invalidResponse(
-            "Cannot decode \(data.count) bytes, first bytes: \(firstBytes)")
+            "Cannot decode \(data.count) bytes, first bytes: \(firstBytes)"
+        )
     }
 }
 

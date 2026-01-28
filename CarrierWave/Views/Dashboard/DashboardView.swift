@@ -4,6 +4,8 @@ import SwiftUI
 // MARK: - DashboardView
 
 struct DashboardView: View {
+    // MARK: Internal
+
     @Environment(\.modelContext) var modelContext
     @Query var qsos: [QSO]
     @Query var allPresence: [ServicePresence]
@@ -17,29 +19,6 @@ struct DashboardView: View {
 
     @AppStorage("debugMode") var debugMode = false
     @AppStorage("bypassPOTAMaintenance") var bypassPOTAMaintenance = false
-
-    var importService: ImportService {
-        ImportService(modelContext: modelContext)
-    }
-
-    let lofiClient = LoFiClient()
-    let qrzClient = QRZClient()
-    let hamrsClient = HAMRSClient()
-    let lotwClient = LoTWClient()
-
-    /// Statistics
-    var stats: QSOStatistics {
-        QSOStatistics(qsos: qsos)
-    }
-
-    /// Derived counts from ServicePresence
-    func uploadedCount(for service: ServiceType) -> Int {
-        allPresence.filter { $0.serviceType == service && $0.isPresent }.count
-    }
-
-    func pendingCount(for service: ServiceType) -> Int {
-        allPresence.filter { $0.serviceType == service && $0.needsUpload }.count
-    }
 
     // Sync state
     @State var isSyncing = false
@@ -74,7 +53,22 @@ struct DashboardView: View {
     /// Callsign alias detection state
     @State var unconfiguredCallsigns: Set<String> = []
     @State var showingCallsignAliasAlert = false
+
+    let lofiClient = LoFiClient()
+    let qrzClient = QRZClient()
+    let hamrsClient = HAMRSClient()
+    let lotwClient = LoTWClient()
+
     let aliasService = CallsignAliasService.shared
+
+    var importService: ImportService {
+        ImportService(modelContext: modelContext)
+    }
+
+    /// Statistics
+    var stats: QSOStatistics {
+        QSOStatistics(qsos: qsos)
+    }
 
     var body: some View {
         NavigationStack {
@@ -115,6 +109,17 @@ struct DashboardView: View {
             }
         }
     }
+
+    /// Derived counts from ServicePresence
+    func uploadedCount(for service: ServiceType) -> Int {
+        allPresence.filter { $0.serviceType == service && $0.isPresent }.count
+    }
+
+    func pendingCount(for service: ServiceType) -> Int {
+        allPresence.filter { $0.serviceType == service && $0.needsUpload }.count
+    }
+
+    // MARK: Private
 
     // MARK: - Toolbar
 

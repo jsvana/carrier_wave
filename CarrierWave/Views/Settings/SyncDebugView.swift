@@ -4,10 +4,9 @@ import SwiftUI
 // MARK: - SyncDebugView
 
 struct SyncDebugView: View {
-    @Environment(\.modelContext) private var modelContext
+    // MARK: Internal
+
     @ObservedObject var debugLog = SyncDebugLog.shared
-    @State private var selectedTab = 0
-    @State private var serviceCounts: [ServiceType: Int] = [:]
 
     var body: some View {
         VStack(spacing: 0) {
@@ -43,6 +42,12 @@ struct SyncDebugView: View {
             }
         }
     }
+
+    // MARK: Private
+
+    @Environment(\.modelContext) private var modelContext
+    @State private var selectedTab = 0
+    @State private var serviceCounts: [ServiceType: Int] = [:]
 
     private var rawQSOsView: some View {
         List {

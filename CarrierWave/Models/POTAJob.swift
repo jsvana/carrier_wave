@@ -124,7 +124,9 @@ struct POTAJob: Identifiable, Codable {
     let callsignUsed: String?
     let userComment: String?
 
-    var id: Int { jobId }
+    var id: Int {
+        jobId
+    }
 
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)

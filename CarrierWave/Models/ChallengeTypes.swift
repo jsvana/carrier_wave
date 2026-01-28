@@ -209,7 +209,9 @@ struct LeaderboardEntry: Codable, Identifiable, Equatable, @unchecked Sendable {
     var currentTier: String?
     var completedAt: Date?
 
-    var id: String { callsign }
+    var id: String {
+        callsign
+    }
 }
 
 // MARK: - ChallengeConfiguration
@@ -439,5 +441,7 @@ struct ParticipatingChallengeDTO: Codable, Identifiable, @unchecked Sendable {
     var joinedAt: Date
     var status: String
 
-    var id: UUID { participationId }
+    var id: UUID {
+        participationId
+    }
 }

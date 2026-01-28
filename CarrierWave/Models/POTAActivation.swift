@@ -58,10 +58,17 @@ struct POTAActivation: Identifiable {
         Self.displayDateFormatter.string(from: utcDate)
     }
 
-    var qsoCount: Int { qsos.count }
+    var qsoCount: Int {
+        qsos.count
+    }
 
-    var uploadedCount: Int { uploadedQSOs().count }
-    var pendingCount: Int { pendingQSOs().count }
+    var uploadedCount: Int {
+        uploadedQSOs().count
+    }
+
+    var pendingCount: Int {
+        pendingQSOs().count
+    }
 
     var status: POTAActivationStatus {
         let uploaded = uploadedCount
@@ -74,7 +81,9 @@ struct POTAActivation: Identifiable {
         }
     }
 
-    var hasQSOsToUpload: Bool { pendingCount > 0 }
+    var hasQSOsToUpload: Bool {
+        pendingCount > 0
+    }
 
     /// Whether this activation has been rejected (all non-uploaded QSOs are rejected)
     var isRejected: Bool {

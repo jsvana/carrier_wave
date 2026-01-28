@@ -8,8 +8,6 @@ import UniformTypeIdentifiers
 struct CarrierWaveApp: App {
     // MARK: Internal
 
-    @State private var tourState = TourState()
-
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             QSO.self,
@@ -56,6 +54,8 @@ struct CarrierWaveApp: App {
     }
 
     // MARK: Private
+
+    @State private var tourState = TourState()
 
     private func handleURL(_ url: URL) {
         // Check if it's a challenge invite link

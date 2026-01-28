@@ -30,7 +30,7 @@ final class LoFiClientTests: XCTestCase {
         }
         """
 
-        let data = json.data(using: .utf8)!
+        let data = try XCTUnwrap(json.data(using: .utf8))
         let response = try JSONDecoder().decode(LoFiRegistrationResponse.self, from: data)
 
         XCTAssertEqual(response.token, "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.test")
@@ -76,7 +76,7 @@ final class LoFiClientTests: XCTestCase {
         }
         """
 
-        let data = json.data(using: .utf8)!
+        let data = try XCTUnwrap(json.data(using: .utf8))
         let response = try JSONDecoder().decode(LoFiOperationsResponse.self, from: data)
 
         XCTAssertEqual(response.operations.count, 1)
@@ -88,7 +88,7 @@ final class LoFiClientTests: XCTestCase {
     }
 
     func testParseQsosResponse() throws {
-        let data = TestData.qsosResponseJSON.data(using: .utf8)!
+        let data = try XCTUnwrap(TestData.qsosResponseJSON.data(using: .utf8))
         let response = try JSONDecoder().decode(LoFiQsosResponse.self, from: data)
 
         XCTAssertEqual(response.qsos.count, 1)
@@ -96,7 +96,7 @@ final class LoFiClientTests: XCTestCase {
     }
 
     func testParseQsoFields() throws {
-        let data = TestData.qsosResponseJSON.data(using: .utf8)!
+        let data = try XCTUnwrap(TestData.qsosResponseJSON.data(using: .utf8))
         let response = try JSONDecoder().decode(LoFiQsosResponse.self, from: data)
         let qso = response.qsos[0]
 
@@ -122,7 +122,7 @@ final class LoFiClientTests: XCTestCase {
         }
         """
 
-        let data = json.data(using: .utf8)!
+        let data = try XCTUnwrap(json.data(using: .utf8))
         let qso = try JSONDecoder().decode(LoFiQso.self, from: data)
 
         // 1704067200000 ms = 2024-01-01 00:00:00 UTC
@@ -154,7 +154,7 @@ final class LoFiClientTests: XCTestCase {
         }
         """
 
-        let data = json.data(using: .utf8)!
+        let data = try XCTUnwrap(json.data(using: .utf8))
         let operation = try JSONDecoder().decode(LoFiOperation.self, from: data)
 
         XCTAssertEqual(operation.potaRef?.reference, "US-1234")

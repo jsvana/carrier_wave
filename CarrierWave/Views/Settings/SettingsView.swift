@@ -5,42 +5,12 @@ import UIKit
 // MARK: - SettingsMainView
 
 struct SettingsMainView: View {
-    @Environment(\.modelContext) private var modelContext
+    // MARK: Internal
+
     @ObservedObject var potaAuth: POTAAuthService
     @Binding var destination: SettingsDestination?
+
     let tourState: TourState
-
-    @State private var navigationPath = NavigationPath()
-    @State private var showingError = false
-    @State private var errorMessage = ""
-    @State private var showingClearAllConfirmation = false
-    @State private var isClearingQSOs = false
-    @State private var dedupeTimeWindow = 5
-    @State private var isDeduplicating = false
-    @State private var showingDedupeResult = false
-    @State private var dedupeResultMessage = ""
-    @State private var isExportingDatabase = false
-    @State private var exportedFile: ExportedFile?
-    @State private var showingBugReport = false
-    @State private var showIntroTour = false
-
-    @AppStorage("debugMode") private var debugMode = false
-    @AppStorage("readOnlyMode") private var readOnlyMode = false
-    @AppStorage("bypassPOTAMaintenance") private var bypassPOTAMaintenance = false
-
-    private let lofiClient = LoFiClient()
-    private let qrzClient = QRZClient()
-    private let hamrsClient = HAMRSClient()
-    private let lotwClient = LoTWClient()
-    @StateObject private var iCloudMonitor = ICloudMonitor()
-
-    @State private var qrzIsConfigured = false
-    @State private var qrzCallsign: String?
-
-    @State private var lotwIsConfigured = false
-    @State private var lotwUsername: String?
-
-    @Query(sort: \ChallengeSource.name) private var challengeSources: [ChallengeSource]
 
     var body: some View {
         NavigationStack(path: $navigationPath) {
@@ -126,6 +96,42 @@ struct SettingsMainView: View {
             }
         }
     }
+
+    // MARK: Private
+
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var navigationPath = NavigationPath()
+    @State private var showingError = false
+    @State private var errorMessage = ""
+    @State private var showingClearAllConfirmation = false
+    @State private var isClearingQSOs = false
+    @State private var dedupeTimeWindow = 5
+    @State private var isDeduplicating = false
+    @State private var showingDedupeResult = false
+    @State private var dedupeResultMessage = ""
+    @State private var isExportingDatabase = false
+    @State private var exportedFile: ExportedFile?
+    @State private var showingBugReport = false
+    @State private var showIntroTour = false
+
+    @AppStorage("debugMode") private var debugMode = false
+    @AppStorage("readOnlyMode") private var readOnlyMode = false
+    @AppStorage("bypassPOTAMaintenance") private var bypassPOTAMaintenance = false
+
+    @StateObject private var iCloudMonitor = ICloudMonitor()
+    @State private var qrzIsConfigured = false
+    @State private var qrzCallsign: String?
+
+    @State private var lotwIsConfigured = false
+    @State private var lotwUsername: String?
+
+    @Query(sort: \ChallengeSource.name) private var challengeSources: [ChallengeSource]
+
+    private let lofiClient = LoFiClient()
+    private let qrzClient = QRZClient()
+    private let hamrsClient = HAMRSClient()
+    private let lotwClient = LoTWClient()
 
     // MARK: - Sections
 
@@ -275,8 +281,6 @@ struct SettingsMainView: View {
         }
     }
 
-    // MARK: - Actions
-
     @MainActor
     private func exportDatabase() async {
         do {
@@ -314,7 +318,8 @@ struct SettingsMainView: View {
         do {
             let service = DeduplicationService(modelContext: modelContext)
             let result = try await service.findAndMergeDuplicates(
-                timeWindowMinutes: dedupeTimeWindow)
+                timeWindowMinutes: dedupeTimeWindow
+            )
 
             if result.duplicateGroupsFound == 0 {
                 dedupeResultMessage = "No duplicates found."

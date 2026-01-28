@@ -142,18 +142,12 @@ struct LoTWSettingsView: View {
 // MARK: - LoTWLoginSheet
 
 struct LoTWLoginSheet: View {
-    @Environment(\.dismiss) private var dismiss
+    // MARK: Internal
 
     @Binding var isAuthenticated: Bool
     @Binding var storedUsername: String
     @Binding var errorMessage: String
     @Binding var showingError: Bool
-
-    @State private var username = ""
-    @State private var password = ""
-    @State private var isValidating = false
-
-    private let lotwClient = LoTWClient()
 
     var body: some View {
         NavigationStack {
@@ -196,6 +190,16 @@ struct LoTWLoginSheet: View {
             }
         }
     }
+
+    // MARK: Private
+
+    @Environment(\.dismiss) private var dismiss
+
+    @State private var username = ""
+    @State private var password = ""
+    @State private var isValidating = false
+
+    private let lotwClient = LoTWClient()
 
     private func validateAndSave() async {
         isValidating = true

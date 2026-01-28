@@ -136,7 +136,6 @@ struct POTAActivationsContentView: View {
             .sorted { $0.utcDate > $1.utcDate }
     }
 
-    @ViewBuilder
     private var emptyStateView: some View {
         ContentUnavailableView {
             Label("No Activations", systemImage: "tree")
@@ -145,7 +144,6 @@ struct POTAActivationsContentView: View {
         }
     }
 
-    @ViewBuilder
     private var maintenanceBanner: some View {
         HStack {
             Image(systemName: "wrench.and.screwdriver")
@@ -169,7 +167,6 @@ struct POTAActivationsContentView: View {
         .padding(.vertical, 4)
     }
 
-    @ViewBuilder
     private var activationsList: some View {
         List {
             if isInMaintenance {

@@ -41,8 +41,7 @@ final class CallsignAliasService {
     func getPreviousCallsigns() -> [String] {
         do {
             let data = try keychain.read(for: KeychainHelper.Keys.previousCallsigns)
-            let callsigns = try JSONDecoder().decode([String].self, from: data)
-            return callsigns
+            return try JSONDecoder().decode([String].self, from: data)
         } catch {
             return []
         }

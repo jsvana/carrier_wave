@@ -102,7 +102,9 @@ class POTAAuthService: NSObject, ObservableObject {
     var authContinuation: CheckedContinuation<POTAToken, Error>?
 
     /// Public accessor for the POTA app URL
-    var potaAppURLString: String { Self.potaAppURL }
+    var potaAppURLString: String {
+        Self.potaAppURL
+    }
 
     /// Check if we have a valid (non-expired) POTA authentication token
     var isAuthenticated: Bool {

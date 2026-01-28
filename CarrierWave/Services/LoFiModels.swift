@@ -424,17 +424,42 @@ struct LoFiQsoRef: Decodable, @unchecked Sendable {
 // MARK: - QSO Helpers
 
 extension LoFiQso {
-    var theirCall: String? { their?.call }
-    var ourCall: String? { our?.call }
-    var rstSent: String? { our?.sent }
-    var rstRcvd: String? { their?.sent }
-    var theirGrid: String? { their?.guess?.grid }
-    var theirName: String? { their?.guess?.name }
-    var theirState: String? { their?.guess?.state }
-    var theirCountry: String? { their?.guess?.entityName }
+    var theirCall: String? {
+        their?.call
+    }
+
+    var ourCall: String? {
+        our?.call
+    }
+
+    var rstSent: String? {
+        our?.sent
+    }
+
+    var rstRcvd: String? {
+        their?.sent
+    }
+
+    var theirGrid: String? {
+        their?.guess?.grid
+    }
+
+    var theirName: String? {
+        their?.guess?.name
+    }
+
+    var theirState: String? {
+        their?.guess?.state
+    }
+
+    var theirCountry: String? {
+        their?.guess?.entityName
+    }
 
     /// Frequency in MHz (API returns kHz)
-    var freqMHz: Double? { freq.map { $0 / 1_000.0 } }
+    var freqMHz: Double? {
+        freq.map { $0 / 1_000.0 }
+    }
 
     /// QSO timestamp as Date
     var timestamp: Date {

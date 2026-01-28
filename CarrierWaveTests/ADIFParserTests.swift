@@ -64,7 +64,7 @@ final class ADIFParserTests: XCTestCase {
         formatter.dateFormat = "yyyy-MM-dd HH:mm"
         formatter.timeZone = TimeZone(identifier: "UTC")
 
-        XCTAssertEqual(formatter.string(from: records[0].timestamp!), "2024-01-15 14:30")
+        XCTAssertEqual(try formatter.string(from: XCTUnwrap(records[0].timestamp)), "2024-01-15 14:30")
     }
 
     func testParsePOTAFields() throws {

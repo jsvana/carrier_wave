@@ -48,6 +48,25 @@ struct QRZSyncResult {
     let skipped: Int
 }
 
+// MARK: - SyncPhase
+
+enum SyncPhase: Equatable {
+    case downloading(service: ServiceType)
+    case processing
+    case uploading(service: ServiceType)
+}
+
+// MARK: - SyncResult
+
+struct SyncResult {
+    var downloaded: [ServiceType: Int]
+    var uploaded: [ServiceType: Int]
+    var errors: [String]
+    var newQSOs: Int
+    var mergedQSOs: Int
+    var potaMaintenanceSkipped: Bool
+}
+
 // MARK: - SyncService
 
 @MainActor
@@ -70,21 +89,6 @@ class SyncService: ObservableObject {
     }
 
     // MARK: Internal
-
-    enum SyncPhase: Equatable {
-        case downloading(service: ServiceType)
-        case processing
-        case uploading(service: ServiceType)
-    }
-
-    struct SyncResult {
-        var downloaded: [ServiceType: Int]
-        var uploaded: [ServiceType: Int]
-        var errors: [String]
-        var newQSOs: Int
-        var mergedQSOs: Int
-        var potaMaintenanceSkipped: Bool
-    }
 
     /// Modes that represent activation metadata, not actual QSOs (from Ham2K PoLo)
     static let metadataModes: Set<String> = ["WEATHER", "SOLAR"]
@@ -388,7 +392,8 @@ class SyncService: ObservableObject {
                 allFetched.append(contentsOf: qsos)
             case let .failure(error):
                 result.errors.append(
-                    "\(service.displayName) download: \(error.localizedDescription)")
+                    "\(service.displayName) download: \(error.localizedDescription)"
+                )
             }
         }
 
@@ -423,7 +428,8 @@ class SyncService: ObservableObject {
                 allFetched.append(contentsOf: qsos)
             case let .failure(error):
                 result.errors.append(
-                    "\(service.displayName) download: \(error.localizedDescription)")
+                    "\(service.displayName) download: \(error.localizedDescription)"
+                )
             }
         }
         return allFetched
@@ -462,7 +468,8 @@ class SyncService: ObservableObject {
                 result.uploaded[service] = count
             case let .failure(error):
                 result.errors.append(
-                    "\(service.displayName) upload: \(error.localizedDescription)")
+                    "\(service.displayName) upload: \(error.localizedDescription)"
+                )
             }
         }
     }

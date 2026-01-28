@@ -4,9 +4,9 @@ import SwiftUI
 
 /// Sheet presenting detailed service information and actions
 struct ServiceDetailSheet: View {
-    let serviceId: ServiceIdentifier
-    @Environment(\.dismiss) private var dismiss
+    // MARK: Internal
 
+    let serviceId: ServiceIdentifier
     // Service-specific data passed in
     let isConfigured: Bool
     let callsign: String?
@@ -179,6 +179,10 @@ struct ServiceDetailSheet: View {
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
+
+    // MARK: Private
+
+    @Environment(\.dismiss) private var dismiss
 
     private var statusRow: some View {
         HStack {

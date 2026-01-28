@@ -8,7 +8,9 @@ struct QSOStatistics {
 
     let qsos: [QSO]
 
-    var totalQSOs: Int { realQSOs.count }
+    var totalQSOs: Int {
+        realQSOs.count
+    }
 
     var uniqueEntities: Int {
         Set(realQSOs.compactMap { $0.dxccEntity?.number }).count
@@ -202,8 +204,7 @@ struct QSOStatistics {
         // Group by frequency rounded to nearest 100Hz (0.0001 MHz)
         let grouped = Dictionary(grouping: withFrequency) { qso in
             let freqMHz = qso.frequency! // Already in MHz
-            let rounded = (freqMHz * 10_000).rounded() / 10_000 // Round to 0.0001 MHz = 100 Hz
-            return rounded
+            return (freqMHz * 10_000).rounded() / 10_000 // Round to 0.0001 MHz = 100 Hz
         }
         return grouped.map { freqMHz, qsos in
             // Only show 100Hz digit if non-zero (e.g., 14.060 vs 14.0625)
