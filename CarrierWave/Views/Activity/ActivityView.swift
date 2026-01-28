@@ -21,13 +21,20 @@ struct ActivityView: View {
             }
             .navigationTitle("Activity")
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
+                ToolbarItemGroup(placement: .topBarLeading) {
                     NavigationLink {
                         FriendsListView()
                     } label: {
                         Image(systemName: "person.2")
                     }
                     .accessibilityLabel("Friends")
+
+                    NavigationLink {
+                        ClubsListView()
+                    } label: {
+                        Image(systemName: "person.3")
+                    }
+                    .accessibilityLabel("Clubs")
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
@@ -49,6 +56,9 @@ struct ActivityView: View {
                 }
                 if friendsSyncService == nil {
                     friendsSyncService = FriendsSyncService(modelContext: modelContext)
+                }
+                if clubsSyncService == nil {
+                    clubsSyncService = ClubsSyncService(modelContext: modelContext)
                 }
             }
             .alert("Error", isPresented: $showingError) {
@@ -106,6 +116,7 @@ struct ActivityView: View {
 
     @State private var syncService: ChallengesSyncService?
     @State private var friendsSyncService: FriendsSyncService?
+    @State private var clubsSyncService: ClubsSyncService?
     @State private var errorMessage: String?
     @State private var showingError = false
 
