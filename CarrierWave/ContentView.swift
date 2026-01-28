@@ -26,6 +26,8 @@ enum SettingsDestination: Hashable {
 struct ContentView: View {
     // MARK: Internal
 
+    let tourState: TourState
+
     var body: some View {
         TabView(selection: $selectedTab) {
             if let syncService {
@@ -91,6 +93,9 @@ struct ContentView: View {
             if potaClient == nil {
                 potaClient = POTAClient(authService: potaAuthService)
             }
+            if tourState.shouldShowIntroTour() {
+                showIntroTour = true
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: .didReceiveADIFFile)) { notification in
             if let url = notification.object as? URL {
@@ -110,6 +115,9 @@ struct ContentView: View {
             // Navigate to challenges tab
             selectedTab = .challenges
         }
+        .fullScreenCover(isPresented: $showIntroTour) {
+            IntroTourView(tourState: tourState)
+        }
     }
 
     // MARK: Private
@@ -121,6 +129,7 @@ struct ContentView: View {
     @State private var settingsDestination: SettingsDestination?
     @State private var syncService: SyncService?
     @State private var potaClient: POTAClient?
+    @State private var showIntroTour = false
 
     private let lofiClient = LoFiClient()
     private let qrzClient = QRZClient()
@@ -129,7 +138,7 @@ struct ContentView: View {
 }
 
 #Preview {
-    ContentView()
+    ContentView(tourState: TourState())
         .modelContainer(
             for: [QSO.self, ServicePresence.self, UploadDestination.self, POTAUploadAttempt.self],
             inMemory: true

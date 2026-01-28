@@ -8,6 +8,8 @@ import UniformTypeIdentifiers
 struct CarrierWaveApp: App {
     // MARK: Internal
 
+    @State private var tourState = TourState()
+
     var sharedModelContainer: ModelContainer = {
         let schema = Schema([
             QSO.self,
@@ -39,7 +41,7 @@ struct CarrierWaveApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            ContentView(tourState: tourState)
                 .task {
                     await POTAParksCache.shared.ensureLoaded()
                 }
