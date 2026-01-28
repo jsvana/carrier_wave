@@ -8,6 +8,7 @@ struct SettingsMainView: View {
     @Environment(\.modelContext) private var modelContext
     @ObservedObject var potaAuth: POTAAuthService
     @Binding var destination: SettingsDestination?
+    let tourState: TourState
 
     @State private var navigationPath = NavigationPath()
     @State private var showingError = false
@@ -21,6 +22,7 @@ struct SettingsMainView: View {
     @State private var isExportingDatabase = false
     @State private var exportedFile: ExportedFile?
     @State private var showingBugReport = false
+    @State private var showIntroTour = false
 
     @AppStorage("debugMode") private var debugMode = false
     @AppStorage("readOnlyMode") private var readOnlyMode = false
@@ -66,9 +68,9 @@ struct SettingsMainView: View {
                 case .qrz:
                     QRZSettingsView()
                 case .pota:
-                    POTASettingsView(potaAuth: potaAuth)
+                    POTASettingsView(potaAuth: potaAuth, tourState: tourState)
                 case .lofi:
-                    LoFiSettingsView()
+                    LoFiSettingsView(tourState: tourState)
                 case .hamrs:
                     HAMRSSettingsView()
                 case .lotw:
@@ -117,6 +119,9 @@ struct SettingsMainView: View {
             )
             .sheet(isPresented: $showingBugReport) {
                 BugReportView(potaAuth: potaAuth, iCloudMonitor: iCloudMonitor)
+            }
+            .fullScreenCover(isPresented: $showIntroTour) {
+                IntroTourView(tourState: tourState)
             }
         }
     }
@@ -246,6 +251,13 @@ struct SettingsMainView: View {
                 showingBugReport = true
             } label: {
                 Label("Report a Bug", systemImage: "ant")
+            }
+
+            Button {
+                tourState.resetForTesting()
+                showIntroTour = true
+            } label: {
+                Label("Show App Tour", systemImage: "questionmark.circle")
             }
 
             Link(destination: URL(string: "https://discord.gg/ksNb2jAeTR")!) {

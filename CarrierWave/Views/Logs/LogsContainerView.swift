@@ -18,6 +18,7 @@ struct LogsContainerView: View {
     let qrzClient: QRZClient
     let hamrsClient: HAMRSClient
     let lotwClient: LoTWClient
+    let tourState: TourState
 
     var body: some View {
         NavigationStack {
@@ -62,7 +63,7 @@ struct LogsContainerView: View {
                 potaAuth: potaAuth
             )
         case .potaActivations:
-            POTAActivationsContentView(potaClient: potaClient, potaAuth: potaAuth)
+            POTAActivationsContentView(potaClient: potaClient, potaAuth: potaAuth, tourState: tourState)
         }
     }
 }

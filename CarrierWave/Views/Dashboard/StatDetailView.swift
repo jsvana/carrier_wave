@@ -5,6 +5,7 @@ struct StatDetailView: View {
 
     let category: StatCategoryType
     let items: [StatCategoryItem]
+    let tourState: TourState
 
     var body: some View {
         List {
@@ -14,6 +15,7 @@ struct StatDetailView: View {
         }
         .listStyle(.plain)
         .navigationTitle(category.title)
+        .miniTour(.statsDrilldown, tourState: tourState)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {

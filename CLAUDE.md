@@ -42,6 +42,7 @@
 | `ChallengeTypes.swift` | Challenge-related enums and types |
 | `LeaderboardCache.swift` | Cached leaderboard data |
 | `POTAActivation.swift` | POTA activation grouping view model |
+| `TourState.swift` | UserDefaults-backed tour progress tracking |
 
 ### Services (`CarrierWave/Services/`)
 | File | Purpose |
@@ -121,6 +122,15 @@
 | `ChallengeDetailHelperViews.swift` | Challenge detail components |
 | `ChallengeProgressCard.swift` | Progress visualization card |
 | `LeaderboardView.swift` | Challenge leaderboard display |
+
+### Views - Tour (`CarrierWave/Views/Tour/`)
+| File | Purpose |
+|------|---------|
+| `TourSheetView.swift` | Reusable bottom sheet component for tour screens |
+| `IntroTourView.swift` | Intro tour flow coordinator |
+| `IntroTourStepViews.swift` | Individual step content views for intro tour |
+| `MiniTourContent.swift` | Content definitions for all mini-tours |
+| `MiniTourModifier.swift` | View modifier for easy mini-tour integration |
 
 ### Views - Settings (`CarrierWave/Views/Settings/`)
 | File | Purpose |

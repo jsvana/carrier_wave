@@ -46,6 +46,8 @@ struct ICloudSettingsView: View {
 struct LoFiSettingsView: View {
     // MARK: Internal
 
+    let tourState: TourState
+
     var body: some View {
         List {
             if isConfigured {
@@ -102,6 +104,7 @@ struct LoFiSettingsView: View {
         .onAppear {
             checkStatus()
         }
+        .miniTour(.lofiSetup, tourState: tourState)
     }
 
     // MARK: Private

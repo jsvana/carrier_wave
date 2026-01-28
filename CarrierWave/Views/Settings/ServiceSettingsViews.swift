@@ -228,6 +228,8 @@ struct POTASettingsView: View {
 
     @ObservedObject var potaAuth: POTAAuthService
 
+    let tourState: TourState
+
     var body: some View {
         List {
             if let token = potaAuth.currentToken, !token.isExpired {
@@ -343,6 +345,7 @@ struct POTASettingsView: View {
         } message: {
             Text("Login successful! Credentials saved.")
         }
+        .miniTour(.potaAccountSetup, tourState: tourState)
     }
 
     // MARK: Private

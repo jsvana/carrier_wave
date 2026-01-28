@@ -13,6 +13,7 @@ struct DashboardView: View {
     @ObservedObject var syncService: SyncService
     @Binding var selectedTab: AppTab
     @Binding var settingsDestination: SettingsDestination?
+    let tourState: TourState
 
     @AppStorage("debugMode") var debugMode = false
     @AppStorage("bypassPOTAMaintenance") var bypassPOTAMaintenance = false
@@ -208,7 +209,7 @@ struct DashboardView: View {
             .buttonStyle(.plain)
 
             NavigationLink {
-                StatDetailView(category: .qsls, items: stats.items(for: .qsls))
+                StatDetailView(category: .qsls, items: stats.items(for: .qsls), tourState: tourState)
             } label: {
                 StatBox(title: "QSLs", value: "\(stats.confirmedQSLs)", icon: "checkmark.seal")
             }
@@ -216,7 +217,7 @@ struct DashboardView: View {
 
             if lotwIsConfigured {
                 NavigationLink {
-                    StatDetailView(category: .entities, items: stats.items(for: .entities))
+                    StatDetailView(category: .entities, items: stats.items(for: .entities), tourState: tourState)
                 } label: {
                     StatBox(title: "DXCC Entities", value: "\(stats.uniqueEntities)", icon: "globe")
                 }
@@ -227,21 +228,21 @@ struct DashboardView: View {
             }
 
             NavigationLink {
-                StatDetailView(category: .grids, items: stats.items(for: .grids))
+                StatDetailView(category: .grids, items: stats.items(for: .grids), tourState: tourState)
             } label: {
                 StatBox(title: "Grids", value: "\(stats.uniqueGrids)", icon: "square.grid.3x3")
             }
             .buttonStyle(.plain)
 
             NavigationLink {
-                StatDetailView(category: .bands, items: stats.items(for: .bands))
+                StatDetailView(category: .bands, items: stats.items(for: .bands), tourState: tourState)
             } label: {
                 StatBox(title: "Bands", value: "\(stats.uniqueBands)", icon: "waveform")
             }
             .buttonStyle(.plain)
 
             NavigationLink {
-                StatDetailView(category: .parks, items: stats.items(for: .parks))
+                StatDetailView(category: .parks, items: stats.items(for: .parks), tourState: tourState)
             } label: {
                 ActivationsStatBox(successful: stats.successfulActivations)
             }
