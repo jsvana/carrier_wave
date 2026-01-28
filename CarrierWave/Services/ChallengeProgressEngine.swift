@@ -242,9 +242,9 @@ final class ChallengeProgressEngine {
     // MARK: - Data Fetching
 
     private func fetchActiveParticipations() -> [ChallengeParticipation] {
-        let activeStatus = ParticipationStatus.active
+        let activeRaw = ParticipationStatus.active.rawValue
         let descriptor = FetchDescriptor<ChallengeParticipation>(
-            predicate: #Predicate { $0.status == activeStatus }
+            predicate: #Predicate { $0.statusRawValue == activeRaw }
         )
         return (try? modelContext.fetch(descriptor)) ?? []
     }

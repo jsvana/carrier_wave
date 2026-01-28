@@ -2,19 +2,42 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
+## [1.11.1] - 2026-01-28
+
+### Fixed
+- Crash during sync when evaluating challenge progress (SwiftData predicate used computed property instead of stored property)
+
 ## [1.11.0] - 2026-01-28
 
 ### Added
+- **Activity tab** (renamed from Challenges)
+  - Activity feed showing friend, club, and personal activities
+  - Filter bar to show All, Friends only, or Clubs only
+  - Activity detection for notable events (new DXCC, bands, modes, DX contacts, streaks)
+  - Automatic activity reporting to server during sync
+- **Friends**
+  - Friends list showing accepted friends and pending requests
+  - Friend search by callsign
+  - Send, accept, and reject friend requests
+- **Clubs**
+  - Clubs list showing memberships (via Polo notes lists)
+  - Club detail view with member list
+- **Adaptive sync for rate limiting**
+  - LoTW: Adaptive date windowing automatically shrinks time windows when hitting rate limits
+  - POTA: Adaptive batch processing adjusts batch size on timeouts
+  - Resumable downloads with checkpoints survive app restarts
+- **Tour updates**
+  - Activity tab added to intro tour
+  - Expanded social mini-tour explaining friends and clubs
 - "Ready to Upload" section in POTA Activations view
   - Pending activations pinned to top, sorted by date descending
   - Park reference shown in each row for easy identification
-  - Existing "grouped by park" sections remain below
 
 ### Fixed
 - POTA tour text changed from "AWS Cognito" to "External Logins (Google, Apple, etc.)" for clarity
 - Map confirmed filter now includes QSOs confirmed by either QRZ or LoTW (union)
 - Crash after device sleep when evaluating challenge progress
-  - ChallengesView now uses fresh ModelContext instead of cached reference
+- Sync pagination handling improved
 
 ## [1.10.0] - 2026-01-28
 
