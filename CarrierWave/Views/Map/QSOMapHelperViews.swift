@@ -142,8 +142,12 @@ struct MapFilterSheet: View {
                 } header: {
                     Text("Display")
                 } footer: {
-                    Text("Individual QSOs shows each contact as a small dot. ") +
-                        Text("Paths draw geodesic curves to contacted stations.")
+                    Text(
+                        """
+                        Individual QSOs shows each contact as a small dot. \
+                        Paths draw geodesic curves to contacted stations.
+                        """
+                    )
                 }
 
                 Section {

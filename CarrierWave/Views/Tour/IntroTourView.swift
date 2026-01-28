@@ -208,8 +208,8 @@ struct IntroTourView: View {
             connectedCallsign = status.callsign
 
             let aliasService = CallsignAliasService.shared
-            if await aliasService.getCurrentCallsign() == nil {
-                try await aliasService.saveCurrentCallsign(status.callsign)
+            if aliasService.getCurrentCallsign() == nil {
+                try aliasService.saveCurrentCallsign(status.callsign)
             }
         } catch {
             errorMessage = error.localizedDescription

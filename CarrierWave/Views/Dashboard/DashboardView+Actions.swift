@@ -245,10 +245,10 @@ extension DashboardView {
         }
 
         // Get unconfigured callsigns
-        let unconfigured = await aliasService.getUnconfiguredCallsigns(from: allMyCallsigns)
+        let unconfigured = aliasService.getUnconfiguredCallsigns(from: allMyCallsigns)
 
         // Only show alert if there are unconfigured callsigns AND user has at least one configured
-        let hasConfiguredCallsigns = await !aliasService.getAllUserCallsigns().isEmpty
+        let hasConfiguredCallsigns = !aliasService.getAllUserCallsigns().isEmpty
         if !unconfigured.isEmpty, hasConfiguredCallsigns {
             unconfiguredCallsigns = unconfigured
             showingCallsignAliasAlert = true
@@ -259,7 +259,7 @@ extension DashboardView {
     func addUnconfiguredCallsignsAsAliases() async {
         for callsign in unconfiguredCallsigns {
             do {
-                try await aliasService.addPreviousCallsign(callsign)
+                try aliasService.addPreviousCallsign(callsign)
             } catch {
                 print("Failed to add callsign alias \(callsign): \(error)")
             }

@@ -107,9 +107,10 @@ final class BugReportService {
         )
     }
 
-    func collectCallsignInfo() async -> CallsignInfo {
-        let currentCallsign = await CallsignAliasService.shared.getCurrentCallsign()
-        let previousCallsigns = await CallsignAliasService.shared.getPreviousCallsigns()
+    @MainActor
+    func collectCallsignInfo() -> CallsignInfo {
+        let currentCallsign = CallsignAliasService.shared.getCurrentCallsign()
+        let previousCallsigns = CallsignAliasService.shared.getPreviousCallsigns()
         return CallsignInfo(
             currentCallsign: currentCallsign,
             previousCallsigns: previousCallsigns

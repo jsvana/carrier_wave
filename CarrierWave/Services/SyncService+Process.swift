@@ -89,8 +89,8 @@ extension SyncService {
         let allQSOs = try modelContext.fetch(descriptor)
 
         // Get user's callsign aliases for matching
-        let aliasService = CallsignAliasService.shared
-        let userCallsigns = await aliasService.getAllUserCallsigns()
+        let aliasService = await MainActor.run { CallsignAliasService.shared }
+        let userCallsigns = await MainActor.run { aliasService.getAllUserCallsigns() }
 
         for qso in allQSOs {
             guard let presence = qso.presence(for: .qrz), presence.isPresent else {

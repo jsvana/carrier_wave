@@ -171,19 +171,19 @@ struct CallsignAliasesSettingsView: View {
         isLoading = true
         defer { isLoading = false }
 
-        currentCallsign = await aliasService.getCurrentCallsign() ?? ""
-        previousCallsigns = await aliasService.getPreviousCallsigns()
+        currentCallsign = aliasService.getCurrentCallsign() ?? ""
+        previousCallsigns = aliasService.getPreviousCallsigns()
     }
 
     private func saveCurrentCallsign() async {
         do {
             let trimmed = currentCallsign.trimmingCharacters(in: .whitespaces)
             if trimmed.isEmpty {
-                try await aliasService.clearCurrentCallsign()
+                try aliasService.clearCurrentCallsign()
             } else {
-                try await aliasService.saveCurrentCallsign(trimmed)
+                try aliasService.saveCurrentCallsign(trimmed)
             }
-            currentCallsign = await aliasService.getCurrentCallsign() ?? ""
+            currentCallsign = aliasService.getCurrentCallsign() ?? ""
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
@@ -197,9 +197,9 @@ struct CallsignAliasesSettingsView: View {
         }
 
         do {
-            try await aliasService.addPreviousCallsign(callsign)
+            try aliasService.addPreviousCallsign(callsign)
             newPreviousCallsign = ""
-            previousCallsigns = await aliasService.getPreviousCallsigns()
+            previousCallsigns = aliasService.getPreviousCallsigns()
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
@@ -208,8 +208,8 @@ struct CallsignAliasesSettingsView: View {
 
     private func removePreviousCallsign(_ callsign: String) async {
         do {
-            try await aliasService.removePreviousCallsign(callsign)
-            previousCallsigns = await aliasService.getPreviousCallsigns()
+            try aliasService.removePreviousCallsign(callsign)
+            previousCallsigns = aliasService.getPreviousCallsigns()
         } catch {
             errorMessage = error.localizedDescription
             showingError = true

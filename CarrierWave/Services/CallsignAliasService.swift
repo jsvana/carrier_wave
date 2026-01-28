@@ -4,7 +4,8 @@ import Foundation
 
 /// Service to manage the user's current callsign and previous callsigns (aliases).
 /// Used to properly match QSOs across services when the user has changed callsigns over time.
-actor CallsignAliasService {
+@MainActor
+final class CallsignAliasService {
     // MARK: Lifecycle
 
     private init() {}

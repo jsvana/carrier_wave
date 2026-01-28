@@ -39,7 +39,7 @@ struct BugReportView: View {
                 }
             }
             .task {
-                callsignInfo = await service.collectCallsignInfo()
+                callsignInfo = service.collectCallsignInfo()
             }
         }
     }
