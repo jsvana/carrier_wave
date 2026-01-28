@@ -71,10 +71,18 @@ struct ContentView: View {
 
             Group {
                 if let syncService {
-                    SettingsMainView(potaAuth: potaAuthService, destination: $settingsDestination)
-                        .environmentObject(syncService)
+                    SettingsMainView(
+                        potaAuth: potaAuthService,
+                        destination: $settingsDestination,
+                        tourState: tourState
+                    )
+                    .environmentObject(syncService)
                 } else {
-                    SettingsMainView(potaAuth: potaAuthService, destination: $settingsDestination)
+                    SettingsMainView(
+                        potaAuth: potaAuthService,
+                        destination: $settingsDestination,
+                        tourState: tourState
+                    )
                 }
             }
             .tabItem {
