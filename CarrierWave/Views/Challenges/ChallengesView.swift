@@ -6,6 +6,8 @@ import SwiftUI
 struct ChallengesView: View {
     // MARK: Internal
 
+    let tourState: TourState
+
     @Environment(\.modelContext) var modelContext
 
     var body: some View {
@@ -78,6 +80,7 @@ struct ChallengesView: View {
             ) { _ in
                 Task { await evaluateNewQSOs() }
             }
+            .miniTour(.challenges, tourState: tourState)
         }
     }
 
@@ -463,7 +466,7 @@ struct InviteJoinSheet: View {
 }
 
 #Preview {
-    ChallengesView()
+    ChallengesView(tourState: TourState())
         .modelContainer(
             for: [
                 ChallengeSource.self,

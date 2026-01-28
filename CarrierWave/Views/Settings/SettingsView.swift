@@ -68,9 +68,9 @@ struct SettingsMainView: View {
                 case .qrz:
                     QRZSettingsView()
                 case .pota:
-                    POTASettingsView(potaAuth: potaAuth)
+                    POTASettingsView(potaAuth: potaAuth, tourState: tourState)
                 case .lofi:
-                    LoFiSettingsView()
+                    LoFiSettingsView(tourState: tourState)
                 case .hamrs:
                     HAMRSSettingsView()
                 case .lotw:

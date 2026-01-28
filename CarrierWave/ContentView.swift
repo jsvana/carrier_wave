@@ -36,7 +36,8 @@ struct ContentView: View {
                     potaAuth: potaAuthService,
                     syncService: syncService,
                     selectedTab: $selectedTab,
-                    settingsDestination: $settingsDestination
+                    settingsDestination: $settingsDestination,
+                    tourState: tourState
                 )
                 .tabItem {
                     Label("Dashboard", systemImage: "square.grid.2x2")
@@ -56,14 +57,15 @@ struct ContentView: View {
                 lofiClient: lofiClient,
                 qrzClient: qrzClient,
                 hamrsClient: hamrsClient,
-                lotwClient: lotwClient
+                lotwClient: lotwClient,
+                tourState: tourState
             )
             .tabItem {
                 Label("Logs", systemImage: "list.bullet")
             }
             .tag(AppTab.logs)
 
-            ChallengesView()
+            ChallengesView(tourState: tourState)
                 .tabItem {
                     Label("Challenges", systemImage: "flag.2.crossed")
                 }

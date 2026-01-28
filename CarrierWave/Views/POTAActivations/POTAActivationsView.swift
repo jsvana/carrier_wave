@@ -13,6 +13,7 @@ struct POTAActivationsContentView: View {
 
     let potaClient: POTAClient?
     let potaAuth: POTAAuthService
+    let tourState: TourState
 
     var body: some View {
         Group {
@@ -22,6 +23,7 @@ struct POTAActivationsContentView: View {
                 activationsList
             }
         }
+        .miniTour(.potaActivations, tourState: tourState)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if isAuthenticated, potaClient != nil {
