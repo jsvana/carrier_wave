@@ -30,9 +30,9 @@ enum MiniTourContent {
         ),
         TourPage(
             icon: "server.rack",
-            title: "Service Login (AWS Cognito)",
+            title: "External Logins (Google, Apple, etc.)",
             body: """
-            If you registered years ago, you may have an AWS Cognito login. \
+            If you registered years ago, you may have an external login (Google, Apple, etc.). \
             This is separate from your pota.app account.
             """
         ),

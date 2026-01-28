@@ -145,8 +145,8 @@ struct QSOMapView: View {
                 return false
             }
 
-            // Confirmed filter
-            if filterState.confirmedOnly, !qso.lotwConfirmed {
+            // Confirmed filter (include if confirmed by either QRZ or LoTW)
+            if filterState.confirmedOnly, !qso.lotwConfirmed, !qso.qrzConfirmed {
                 return false
             }
 
