@@ -7,6 +7,7 @@ struct QSOMarkerView: View {
     // MARK: Internal
 
     let annotation: QSOAnnotation
+    var isSelected: Bool = false
 
     var body: some View {
         VStack(spacing: 2) {
@@ -14,6 +15,10 @@ struct QSOMarkerView: View {
                 Circle()
                     .fill(markerColor)
                     .frame(width: markerSize, height: markerSize)
+                    .overlay(
+                        Circle()
+                            .stroke(isSelected ? Color.white : Color.clear, lineWidth: 3)
+                    )
 
                 if annotation.qsoCount > 1 {
                     Text("\(annotation.qsoCount)")
@@ -21,7 +26,9 @@ struct QSOMarkerView: View {
                         .foregroundStyle(.white)
                 }
             }
-            .shadow(radius: 2)
+            .shadow(radius: isSelected ? 4 : 2)
+            .scaleEffect(isSelected ? 1.2 : 1.0)
+            .animation(.easeInOut(duration: 0.2), value: isSelected)
         }
     }
 

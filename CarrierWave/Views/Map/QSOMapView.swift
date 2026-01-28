@@ -9,16 +9,24 @@ struct QSOMapView: View {
 
     var body: some View {
         ZStack {
-            Map(position: $cameraPosition, selection: $selectedAnnotation) {
+            Map(position: $cameraPosition) {
                 ForEach(annotations) { annotation in
                     Annotation(
                         annotation.displayTitle,
                         coordinate: annotation.coordinate,
                         anchor: .bottom
                     ) {
-                        QSOMarkerView(annotation: annotation)
+                        QSOMarkerView(annotation: annotation, isSelected: selectedAnnotation?.id == annotation.id)
+                            .onTapGesture {
+                                withAnimation {
+                                    if selectedAnnotation?.id == annotation.id {
+                                        selectedAnnotation = nil
+                                    } else {
+                                        selectedAnnotation = annotation
+                                    }
+                                }
+                            }
                     }
-                    .tag(annotation)
                 }
 
                 if filterState.showArcs {
@@ -114,7 +122,7 @@ struct QSOMapView: View {
             }
 
             // Confirmed filter
-            if filterState.confirmedOnly, !qso.isConfirmed {
+            if filterState.confirmedOnly, !qso.lotwConfirmed {
                 return false
             }
 

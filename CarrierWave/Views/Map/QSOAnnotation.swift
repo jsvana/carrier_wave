@@ -4,7 +4,7 @@ import Foundation
 // MARK: - QSOAnnotation
 
 /// Represents a cluster of QSOs at a location for map display
-struct QSOAnnotation: Identifiable {
+struct QSOAnnotation: Identifiable, Hashable {
     let id: String
     let coordinate: CLLocationCoordinate2D
     let gridSquare: String
@@ -30,6 +30,16 @@ struct QSOAnnotation: Identifiable {
             return "\(sample), +\(qsoCount - 3) more"
         }
         return sample
+    }
+
+    // MARK: Hashable
+
+    static func == (lhs: QSOAnnotation, rhs: QSOAnnotation) -> Bool {
+        lhs.id == rhs.id
+    }
+
+    func hash(into hasher: inout Hasher) {
+        hasher.combine(id)
     }
 }
 
