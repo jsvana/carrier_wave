@@ -83,6 +83,13 @@ struct ActivityView: View {
     @Query(sort: \ChallengeParticipation.joinedAt, order: .reverse)
     private var allParticipations: [ChallengeParticipation]
 
+    @Query(sort: \ActivityItem.timestamp, order: .reverse)
+    private var allActivityItems: [ActivityItem]
+
+    @Query private var clubs: [Club]
+
+    @State private var selectedFilter: FeedFilter = .all
+
     @State private var syncService: ChallengesSyncService?
     @State private var errorMessage: String?
     @State private var showingError = false
@@ -98,6 +105,21 @@ struct ActivityView: View {
 
     private var completedParticipations: [ChallengeParticipation] {
         allParticipations.filter { $0.status == .completed }
+    }
+
+    private var filteredActivityItems: [ActivityItem] {
+        switch selectedFilter {
+        case .all:
+            return allActivityItems
+        case .friends:
+            // For now, show all items - friend filtering will be added when friend system is implemented
+            return allActivityItems
+        case let .club(clubId):
+            guard let club = clubs.first(where: { $0.id == clubId }) else {
+                return []
+            }
+            return allActivityItems.filter { club.isMember(callsign: $0.callsign) }
+        }
     }
 
     // MARK: - Challenges Section
@@ -172,13 +194,34 @@ struct ActivityView: View {
             Text("Recent Activity")
                 .font(.headline)
 
-            // Placeholder for feed
-            ContentUnavailableView(
-                "No Activity Yet",
-                systemImage: "person.2",
-                description: Text("Activity from friends and clubs will appear here.")
-            )
+            FilterBar(selectedFilter: $selectedFilter, clubs: clubs)
+
+            if filteredActivityItems.isEmpty {
+                activityEmptyState
+            } else {
+                LazyVStack(spacing: 12) {
+                    ForEach(filteredActivityItems) { item in
+                        ActivityItemRow(item: item) {
+                            shareActivity(item)
+                        }
+                    }
+                }
+            }
         }
+    }
+
+    private var activityEmptyState: some View {
+        ContentUnavailableView(
+            "No Activity Yet",
+            systemImage: "person.2",
+            description: Text("Activity from friends and clubs will appear here.")
+        )
+        .padding(.vertical, 24)
+    }
+
+    private func shareActivity(_ item: ActivityItem) {
+        // Sharing will be implemented in Phase 7
+        print("Share activity: \(item.callsign) - \(item.activityType.displayName)")
     }
 
     private func refresh() async {
@@ -247,6 +290,8 @@ struct ActivityView: View {
                 ChallengeSource.self,
                 ChallengeDefinition.self,
                 ChallengeParticipation.self,
+                ActivityItem.self,
+                Club.self,
             ], inMemory: true
         )
 }
