@@ -1,5 +1,8 @@
 # New activations pinned to top of POTA log page
 
+**✅ DONE** - Added "Ready to Upload" section at top of POTA activations list showing
+pending activations sorted by date descending, with park reference shown in each row.
+
 Let's add a list of all not-yet-uploaded activations by descending activation date. Push the "grouped by park" view down".
 
 Feature request dialog:

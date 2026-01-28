@@ -129,6 +129,13 @@ struct POTAActivationsContentView: View {
         POTAActivation.groupByPark(activations)
     }
 
+    /// Activations with pending uploads (not fully uploaded and not rejected), sorted by date descending
+    private var pendingActivations: [POTAActivation] {
+        activations
+            .filter { $0.hasQSOsToUpload && !$0.isRejected }
+            .sorted { $0.utcDate > $1.utcDate }
+    }
+
     @ViewBuilder
     private var emptyStateView: some View {
         ContentUnavailableView {
@@ -187,6 +194,24 @@ struct POTAActivationsContentView: View {
                 }
             }
 
+            // Ready to Upload section - pending activations sorted by date
+            if !pendingActivations.isEmpty {
+                Section {
+                    ForEach(pendingActivations) { activation in
+                        ActivationRow(
+                            activation: activation,
+                            isUploadDisabled: isInMaintenance || potaClient == nil,
+                            onUploadTapped: { activationToUpload = activation },
+                            onRejectTapped: { activationToReject = activation },
+                            showParkReference: true
+                        )
+                    }
+                } header: {
+                    Label("Ready to Upload", systemImage: "arrow.up.circle")
+                }
+            }
+
+            // All activations grouped by park
             ForEach(activationsByPark, id: \.park) { parkGroup in
                 Section {
                     ForEach(parkGroup.activations) { activation in
@@ -248,8 +273,12 @@ struct POTAActivationsContentView: View {
         They will remain in your log but won't be prompted for upload again.
         """
     }
+}
 
-    private func loadCachedParkNames() async {
+// MARK: - Actions
+
+extension POTAActivationsContentView {
+    func loadCachedParkNames() async {
         await POTAParksCache.shared.ensureLoaded()
         // Pre-load names for all parks in our activations
         var names: [String: String] = [:]
@@ -264,7 +293,7 @@ struct POTAActivationsContentView: View {
         }
     }
 
-    private func refreshJobs() async {
+    func refreshJobs() async {
         guard isAuthenticated, let potaClient else {
             return
         }
@@ -291,7 +320,7 @@ struct POTAActivationsContentView: View {
         }
     }
 
-    private func uploadActivation(_ activation: POTAActivation) async {
+    func uploadActivation(_ activation: POTAActivation) async {
         activationToUpload = nil
 
         guard let potaClient else {
@@ -327,7 +356,7 @@ struct POTAActivationsContentView: View {
         }
     }
 
-    private func rejectActivation(_ activation: POTAActivation) {
+    func rejectActivation(_ activation: POTAActivation) {
         let pendingQSOs = activation.pendingQSOs()
         for qso in pendingQSOs {
             qso.markUploadRejected(for: .pota, context: modelContext)

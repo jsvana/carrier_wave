@@ -14,6 +14,7 @@ struct ActivationRow: View {
     var isUploadDisabled: Bool = false
     let onUploadTapped: () -> Void
     let onRejectTapped: () -> Void
+    var showParkReference: Bool = false
 
     var body: some View {
         DisclosureGroup(isExpanded: $isExpanded) {
@@ -26,6 +27,11 @@ struct ActivationRow: View {
                     HStack {
                         Text(activation.displayDate)
                             .font(.headline)
+                        if showParkReference {
+                            Text(activation.parkReference)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                         Text(activation.callsign)
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
