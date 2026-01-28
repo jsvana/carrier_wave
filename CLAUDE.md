@@ -91,6 +91,8 @@
 | `ChallengeQSOMatcher.swift` | Match QSOs to challenge criteria |
 | `BugReportService.swift` | Collects device/app info for bug reports |
 | `CallsignAliasService.swift` | Manage current and previous callsigns for alias matching |
+| `ChallengesClient+Friends.swift` | Friend API endpoints extension |
+| `FriendsSyncService.swift` | Friend data synchronization and actions |
 
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |
@@ -135,6 +137,8 @@
 | `ActivityView.swift` | Main activity tab with challenges section and activity feed |
 | `ActivityItemRow.swift` | Individual activity feed item display |
 | `FilterBar.swift` | Feed filter chips (All/Friends/Clubs) |
+| `FriendsListView.swift` | Friends list with pending requests |
+| `FriendSearchView.swift` | Search and add friends |
 
 ### Views - Tour (`CarrierWave/Views/Tour/`)
 | File | Purpose |
