@@ -51,4 +51,45 @@ struct QSOArc: Identifiable {
     let from: CLLocationCoordinate2D
     let to: CLLocationCoordinate2D
     let callsign: String
+
+    /// Calculate intermediate points along the great circle path
+    /// - Parameter segments: Number of segments (more = smoother curve)
+    /// - Returns: Array of coordinates forming the geodesic path
+    func geodesicPath(segments: Int = 50) -> [CLLocationCoordinate2D] {
+        var points: [CLLocationCoordinate2D] = []
+
+        let lat1 = from.latitude * .pi / 180
+        let lon1 = from.longitude * .pi / 180
+        let lat2 = to.latitude * .pi / 180
+        let lon2 = to.longitude * .pi / 180
+
+        // Angular distance between points
+        let angularDist = 2 * asin(sqrt(
+            pow(sin((lat1 - lat2) / 2), 2) +
+                cos(lat1) * cos(lat2) * pow(sin((lon1 - lon2) / 2), 2)
+        ))
+
+        // Skip if points are too close
+        guard angularDist > 0.001 else {
+            return [from, to]
+        }
+
+        for i in 0 ... segments {
+            let fraction = Double(i) / Double(segments)
+
+            let coeffA = sin((1 - fraction) * angularDist) / sin(angularDist)
+            let coeffB = sin(fraction * angularDist) / sin(angularDist)
+
+            let x = coeffA * cos(lat1) * cos(lon1) + coeffB * cos(lat2) * cos(lon2)
+            let y = coeffA * cos(lat1) * sin(lon1) + coeffB * cos(lat2) * sin(lon2)
+            let z = coeffA * sin(lat1) + coeffB * sin(lat2)
+
+            let lat = atan2(z, sqrt(x * x + y * y)) * 180 / .pi
+            let lon = atan2(y, x) * 180 / .pi
+
+            points.append(CLLocationCoordinate2D(latitude: lat, longitude: lon))
+        }
+
+        return points
+    }
 }

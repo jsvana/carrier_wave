@@ -181,6 +181,72 @@ struct IntroTourServicesStep: View {
     }
 }
 
+// MARK: - IntroTourStatisticsStep
+
+struct IntroTourStatisticsStep: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "flame.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(.orange)
+
+            Text("Track Your Progress")
+                .font(.title)
+                .fontWeight(.bold)
+                .multilineTextAlignment(.center)
+
+            Text(
+                "Stay motivated with detailed statistics and streak tracking. " +
+                    "See your daily activity, track your best streaks, and watch your progress grow."
+            )
+            .font(.body)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+
+            VStack(alignment: .leading, spacing: 12) {
+                IntroTourFeatureRow(icon: "flame.fill", text: "Daily QSO streaks")
+                IntroTourFeatureRow(icon: "leaf.fill", text: "POTA activation streaks")
+                IntroTourFeatureRow(icon: "waveform.path", text: "Mode and band streaks")
+                IntroTourFeatureRow(icon: "chart.bar.fill", text: "Activity grid visualization")
+            }
+            .padding(.top, 8)
+        }
+    }
+}
+
+// MARK: - IntroTourMapStep
+
+struct IntroTourMapStep: View {
+    var body: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "map.fill")
+                .font(.system(size: 64))
+                .foregroundStyle(.blue)
+
+            Text("See Your Contacts")
+                .font(.title)
+                .fontWeight(.bold)
+                .multilineTextAlignment(.center)
+
+            Text(
+                "Visualize your QSOs on an interactive map. " +
+                    "See where your contacts are located and track your grid square coverage."
+            )
+            .font(.body)
+            .foregroundStyle(.secondary)
+            .multilineTextAlignment(.center)
+
+            VStack(alignment: .leading, spacing: 12) {
+                IntroTourFeatureRow(icon: "mappin.circle.fill", text: "QSO locations by grid square")
+                IntroTourFeatureRow(icon: "arrow.triangle.swap", text: "Geodesic paths to contacts")
+                IntroTourFeatureRow(icon: "square.grid.3x3.fill", text: "Grids, States, and DXCC counts")
+                IntroTourFeatureRow(icon: "slider.horizontal.3", text: "Filter by band, mode, and date")
+            }
+            .padding(.top, 8)
+        }
+    }
+}
+
 // MARK: - IntroTourFeedbackStep
 
 struct IntroTourFeedbackStep: View {

@@ -3,11 +3,11 @@ import Foundation
 // MARK: - QSOStatistics Streak Extensions
 
 extension QSOStatistics {
-    /// Daily QSO streak (local timezone)
+    /// Daily QSO streak (UTC dates for consistency with POTA)
     var dailyStreak: StreakInfo {
         let activeDates = Set(qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
-            .map(\.dateOnly))
-        let result = StreakCalculator.calculateStreak(from: activeDates)
+            .map(\.utcDateOnly))
+        let result = StreakCalculator.calculateStreak(from: activeDates, useUTC: true)
         return makeStreakInfo(id: "daily", category: .daily, result: result)
     }
 
@@ -30,24 +30,24 @@ extension QSOStatistics {
         return makeStreakInfo(id: "pota", category: .pota, result: result)
     }
 
-    /// All mode streaks sorted by current streak length
+    /// All mode streaks sorted by current streak length (UTC dates)
     var modeStreaks: [StreakInfo] {
         let realQSOs = qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
         let modes = Set(realQSOs.map { $0.mode.uppercased() })
         return modes.map { mode in
-            let dates = Set(realQSOs.filter { $0.mode.uppercased() == mode }.map(\.dateOnly))
-            let result = StreakCalculator.calculateStreak(from: dates)
+            let dates = Set(realQSOs.filter { $0.mode.uppercased() == mode }.map(\.utcDateOnly))
+            let result = StreakCalculator.calculateStreak(from: dates, useUTC: true)
             return makeStreakInfo(id: "mode-\(mode)", category: .mode, subcategory: mode, result: result)
         }.sorted { $0.currentStreak > $1.currentStreak }
     }
 
-    /// All band streaks sorted by current streak length
+    /// All band streaks sorted by current streak length (UTC dates)
     var bandStreaks: [StreakInfo] {
         let realQSOs = qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
         let bands = Set(realQSOs.map { $0.band.lowercased() })
         return bands.map { band in
-            let dates = Set(realQSOs.filter { $0.band.lowercased() == band }.map(\.dateOnly))
-            let result = StreakCalculator.calculateStreak(from: dates)
+            let dates = Set(realQSOs.filter { $0.band.lowercased() == band }.map(\.utcDateOnly))
+            let result = StreakCalculator.calculateStreak(from: dates, useUTC: true)
             return makeStreakInfo(id: "band-\(band)", category: .band, subcategory: band, result: result)
         }.sorted { $0.currentStreak > $1.currentStreak }
     }

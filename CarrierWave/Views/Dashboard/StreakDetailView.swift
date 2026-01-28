@@ -10,9 +10,26 @@ struct StreakDetailView: View {
         List {
             Section {
                 StreakRow(streak: stats.dailyStreak)
-                StreakRow(streak: stats.potaActivationStreak)
             } header: {
-                Text("Main Streaks")
+                Text("Daily Streak")
+            }
+
+            Section {
+                StreakRow(streak: stats.potaActivationStreak)
+                HStack {
+                    Label("Valid Activations", systemImage: "checkmark.circle.fill")
+                    Spacer()
+                    Text("\(stats.successfulActivations)")
+                        .foregroundStyle(.secondary)
+                }
+                HStack {
+                    Label("Attempted (<10 QSOs)", systemImage: "circle.dashed")
+                    Spacer()
+                    Text("\(stats.attemptedActivations)")
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("POTA Activations")
             }
 
             if !stats.modeStreaks.isEmpty {
@@ -45,9 +62,8 @@ struct StreakDetailView: View {
 
             Section {
                 VStack(alignment: .leading, spacing: 8) {
-                    Label("Daily streaks use local timezone", systemImage: "clock")
-                    Label("POTA streaks use UTC dates", systemImage: "globe")
-                    Label("10+ QSOs required for valid activation", systemImage: "leaf")
+                    Label("All streaks use UTC dates", systemImage: "globe")
+                    Label("POTA activations require 10+ QSOs", systemImage: "leaf")
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
@@ -100,9 +116,17 @@ struct StreakRow: View {
                         .fontWeight(.semibold)
                 }
 
-                Text("Best: \(streak.longestStreak)")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let start = streak.longestStartDate, let end = streak.longestEndDate {
+                    let startFmt = start.formatted(.dateTime.month().day().year())
+                    let endFmt = end.formatted(.dateTime.month().day().year())
+                    Text("Best: \(streak.longestStreak) (\(startFmt) - \(endFmt))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("Best: \(streak.longestStreak)")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
         }
         .padding(.vertical, 4)

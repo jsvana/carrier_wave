@@ -29,23 +29,43 @@ struct QSOMapView: View {
                     }
                 }
 
-                if filterState.showArcs {
+                if filterState.showPaths {
                     ForEach(arcs) { arc in
-                        MapPolyline(coordinates: [arc.from, arc.to])
-                            .stroke(.blue.opacity(0.3), lineWidth: 1)
+                        MapPolyline(coordinates: arc.geodesicPath())
+                            .stroke(.blue.opacity(0.5), lineWidth: 2.5)
                     }
                 }
             }
             .mapStyle(.standard(elevation: .realistic))
 
             VStack {
-                HStack {
-                    Spacer()
-                    MapStatsOverlay(
-                        totalQSOs: allQSOs.count,
-                        visibleQSOs: filteredQSOs.count,
-                        gridCount: annotations.count
+                HStack(alignment: .top) {
+                    ActiveFiltersView(
+                        filterState: filterState,
+                        earliestDate: earliestQSODate,
+                        latestDate: Date()
                     )
+
+                    Spacer()
+
+                    VStack(alignment: .trailing, spacing: 4) {
+                        MapStatsOverlay(
+                            totalQSOs: allQSOs.count,
+                            visibleQSOs: filteredQSOs.count,
+                            gridCount: annotations.count,
+                            stateCount: uniqueStates,
+                            dxccCount: uniqueDXCCEntities
+                        )
+
+                        if isLimited {
+                            Text("Limited to \(MapFilterState.maxQSOsDefault) for performance")
+                                .font(.caption2)
+                                .foregroundStyle(.orange)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.ultraThinMaterial, in: Capsule())
+                        }
+                    }
                 }
                 .padding()
 
@@ -76,13 +96,17 @@ struct QSOMapView: View {
                 filterState: filterState,
                 availableBands: availableBands,
                 availableModes: availableModes,
-                availableParks: availableParks
+                availableParks: availableParks,
+                earliestDate: earliestQSODate
             )
             .presentationDetents([.medium, .large])
         }
     }
 
     // MARK: Private
+
+    /// Modes that represent activation metadata, not actual QSOs
+    private static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
 
     @Query(sort: \QSO.timestamp, order: .reverse) private var allQSOs: [QSO]
 
@@ -130,45 +154,78 @@ struct QSOMapView: View {
         }
     }
 
-    private var annotations: [QSOAnnotation] {
-        // Group QSOs by 4-char grid for clustering
-        var gridGroups: [String: [QSO]] = [:]
-
-        for qso in filteredQSOs {
-            guard let grid = qso.theirGrid, grid.count >= 4 else {
-                continue
-            }
-            let gridKey = String(grid.prefix(4)).uppercased()
-            gridGroups[gridKey, default: []].append(qso)
+    /// QSOs to display on map, limited for performance unless showAllQSOs is enabled
+    private var displayedQSOs: [QSO] {
+        if filterState.showAllQSOs {
+            return filteredQSOs
         }
+        return Array(filteredQSOs.prefix(MapFilterState.maxQSOsDefault))
+    }
 
-        return gridGroups.compactMap { gridKey, qsos -> QSOAnnotation? in
-            guard let coordinate = MaidenheadConverter.coordinate(from: gridKey) else {
-                return nil
+    /// Whether the display is limited due to too many QSOs
+    private var isLimited: Bool {
+        !filterState.showAllQSOs && filteredQSOs.count > MapFilterState.maxQSOsDefault
+    }
+
+    private var annotations: [QSOAnnotation] {
+        if filterState.showIndividualQSOs {
+            // Show each QSO as an individual marker
+            return displayedQSOs.compactMap { qso -> QSOAnnotation? in
+                guard let grid = qso.theirGrid, grid.count >= 4,
+                      let coordinate = MaidenheadConverter.coordinate(from: grid)
+                else {
+                    return nil
+                }
+
+                return QSOAnnotation(
+                    id: qso.id.uuidString,
+                    coordinate: coordinate,
+                    gridSquare: String(grid.prefix(4)).uppercased(),
+                    qsoCount: 1,
+                    callsigns: [qso.callsign],
+                    mostRecentDate: qso.timestamp
+                )
+            }
+        } else {
+            // Group QSOs by 4-char grid for clustering
+            var gridGroups: [String: [QSO]] = [:]
+
+            for qso in displayedQSOs {
+                guard let grid = qso.theirGrid, grid.count >= 4 else {
+                    continue
+                }
+                let gridKey = String(grid.prefix(4)).uppercased()
+                gridGroups[gridKey, default: []].append(qso)
             }
 
-            let callsigns = qsos.map(\.callsign).sorted()
-            let mostRecent = qsos.map(\.timestamp).max() ?? Date()
+            return gridGroups.compactMap { gridKey, qsos -> QSOAnnotation? in
+                guard let coordinate = MaidenheadConverter.coordinate(from: gridKey) else {
+                    return nil
+                }
 
-            return QSOAnnotation(
-                id: gridKey,
-                coordinate: coordinate,
-                gridSquare: gridKey,
-                qsoCount: qsos.count,
-                callsigns: callsigns,
-                mostRecentDate: mostRecent
-            )
+                let callsigns = qsos.map(\.callsign).sorted()
+                let mostRecent = qsos.map(\.timestamp).max() ?? Date()
+
+                return QSOAnnotation(
+                    id: gridKey,
+                    coordinate: coordinate,
+                    gridSquare: gridKey,
+                    qsoCount: qsos.count,
+                    callsigns: callsigns,
+                    mostRecentDate: mostRecent
+                )
+            }
         }
     }
 
     private var arcs: [QSOArc] {
-        guard filterState.showArcs else {
+        guard filterState.showPaths else {
             return []
         }
 
         var result: [QSOArc] = []
 
-        for qso in filteredQSOs {
+        for qso in displayedQSOs {
             guard let myGrid = qso.myGrid,
                   let theirGrid = qso.theirGrid,
                   let from = MaidenheadConverter.coordinate(from: myGrid),
@@ -195,11 +252,28 @@ struct QSOMapView: View {
     }
 
     private var availableModes: [String] {
-        Array(Set(allQSOs.map(\.mode))).sorted()
+        Array(Set(allQSOs.map(\.mode)))
+            .filter { !Self.metadataModes.contains($0.uppercased()) }
+            .sorted()
+    }
+
+    /// Earliest QSO date for date picker defaults
+    private var earliestQSODate: Date? {
+        allQSOs.map(\.timestamp).min()
     }
 
     private var availableParks: [String] {
         Array(Set(allQSOs.compactMap(\.parkReference))).sorted()
+    }
+
+    /// Unique US states from filtered QSOs
+    private var uniqueStates: Int {
+        Set(filteredQSOs.compactMap(\.state).filter { !$0.isEmpty }).count
+    }
+
+    /// Unique DXCC entities from filtered QSOs
+    private var uniqueDXCCEntities: Int {
+        Set(filteredQSOs.compactMap { $0.dxccEntity?.number }).count
     }
 
     private func bandSortOrder(_ band: String) -> Int {
