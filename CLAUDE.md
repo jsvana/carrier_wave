@@ -133,6 +133,8 @@
 | File | Purpose |
 |------|---------|
 | `ActivityView.swift` | Main activity tab with challenges section and activity feed |
+| `ActivityItemRow.swift` | Individual activity feed item display |
+| `FilterBar.swift` | Feed filter chips (All/Friends/Clubs) |
 
 ### Views - Tour (`CarrierWave/Views/Tour/`)
 | File | Purpose |
