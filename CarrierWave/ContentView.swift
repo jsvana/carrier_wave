@@ -7,7 +7,7 @@ enum AppTab: Hashable {
     case dashboard
     case logs
     case map
-    case challenges
+    case activity
     case settings
 }
 
@@ -76,9 +76,9 @@ struct ContentView: View {
 
             ChallengesView(tourState: tourState)
                 .tabItem {
-                    Label("Challenges", systemImage: "flag.2.crossed")
+                    Label("Activity", systemImage: "person.2")
                 }
-                .tag(AppTab.challenges)
+                .tag(AppTab.activity)
 
             Group {
                 if let syncService {
@@ -131,8 +131,8 @@ struct ContentView: View {
             else {
                 return
             }
-            // Navigate to challenges tab
-            selectedTab = .challenges
+            // Navigate to activity tab
+            selectedTab = .activity
         }
         .fullScreenCover(isPresented: $showIntroTour) {
             IntroTourView(tourState: tourState)
