@@ -33,14 +33,14 @@ struct FilterBar: View {
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
-                FilterChip(
+                FeedFilterChip(
                     title: "All",
                     isSelected: selectedFilter == .all
                 ) {
                     selectedFilter = .all
                 }
 
-                FilterChip(
+                FeedFilterChip(
                     title: "Friends",
                     isSelected: selectedFilter == .friends
                 ) {
@@ -48,7 +48,7 @@ struct FilterBar: View {
                 }
 
                 ForEach(clubs) { club in
-                    FilterChip(
+                    FeedFilterChip(
                         title: club.name,
                         isSelected: isClubSelected(club)
                     ) {
@@ -70,9 +70,9 @@ struct FilterBar: View {
     }
 }
 
-// MARK: - FilterChip
+// MARK: - FeedFilterChip
 
-struct FilterChip: View {
+struct FeedFilterChip: View {
     let title: String
     let isSelected: Bool
     let action: () -> Void
