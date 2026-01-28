@@ -1,5 +1,7 @@
 # Bugfixes on maps and streaks
 
+**✅ DONE**
+
 * Map view
   * The date range selector on the map pane's "from" date shows "Dec 31, 1". It should be the earliest QSO date
   * Switching band filters in the map view doesn't automatically update the counts of QSOs on the map--it needs to

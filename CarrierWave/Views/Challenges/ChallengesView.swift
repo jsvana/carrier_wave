@@ -229,9 +229,9 @@ struct ChallengesView: View {
     }
 
     private func evaluateNewQSOs() async {
-        guard let syncService else {
-            return
-        }
+        // Use a fresh progress engine with current modelContext to avoid stale context issues
+        // (e.g., after device sleep the cached syncService.progressEngine may have an invalid context)
+        let engine = ChallengeProgressEngine(modelContext: modelContext)
 
         // Fetch all QSOs and evaluate against active challenges
         // The progress engine will handle deduplication internally
@@ -243,7 +243,7 @@ struct ChallengesView: View {
             let recentQSOs = try modelContext.fetch(descriptor)
             // Evaluate only the most recent QSOs (last 100) for performance
             for qso in recentQSOs.prefix(100) {
-                syncService.progressEngine.evaluateQSO(qso, notificationsEnabled: false)
+                engine.evaluateQSO(qso, notificationsEnabled: false)
             }
             try modelContext.save()
         } catch {

@@ -1,5 +1,7 @@
 # Sync improvements
 
+**✅ DONE**
+
 We need to improve a few things about Ham2K LoFi, QRZ, and POTA.
 
 First, users must ensure they have download enabled on Ham2K LoFi. Currently the only way to do that is by chatting with Sebastian KI2D on his Discord server (https://discord.gg/K29T3Njh4U). If you try to download and get 0 items from LoFi, they likely don't have download enabled.
