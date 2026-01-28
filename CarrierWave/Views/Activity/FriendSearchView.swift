@@ -1,3 +1,4 @@
+import SwiftData
 import SwiftUI
 
 // MARK: - FriendSearchView
@@ -60,9 +61,17 @@ struct FriendSearchView: View {
                 Text(errorMessage)
             }
         }
+        .onAppear {
+            if friendsSyncService == nil {
+                friendsSyncService = FriendsSyncService(modelContext: modelContext)
+            }
+        }
     }
 
     // MARK: Private
+
+    @Environment(\.modelContext) private var modelContext
+    @State private var friendsSyncService: FriendsSyncService?
 
     @State private var searchText = ""
     @State private var searchResults: [UserSearchResult] = []
@@ -71,6 +80,8 @@ struct FriendSearchView: View {
     @State private var showingError = false
     @State private var sentRequests: Set<String> = []
     @State private var searchTask: Task<Void, Never>?
+
+    private let sourceURL = "https://challenges.example.com"
 
     private var searchResultsList: some View {
         ForEach(searchResults, id: \.userId) { user in
@@ -90,18 +101,38 @@ struct FriendSearchView: View {
             return
         }
 
+        guard let service = friendsSyncService else {
+            return
+        }
+
         isSearching = true
         defer { isSearching = false }
 
-        // Stub: Will call ChallengesClient.searchUsers
-        // For now, just clear results after a delay
-        try? await Task.sleep(nanoseconds: 300_000_000)
-        searchResults = []
+        do {
+            searchResults = try await service.searchUsers(query: searchText, sourceURL: sourceURL)
+        } catch {
+            errorMessage = error.localizedDescription
+            showingError = true
+            searchResults = []
+        }
     }
 
     private func sendRequest(to user: UserSearchResult) {
-        // Stub: Will call FriendsSyncService
+        guard let service = friendsSyncService else {
+            return
+        }
         sentRequests.insert(user.userId)
+
+        Task {
+            do {
+                try await service.sendFriendRequest(toUserId: user.userId, sourceURL: sourceURL)
+            } catch {
+                // Remove from sent if failed
+                sentRequests.remove(user.userId)
+                errorMessage = error.localizedDescription
+                showingError = true
+            }
+        }
     }
 }
 

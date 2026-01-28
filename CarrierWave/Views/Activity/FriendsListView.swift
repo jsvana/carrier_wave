@@ -28,6 +28,18 @@ struct FriendsListView: View {
                 }
             }
         }
+        .onAppear {
+            if friendsSyncService == nil {
+                friendsSyncService = FriendsSyncService(modelContext: modelContext)
+            }
+        }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            if let errorMessage {
+                Text(errorMessage)
+            }
+        }
     }
 
     // MARK: Private
@@ -36,6 +48,14 @@ struct FriendsListView: View {
 
     @Query(sort: \Friendship.friendCallsign)
     private var friendships: [Friendship]
+
+    @State private var friendsSyncService: FriendsSyncService?
+    @State private var isLoading = false
+    @State private var errorMessage: String?
+    @State private var showingError = false
+
+    /// For now, hardcode the source URL (will come from settings later)
+    private let sourceURL = "https://challenges.example.com"
 
     private var acceptedFriends: [Friendship] {
         friendships.filter(\.isAccepted)
@@ -88,15 +108,45 @@ struct FriendsListView: View {
     }
 
     private func acceptRequest(_ friendship: Friendship) {
-        // Will call FriendsSyncService
+        guard let service = friendsSyncService else {
+            return
+        }
+        Task {
+            do {
+                try await service.acceptFriendRequest(friendship, sourceURL: sourceURL)
+            } catch {
+                errorMessage = error.localizedDescription
+                showingError = true
+            }
+        }
     }
 
     private func declineRequest(_ friendship: Friendship) {
-        // Will call FriendsSyncService
+        guard let service = friendsSyncService else {
+            return
+        }
+        Task {
+            do {
+                try await service.declineFriendRequest(friendship, sourceURL: sourceURL)
+            } catch {
+                errorMessage = error.localizedDescription
+                showingError = true
+            }
+        }
     }
 
     private func removeFriend(_ friendship: Friendship) {
-        // Will call FriendsSyncService
+        guard let service = friendsSyncService else {
+            return
+        }
+        Task {
+            do {
+                try await service.removeFriend(friendship, sourceURL: sourceURL)
+            } catch {
+                errorMessage = error.localizedDescription
+                showingError = true
+            }
+        }
     }
 }
 

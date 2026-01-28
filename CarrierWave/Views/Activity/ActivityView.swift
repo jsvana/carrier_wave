@@ -21,6 +21,14 @@ struct ActivityView: View {
             }
             .navigationTitle("Activity")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink {
+                        FriendsListView()
+                    } label: {
+                        Image(systemName: "person.2")
+                    }
+                    .accessibilityLabel("Friends")
+                }
                 ToolbarItem(placement: .primaryAction) {
                     Button {
                         Task { await refresh() }
@@ -38,6 +46,9 @@ struct ActivityView: View {
             .onAppear {
                 if syncService == nil {
                     syncService = ChallengesSyncService(modelContext: modelContext)
+                }
+                if friendsSyncService == nil {
+                    friendsSyncService = FriendsSyncService(modelContext: modelContext)
                 }
             }
             .alert("Error", isPresented: $showingError) {
@@ -88,9 +99,13 @@ struct ActivityView: View {
 
     @Query private var clubs: [Club]
 
+    @Query(filter: #Predicate<Friendship> { $0.statusRawValue == "accepted" })
+    private var acceptedFriends: [Friendship]
+
     @State private var selectedFilter: FeedFilter = .all
 
     @State private var syncService: ChallengesSyncService?
+    @State private var friendsSyncService: FriendsSyncService?
     @State private var errorMessage: String?
     @State private var showingError = false
 
@@ -112,8 +127,8 @@ struct ActivityView: View {
         case .all:
             return allActivityItems
         case .friends:
-            // For now, show all items - friend filtering will be added when friend system is implemented
-            return allActivityItems
+            let friendCallsigns = Set(acceptedFriends.map { $0.friendCallsign.uppercased() })
+            return allActivityItems.filter { friendCallsigns.contains($0.callsign.uppercased()) }
         case let .club(clubId):
             guard let club = clubs.first(where: { $0.id == clubId }) else {
                 return []
@@ -292,6 +307,7 @@ struct ActivityView: View {
                 ChallengeParticipation.self,
                 ActivityItem.self,
                 Club.self,
+                Friendship.self,
             ], inMemory: true
         )
 }
