@@ -89,7 +89,7 @@ extension DashboardView {
 
         do {
             let result = try await syncService.syncQRZ()
-            if result.downloaded == 0, result.uploaded == 0 {
+            if result.downloaded == 0, result.uploaded == 0, result.skipped == 0 {
                 qrzSyncResult = "Already in sync"
             } else {
                 var parts: [String] = []
@@ -98,6 +98,9 @@ extension DashboardView {
                 }
                 if result.uploaded > 0 {
                     parts.append("↑\(result.uploaded)")
+                }
+                if result.skipped > 0 {
+                    parts.append("⚠️\(result.skipped) skipped")
                 }
                 qrzSyncResult = parts.joined(separator: " ")
             }

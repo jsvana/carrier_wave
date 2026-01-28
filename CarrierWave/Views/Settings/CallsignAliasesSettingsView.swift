@@ -11,6 +11,9 @@ struct CallsignAliasesSettingsView: View {
             currentCallsignSection
             previousCallsignsSection
             addPreviousCallsignSection
+            if !nonPrimaryQSOCounts.isEmpty {
+                nonPrimaryQSOsSection
+            }
         }
         .navigationTitle("Callsign Aliases")
         .task { await loadCallsigns() }
@@ -19,19 +22,50 @@ struct CallsignAliasesSettingsView: View {
         } message: {
             Text(errorMessage)
         }
+        .alert("Delete QSOs?", isPresented: $showingDeleteConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete", role: .destructive) {
+                Task { await deleteQSOsForCallsign(callsignToDelete) }
+            }
+        } message: {
+            let count = nonPrimaryQSOCounts[callsignToDelete] ?? 0
+            Text("Delete \(count) QSOs logged under \(callsignToDelete)? This cannot be undone.")
+        }
     }
 
     // MARK: Private
 
     @Environment(\.modelContext) private var modelContext
+    @Query private var allQSOs: [QSO]
+
     @State private var currentCallsign = ""
     @State private var previousCallsigns: [String] = []
     @State private var newPreviousCallsign = ""
     @State private var isLoading = true
     @State private var showingError = false
     @State private var errorMessage = ""
+    @State private var showingDeleteConfirmation = false
+    @State private var callsignToDelete = ""
 
     private let aliasService = CallsignAliasService.shared
+
+    /// QSO counts grouped by non-primary callsigns
+    private var nonPrimaryQSOCounts: [String: Int] {
+        guard !currentCallsign.isEmpty else {
+            return [:]
+        }
+        let primary = currentCallsign.uppercased()
+
+        var counts: [String: Int] = [:]
+        for qso in allQSOs {
+            let myCall = qso.myCallsign.uppercased()
+            guard !myCall.isEmpty, myCall != primary else {
+                continue
+            }
+            counts[myCall, default: 0] += 1
+        }
+        return counts
+    }
 
     // MARK: - Sections
 
@@ -82,7 +116,7 @@ struct CallsignAliasesSettingsView: View {
             Text(
                 """
                 Add your previous callsigns so QSOs logged under old calls are properly matched \
-                during sync.
+                during sync. Note: QSOs from previous callsigns will not be uploaded to QRZ.
                 """
             )
         }
@@ -100,6 +134,36 @@ struct CallsignAliasesSettingsView: View {
                 }
                 .disabled(newPreviousCallsign.trimmingCharacters(in: .whitespaces).isEmpty)
             }
+        }
+    }
+
+    private var nonPrimaryQSOsSection: some View {
+        Section {
+            ForEach(nonPrimaryQSOCounts.keys.sorted(), id: \.self) { callsign in
+                HStack {
+                    VStack(alignment: .leading) {
+                        Text(callsign)
+                        Text("\(nonPrimaryQSOCounts[callsign] ?? 0) QSOs")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Button("Delete", role: .destructive) {
+                        callsignToDelete = callsign
+                        showingDeleteConfirmation = true
+                    }
+                    .buttonStyle(.bordered)
+                }
+            }
+        } header: {
+            Text("QSOs from Other Callsigns")
+        } footer: {
+            Text(
+                """
+                These QSOs are logged under callsigns that don't match your current QRZ account \
+                and won't be synced. Delete them if you no longer need them.
+                """
+            )
         }
     }
 
@@ -148,6 +212,26 @@ struct CallsignAliasesSettingsView: View {
             previousCallsigns = await aliasService.getPreviousCallsigns()
         } catch {
             errorMessage = error.localizedDescription
+            showingError = true
+        }
+    }
+
+    private func deleteQSOsForCallsign(_ callsign: String) async {
+        let upperCallsign = callsign.uppercased()
+        let qsosToDelete = allQSOs.filter { $0.myCallsign.uppercased() == upperCallsign }
+
+        for qso in qsosToDelete {
+            modelContext.delete(qso)
+        }
+
+        do {
+            try modelContext.save()
+            SyncDebugLog.shared.info(
+                "Deleted \(qsosToDelete.count) QSOs from callsign \(callsign)",
+                service: nil
+            )
+        } catch {
+            errorMessage = "Failed to delete QSOs: \(error.localizedDescription)"
             showingError = true
         }
     }

@@ -55,6 +55,25 @@ final class BugReportService {
         let iCloudStatus: String
     }
 
+    // MARK: - Callsign Info
+
+    struct CallsignInfo {
+        let currentCallsign: String?
+        let previousCallsigns: [String]
+    }
+
+    // MARK: - Report Context
+
+    /// Groups all context data needed to format a bug report
+    struct ReportContext {
+        let category: BugCategory
+        let description: String
+        let deviceInfo: DeviceInfo
+        let serviceStatus: ServiceStatus
+        let callsignInfo: CallsignInfo
+        let syncLogs: String
+    }
+
     func collectDeviceInfo(debugMode: Bool) -> DeviceInfo {
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
         let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
@@ -88,6 +107,15 @@ final class BugReportService {
         )
     }
 
+    func collectCallsignInfo() async -> CallsignInfo {
+        let currentCallsign = await CallsignAliasService.shared.getCurrentCallsign()
+        let previousCallsigns = await CallsignAliasService.shared.getPreviousCallsigns()
+        return CallsignInfo(
+            currentCallsign: currentCallsign,
+            previousCallsigns: previousCallsigns
+        )
+    }
+
     func collectSyncLogs() -> String {
         let entries = Array(SyncDebugLog.shared.logEntries.prefix(50))
         guard !entries.isEmpty else {
@@ -104,42 +132,46 @@ final class BugReportService {
         }.joined(separator: "\n")
     }
 
-    func formatReport(
-        category: BugCategory,
-        description: String,
-        deviceInfo: DeviceInfo,
-        serviceStatus: ServiceStatus,
-        syncLogs: String
-    ) -> String {
-        """
+    func formatReport(_ context: ReportContext) -> String {
+        let currentCallsignDisplay = context.callsignInfo.currentCallsign ?? "Not configured"
+        let previousCallsignsDisplay = context.callsignInfo.previousCallsigns.isEmpty
+            ? "None"
+            : context.callsignInfo.previousCallsigns.joined(separator: ", ")
+
+        return """
         BUG REPORT
         ==========
 
-        Category: \(category.rawValue)
+        Category: \(context.category.rawValue)
 
         Description:
-        \(description)
+        \(context.description)
 
         DEVICE INFO
         -----------
-        App Version: \(deviceInfo.appVersion)
-        Build Number: \(deviceInfo.buildNumber)
-        iOS Version: \(deviceInfo.iosVersion)
-        Device: \(deviceInfo.deviceModel)
-        Debug Mode: \(deviceInfo.debugMode ? "Enabled" : "Disabled")
+        App Version: \(context.deviceInfo.appVersion)
+        Build Number: \(context.deviceInfo.buildNumber)
+        iOS Version: \(context.deviceInfo.iosVersion)
+        Device: \(context.deviceInfo.deviceModel)
+        Debug Mode: \(context.deviceInfo.debugMode ? "Enabled" : "Disabled")
+
+        CALLSIGN INFO
+        -------------
+        Current Callsign: \(currentCallsignDisplay)
+        Previous Callsigns: \(previousCallsignsDisplay)
 
         SERVICE STATUS
         --------------
-        QRZ: \(serviceStatus.qrzConfigured ? "Configured" : "Not configured")
-        POTA: \(serviceStatus.potaConfigured ? "Configured" : "Not configured")
-        LoFi: \(serviceStatus.lofiConfigured ? "Configured" : "Not configured")
-        LoTW: \(serviceStatus.lotwConfigured ? "Configured" : "Not configured")
-        HAMRS: \(serviceStatus.hamrsConfigured ? "Configured" : "Not configured")
-        iCloud: \(serviceStatus.iCloudStatus)
+        QRZ: \(context.serviceStatus.qrzConfigured ? "Configured" : "Not configured")
+        POTA: \(context.serviceStatus.potaConfigured ? "Configured" : "Not configured")
+        LoFi: \(context.serviceStatus.lofiConfigured ? "Configured" : "Not configured")
+        LoTW: \(context.serviceStatus.lotwConfigured ? "Configured" : "Not configured")
+        HAMRS: \(context.serviceStatus.hamrsConfigured ? "Configured" : "Not configured")
+        iCloud: \(context.serviceStatus.iCloudStatus)
 
         RECENT SYNC LOGS
         ----------------
-        \(syncLogs)
+        \(context.syncLogs)
         """
     }
 

@@ -38,6 +38,9 @@ struct BugReportView: View {
                     }
                 }
             }
+            .task {
+                callsignInfo = await service.collectCallsignInfo()
+            }
         }
     }
 
@@ -53,6 +56,9 @@ struct BugReportView: View {
     @State private var descriptionText = ""
     @State private var showingLogs = false
     @State private var hasSubmitted = false
+    @State private var callsignInfo = BugReportService.CallsignInfo(
+        currentCallsign: nil, previousCallsigns: []
+    )
 
     private let potaAuth: POTAAuthService
     private let iCloudMonitor: ICloudMonitor
@@ -74,13 +80,15 @@ struct BugReportView: View {
     }
 
     private var reportBody: String {
-        service.formatReport(
+        let context = BugReportService.ReportContext(
             category: selectedCategory,
             description: descriptionText,
             deviceInfo: deviceInfo,
             serviceStatus: serviceStatus,
+            callsignInfo: callsignInfo,
             syncLogs: syncLogs
         )
+        return service.formatReport(context)
     }
 
     private var categorySection: some View {
@@ -109,6 +117,14 @@ struct BugReportView: View {
                 LabeledContent("Version", value: "\(deviceInfo.appVersion) (\(deviceInfo.buildNumber))")
                 LabeledContent("iOS", value: deviceInfo.iosVersion)
                 LabeledContent("Device", value: deviceInfo.deviceModel)
+                LabeledContent(
+                    "Current Callsign", value: callsignInfo.currentCallsign ?? "Not configured"
+                )
+                if !callsignInfo.previousCallsigns.isEmpty {
+                    LabeledContent(
+                        "Previous Callsigns", value: callsignInfo.previousCallsigns.joined(separator: ", ")
+                    )
+                }
                 LabeledContent("QRZ", value: serviceStatus.qrzConfigured ? "Configured" : "Not configured")
                 LabeledContent("POTA", value: serviceStatus.potaConfigured ? "Configured" : "Not configured")
                 LabeledContent("LoFi", value: serviceStatus.lofiConfigured ? "Configured" : "Not configured")

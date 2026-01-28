@@ -110,6 +110,7 @@ extension KeychainHelper {
         // QRZ - token-based auth (new)
         static let qrzApiKey = "qrz.api.key"
         static let qrzCallsign = "qrz.callsign"
+        static let qrzBookIdMap = "qrz.bookid.map" // JSON: {callsign: bookId}
         static let qrzTotalUploaded = "qrz.total.uploaded"
         static let qrzTotalDownloaded = "qrz.total.downloaded"
         static let qrzLastUploadDate = "qrz.last.upload.date"

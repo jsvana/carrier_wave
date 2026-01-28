@@ -39,6 +39,15 @@ func withTimeout<T>(
     }
 }
 
+// MARK: - QRZSyncResult
+
+/// Result of syncing with QRZ
+struct QRZSyncResult {
+    let downloaded: Int
+    let uploaded: Int
+    let skipped: Int
+}
+
 // MARK: - SyncService
 
 @MainActor
@@ -147,7 +156,7 @@ class SyncService: ObservableObject {
     // MARK: - Single Service Sync (for UI buttons)
 
     /// Sync only with QRZ (download then upload)
-    func syncQRZ() async throws -> (downloaded: Int, uploaded: Int) {
+    func syncQRZ() async throws -> QRZSyncResult {
         isSyncing = true
         defer {
             isSyncing = false
@@ -156,6 +165,7 @@ class SyncService: ObservableObject {
 
         var downloaded = 0
         var uploaded = 0
+        var skipped = 0
 
         // Download with timeout
         syncPhase = .downloading(service: .qrz)
@@ -178,13 +188,15 @@ class SyncService: ObservableObject {
         if !isReadOnlyMode {
             syncPhase = .uploading(service: .qrz)
             let qsosToUpload = try fetchQSOsNeedingUpload().filter { $0.needsUpload(to: .qrz) }
-            uploaded = try await withTimeout(seconds: syncTimeoutSeconds, service: .qrz) {
+            let uploadResult = try await withTimeout(seconds: syncTimeoutSeconds, service: .qrz) {
                 try await self.uploadToQRZ(qsos: qsosToUpload)
             }
+            uploaded = uploadResult.uploaded
+            skipped = uploadResult.skipped
             try modelContext.save()
         }
 
-        return (downloaded, uploaded)
+        return QRZSyncResult(downloaded: downloaded, uploaded: uploaded, skipped: skipped)
     }
 
     /// Sync only with POTA (download then upload)

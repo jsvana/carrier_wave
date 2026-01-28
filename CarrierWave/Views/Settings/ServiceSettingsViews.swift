@@ -68,6 +68,10 @@ struct QRZApiKeySheet: View {
             let status = try await client.validateApiKey(apiKey)
             try client.saveApiKey(apiKey)
             try client.saveCallsign(status.callsign)
+            // Save the bookId for this callsign (used when uploading)
+            if let bookId = status.bookId {
+                try client.saveBookId(bookId, for: status.callsign)
+            }
             callsign = status.callsign
             isAuthenticated = true
 

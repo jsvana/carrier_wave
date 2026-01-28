@@ -41,8 +41,18 @@ enum QRZError: Error, LocalizedError {
 /// Response from QRZ STATUS action
 struct QRZStatusResponse {
     let callsign: String
+    let bookId: String?
     let qsoCount: Int
     let confirmedCount: Int
+}
+
+// MARK: - QRZUploadResult
+
+/// Result of uploading QSOs to QRZ
+struct QRZUploadResult {
+    let uploaded: Int
+    let duplicates: Int
+    let skipped: Int
 }
 
 // MARK: - QRZFetchedQSO
@@ -148,6 +158,36 @@ final class QRZClient {
         try? keychain.readString(for: KeychainHelper.Keys.qrzCallsign)
     }
 
+    // MARK: - BookId Management
+
+    /// Get the stored callsign -> bookId mapping
+    func getBookIdMap() -> [String: String] {
+        guard let data = try? keychain.read(for: KeychainHelper.Keys.qrzBookIdMap),
+              let map = try? JSONDecoder().decode([String: String].self, from: data)
+        else {
+            return [:]
+        }
+        return map
+    }
+
+    /// Save the callsign -> bookId mapping
+    func saveBookIdMap(_ map: [String: String]) throws {
+        let data = try JSONEncoder().encode(map)
+        try keychain.save(data, for: KeychainHelper.Keys.qrzBookIdMap)
+    }
+
+    /// Add or update a bookId for a callsign
+    func saveBookId(_ bookId: String, for callsign: String) throws {
+        var map = getBookIdMap()
+        map[callsign.uppercased()] = bookId
+        try saveBookIdMap(map)
+    }
+
+    /// Get the bookId for a callsign
+    func getBookId(for callsign: String) -> String? {
+        getBookIdMap()[callsign.uppercased()]
+    }
+
     // MARK: - API Methods
 
     /// Validate an API key by calling STATUS action
@@ -191,72 +231,49 @@ final class QRZClient {
             throw QRZError.invalidResponse("No callsign in response: \(responseString.prefix(200))")
         }
 
+        let bookId = parsed["BOOKID"]
         let qsoCount = Int(parsed["COUNT"] ?? "0") ?? 0
         let confirmedCount = Int(parsed["CONFIRMED"] ?? "0") ?? 0
 
         return QRZStatusResponse(
             callsign: callsign,
+            bookId: bookId,
             qsoCount: qsoCount,
             confirmedCount: confirmedCount
         )
     }
 
-    /// Upload QSOs to QRZ logbook
-    func uploadQSOs(_ qsos: [QSO]) async throws -> (uploaded: Int, duplicates: Int) {
+    /// Upload QSOs to QRZ logbook.
+    /// Only uploads QSOs matching the configured QRZ callsign; returns count of skipped QSOs.
+    func uploadQSOs(_ qsos: [QSO]) async throws -> QRZUploadResult {
         guard !qsos.isEmpty else {
-            return (uploaded: 0, duplicates: 0)
+            return QRZUploadResult(uploaded: 0, duplicates: 0, skipped: 0)
         }
 
         let apiKey = try getApiKey()
+        let accountCallsign = getCallsign()?.uppercased()
+        let bookId = accountCallsign.flatMap { getBookId(for: $0) }
 
-        // Convert QSOs to ADIF
-        let adifContent = qsos.map { qso in
+        // Filter to only QSOs matching the QRZ account callsign
+        let (matchingQSOs, skippedCount) = filterQSOsForUpload(qsos, accountCallsign: accountCallsign)
+
+        guard !matchingQSOs.isEmpty else {
+            return QRZUploadResult(uploaded: 0, duplicates: 0, skipped: skippedCount)
+        }
+
+        let adifContent = matchingQSOs.map { qso in
             qso.rawADIF ?? generateADIF(for: qso)
         }.joined(separator: "\n")
 
-        guard let url = URL(string: baseURL) else {
-            throw QRZError.invalidResponse("Invalid URL")
-        }
-
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-
-        // Form-encode the body
-        // Use REPLACE option to handle duplicates gracefully
-        let formData = [
-            "KEY": apiKey,
-            "ACTION": "INSERT",
-            "OPTION": "REPLACE",
-            "ADIF": adifContent,
-        ]
-        request.httpBody = formEncode(formData).data(using: .utf8)
-
+        let request = try buildUploadRequest(apiKey: apiKey, adifContent: adifContent, bookId: bookId)
         let (data, _) = try await URLSession.shared.data(for: request)
 
         guard let responseString = String(data: data, encoding: .utf8) else {
             throw QRZError.invalidResponse("Cannot decode response as UTF-8, \(data.count) bytes")
         }
 
-        let parsed = Self.parseResponse(responseString)
-
-        if parsed["RESULT"] == "AUTH" {
-            throw QRZError.sessionExpired
-        }
-
-        // Accept OK, REPLACE (duplicate replaced), or PARTIAL (some succeeded)
-        let result = parsed["RESULT"] ?? ""
-        guard result == "OK" || result == "REPLACE" || result == "PARTIAL" else {
-            // Include full response for debugging
-            let reason = parsed["REASON"] ?? "Response: \(responseString.prefix(200))"
-            throw QRZError.uploadFailed(reason)
-        }
-
-        let count = Int(parsed["COUNT"] ?? "0") ?? 0
-        let dupes = Int(parsed["DUPES"] ?? "0") ?? 0
-
-        return (uploaded: count, duplicates: dupes)
+        let result = try parseUploadResponse(responseString)
+        return QRZUploadResult(uploaded: result.uploaded, duplicates: result.duplicates, skipped: skippedCount)
     }
 
     /// Fetch QSOs from QRZ logbook with pagination
@@ -293,6 +310,7 @@ final class QRZClient {
     func logout() {
         clearApiKey()
         try? keychain.delete(for: KeychainHelper.Keys.qrzCallsign)
+        try? keychain.delete(for: KeychainHelper.Keys.qrzBookIdMap)
         // Also clear deprecated session-based keys
         try? keychain.delete(for: KeychainHelper.Keys.qrzSessionKey)
         try? keychain.delete(for: KeychainHelper.Keys.qrzUsername)
@@ -304,6 +322,70 @@ final class QRZClient {
     }
 
     // MARK: Private
+
+    /// Filter QSOs to only those matching the QRZ account callsign
+    private func filterQSOsForUpload(
+        _ qsos: [QSO], accountCallsign: String?
+    ) -> (matching: [QSO], skippedCount: Int) {
+        guard let accountCallsign else {
+            // No account callsign configured, upload all
+            return (qsos, 0)
+        }
+
+        var matching: [QSO] = []
+        var skipped = 0
+
+        for qso in qsos {
+            let qsoCallsign = qso.myCallsign.uppercased()
+            if qsoCallsign.isEmpty || qsoCallsign == accountCallsign {
+                matching.append(qso)
+            } else {
+                skipped += 1
+            }
+        }
+
+        return (matching, skipped)
+    }
+
+    /// Build the upload request with proper headers and form data
+    private func buildUploadRequest(
+        apiKey: String, adifContent: String, bookId: String?
+    ) throws -> URLRequest {
+        guard let url = URL(string: baseURL) else {
+            throw QRZError.invalidResponse("Invalid URL")
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+
+        var formData = ["KEY": apiKey, "ACTION": "INSERT", "OPTION": "REPLACE", "ADIF": adifContent]
+        if let bookId {
+            formData["BOOKID"] = bookId
+        }
+        request.httpBody = formEncode(formData).data(using: .utf8)
+        return request
+    }
+
+    /// Parse the upload response and return counts or throw appropriate error
+    private func parseUploadResponse(_ responseString: String) throws -> (uploaded: Int, duplicates: Int) {
+        let parsed = Self.parseResponse(responseString)
+
+        if parsed["RESULT"] == "AUTH" {
+            throw QRZError.sessionExpired
+        }
+
+        let result = parsed["RESULT"] ?? ""
+        guard result == "OK" || result == "REPLACE" || result == "PARTIAL" else {
+            let reason = parsed["REASON"] ?? "Response: \(responseString.prefix(200))"
+            throw QRZError.uploadFailed(reason)
+        }
+
+        let count = Int(parsed["COUNT"] ?? "0") ?? 0
+        let dupes = Int(parsed["DUPES"] ?? "0") ?? 0
+        return (uploaded: count, duplicates: dupes)
+    }
 
     private func buildFetchRequest(
         url: URL, apiKey: String, offset: Int, pageSize: Int, since: Date?

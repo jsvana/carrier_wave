@@ -54,10 +54,10 @@ extension SyncService {
     ) {
         await MainActor.run { self.syncPhase = .uploading(service: .qrz) }
         do {
-            let count = try await withTimeout(seconds: timeout, service: .qrz) {
+            let result = try await withTimeout(seconds: timeout, service: .qrz) {
                 try await self.uploadToQRZ(qsos: qsos)
             }
-            return (.qrz, .success(count))
+            return (.qrz, .success(result.uploaded))
         } catch {
             return (.qrz, .failure(error))
         }
@@ -85,29 +85,44 @@ extension SyncService {
         }
     }
 
-    func uploadToQRZ(qsos: [QSO]) async throws -> Int {
+    func uploadToQRZ(qsos: [QSO]) async throws -> (uploaded: Int, skipped: Int) {
         let batchSize = 50
         var totalUploaded = 0
+        var totalSkipped = 0
 
         for batch in stride(from: 0, to: qsos.count, by: batchSize) {
             let end = min(batch + batchSize, qsos.count)
             let batchQSOs = Array(qsos[batch ..< end])
 
-            let result = try await qrzClient.uploadQSOs(batchQSOs)
-            totalUploaded += result.uploaded
+            let uploadResult = try await qrzClient.uploadQSOs(batchQSOs)
+            totalUploaded += uploadResult.uploaded
+            totalSkipped += uploadResult.skipped
 
-            // Clear needsUpload flag - don't mark as present yet.
-            // Let the next download confirm actual presence in QRZ.
+            // Only clear needsUpload for QSOs that were actually uploaded (matching callsign)
+            // Non-matching QSOs keep their needsUpload flag - they're just skipped, not rejected
+            let accountCallsign = qrzClient.getCallsign()?.uppercased()
             await MainActor.run {
                 for qso in batchQSOs {
-                    if let presence = qso.presence(for: .qrz) {
+                    let qsoCallsign = qso.myCallsign.uppercased()
+                    let matches = qsoCallsign.isEmpty || qsoCallsign == accountCallsign
+                    if matches, let presence = qso.presence(for: .qrz) {
                         presence.needsUpload = false
                     }
                 }
             }
         }
 
-        return totalUploaded
+        // Warn user if QSOs were skipped due to callsign mismatch
+        if totalSkipped > 0 {
+            let callsign = qrzClient.getCallsign() ?? "unknown"
+            SyncDebugLog.shared.warning(
+                "Skipped \(totalSkipped) QSOs from other callsigns (QRZ account: \(callsign)). " +
+                    "Go to Settings > Callsign Aliases to delete non-primary callsign QSOs.",
+                service: .qrz
+            )
+        }
+
+        return (uploaded: totalUploaded, skipped: totalSkipped)
     }
 
     func uploadToPOTA(qsos: [QSO]) async throws -> Int {
