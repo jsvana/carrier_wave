@@ -2,6 +2,29 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
+## [1.10.0] - 2026-01-28
+
+### Added
+- QSO Map view improvements:
+  - States and DXCC counts in stats overlay
+  - "Show Individual QSOs" toggle for small dot markers per QSO
+  - Always-visible active filters display (dates, band, mode, park, confirmed)
+  - Geodesic curve paths to contacted stations (renamed from "Show Arcs")
+  - Performance limit (500 QSOs) with toggle to show all
+- Streak statistics improvements:
+  - POTA section showing valid/attempted activation counts
+  - Best streak date ranges now include year
+- Intro tour updates:
+  - New Statistics step highlighting streaks and activity tracking
+  - New Map step highlighting geodesic paths and filters
+
+### Fixed
+- Map date picker now defaults to earliest QSO date instead of invalid date
+- Metadata modes (SOLAR, WEATHER, NOTE) filtered from map mode picker
+- All streaks now use UTC consistently for date calculations
+- Tour text alignment in Track Your Progress step
+- Swift 6 concurrency warnings
+
 ## [1.9.0] - 2026-01-27
 
 ### Added
