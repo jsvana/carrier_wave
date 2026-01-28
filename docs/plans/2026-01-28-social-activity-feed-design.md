@@ -101,10 +101,11 @@ Admin-only for v1. Clubs registered via backend/admin tooling.
 | `newDXCCEntity` | First contact with a country | "N3QRS worked Japan for the first time" |
 | `newBand` | First QSO on a band | "W4DEF made first 6m contact" |
 | `newMode` | First QSO with a mode | "KD5GHI made first FT8 contact" |
-| `dxContact` | QSO over ~5000km | "WA6JKL worked VK2ABC (14,231 km)" |
+| `dxContact` | QSO over 5000km | "WA6JKL worked VK2ABC (14,231 km)" |
 | `potaActivation` | POTA activation logged | "W7MNO activated US-1234 (5 QSOs)" |
 | `sotaActivation` | SOTA activation logged | "W8PQR activated W7W/LC-001" |
-| `streakAchieved` | New or extended streak | "W9STU hit a 30-day QSO streak" |
+| `dailyStreak` | Daily QSO streak achieved/extended | "W9STU hit a 30-day QSO streak" |
+| `potaDailyStreak` | Daily POTA streak achieved/extended | "W9STU hit a 14-day POTA streak" |
 | `personalBest` | New personal record | "W0VWX set new distance record: 18,402 km" |
 
 ### Feed Item Structure
@@ -232,7 +233,8 @@ enum ActivityType: String, Codable {
     case dxContact
     case potaActivation
     case sotaActivation
-    case streakAchieved
+    case dailyStreak
+    case potaDailyStreak
     case personalBest
 }
 
@@ -381,13 +383,15 @@ NavigationStack
 
 ---
 
-## Open Questions
+## Decisions
 
-1. **Distance threshold for DX contacts** — 5000km? Configurable?
-2. **Streak types** — Daily QSOs only, or also band/mode streaks?
-3. **Feed pagination** — How many items per page? Infinite scroll or "Load more"?
-4. **Polo notes list format** — What's the exact URL structure and response format?
-5. **Activity retention** — How long to keep activities on server?
+| Question | Decision |
+|----------|----------|
+| DX distance threshold | 5000km |
+| Streak types | Daily QSOs and POTA daily |
+| Feed pagination | TBD during implementation |
+| Polo notes list format | TBD - need to confirm with Ham2K |
+| Activity retention | TBD during implementation |
 
 ---
 
