@@ -145,6 +145,13 @@ struct SyncSourcesSection: View {
                     }
                 }
             }
+
+            // Callsign Aliases
+            NavigationLink {
+                CallsignAliasesSettingsView()
+            } label: {
+                Label("Callsign Aliases", systemImage: "person.text.rectangle")
+            }
         } header: {
             Text("Sync Sources")
         }

@@ -70,6 +70,11 @@ struct DashboardView: View {
     /// Service detail sheet state
     @State var selectedService: ServiceIdentifier?
 
+    /// Callsign alias detection state
+    @State var unconfiguredCallsigns: Set<String> = []
+    @State var showingCallsignAliasAlert = false
+    let aliasService = CallsignAliasService.shared
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -85,6 +90,18 @@ struct DashboardView: View {
                 loadQRZConfig()
                 refreshServiceStatus()
             }
+            .task {
+                await checkForUnconfiguredCallsigns()
+            }
+            .callsignAliasDetectionAlert(
+                unconfiguredCallsigns: $unconfiguredCallsigns,
+                showingAlert: $showingCallsignAliasAlert,
+                onAccept: { await addUnconfiguredCallsignsAsAliases() },
+                onOpenSettings: {
+                    selectedTab = .settings
+                    settingsDestination = nil
+                }
+            )
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     toolbarButtons

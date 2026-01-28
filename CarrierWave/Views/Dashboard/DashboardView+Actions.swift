@@ -228,4 +228,39 @@ extension DashboardView {
         lotwSyncResult = "Cleared"
         refreshServiceStatus()
     }
+
+    // MARK: - Callsign Alias Detection
+
+    /// Check for callsigns in QSOs that aren't configured as user callsigns
+    func checkForUnconfiguredCallsigns() async {
+        // Get all unique MYCALLSIGN values from QSOs
+        let allMyCallsigns = Set(qsos.map { $0.myCallsign.uppercased() }.filter { !$0.isEmpty })
+
+        // Skip check if no QSOs with callsigns
+        guard !allMyCallsigns.isEmpty else {
+            return
+        }
+
+        // Get unconfigured callsigns
+        let unconfigured = await aliasService.getUnconfiguredCallsigns(from: allMyCallsigns)
+
+        // Only show alert if there are unconfigured callsigns AND user has at least one configured
+        let hasConfiguredCallsigns = await !aliasService.getAllUserCallsigns().isEmpty
+        if !unconfigured.isEmpty, hasConfiguredCallsigns {
+            unconfiguredCallsigns = unconfigured
+            showingCallsignAliasAlert = true
+        }
+    }
+
+    /// Add all unconfigured callsigns as previous callsigns
+    func addUnconfiguredCallsignsAsAliases() async {
+        for callsign in unconfiguredCallsigns {
+            do {
+                try await aliasService.addPreviousCallsign(callsign)
+            } catch {
+                print("Failed to add callsign alias \(callsign): \(error)")
+            }
+        }
+        unconfiguredCallsigns = []
+    }
 }

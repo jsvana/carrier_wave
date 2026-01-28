@@ -84,6 +84,7 @@
 | `ChallengeProgressEngine.swift` | Challenge progress calculation |
 | `ChallengeQSOMatcher.swift` | Match QSOs to challenge criteria |
 | `BugReportService.swift` | Collects device/app info for bug reports |
+| `CallsignAliasService.swift` | Manage current and previous callsigns for alias matching |
 
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |
@@ -135,6 +136,8 @@
 | `AttributionsView.swift` | Third-party attributions |
 | `ExternalDataView.swift` | External data cache status and refresh (POTA parks) |
 | `BugReportView.swift` | Bug report form with dpaste upload and Discord instructions |
+| `CallsignAliasesSettingsView.swift` | Manage current and previous callsigns |
+| `SettingsSections.swift` | Sync Sources section with service navigation links |
 
 ### Utilities (`CarrierWave/Utilities/`)
 | File | Purpose |

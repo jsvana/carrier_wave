@@ -70,6 +70,13 @@ struct QRZApiKeySheet: View {
             try client.saveCallsign(status.callsign)
             callsign = status.callsign
             isAuthenticated = true
+
+            // Auto-populate current callsign in CallsignAliasService
+            let aliasService = CallsignAliasService.shared
+            if await aliasService.getCurrentCallsign() == nil {
+                try await aliasService.saveCurrentCallsign(status.callsign)
+            }
+
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

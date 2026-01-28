@@ -132,7 +132,7 @@ class SyncService: ObservableObject {
         // PHASE 2.5: Reconcile QRZ presence against what QRZ actually returned
         let qrzDownloadedKeys = Set(allFetched.filter { $0.source == .qrz }.map(\.deduplicationKey))
         if !qrzDownloadedKeys.isEmpty {
-            try reconcileQRZPresence(downloadedKeys: qrzDownloadedKeys)
+            try await reconcileQRZPresence(downloadedKeys: qrzDownloadedKeys)
         }
 
         try modelContext.save()
@@ -170,7 +170,7 @@ class SyncService: ObservableObject {
 
         // Reconcile QRZ presence against what QRZ actually returned
         let qrzDownloadedKeys = Set(fetched.map(\.deduplicationKey))
-        try reconcileQRZPresence(downloadedKeys: qrzDownloadedKeys)
+        try await reconcileQRZPresence(downloadedKeys: qrzDownloadedKeys)
 
         try modelContext.save()
 

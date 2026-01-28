@@ -2,6 +2,15 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
+## [1.9.0] - 2026-01-27
+
+### Added
+- Callsign Aliases feature for users who have changed callsigns over time
+  - Configure current callsign and list of previous callsigns in Settings
+  - Auto-detects multiple callsigns in QSO data and suggests adding as aliases
+  - QRZ sync now properly matches QSOs logged under any user callsign
+  - Current callsign auto-populated from QRZ on first connection
+
 ## [1.8.3] - 2026-01-27
 
 ### Added

@@ -145,5 +145,9 @@ extension KeychainHelper {
         static let lotwPassword = "lotw.password"
         static let lotwLastQSL = "lotw.last.qsl"
         static let lotwLastQSORx = "lotw.last.qso.rx"
+
+        /// Callsign Aliases
+        static let currentCallsign = "user.current.callsign"
+        static let previousCallsigns = "user.previous.callsigns" // JSON array
     }
 }

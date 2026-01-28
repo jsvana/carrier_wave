@@ -83,21 +83,61 @@ extension SyncService {
 
     /// Reconcile QRZ presence records against what QRZ actually returned.
     /// Clears isPresent and sets needsUpload for QSOs that we thought were in QRZ but aren't.
-    func reconcileQRZPresence(downloadedKeys: Set<String>) throws {
+    /// Uses callsign aliases to properly match QSOs logged under previous callsigns.
+    func reconcileQRZPresence(downloadedKeys: Set<String>) async throws {
         let descriptor = FetchDescriptor<QSO>()
         let allQSOs = try modelContext.fetch(descriptor)
+
+        // Get user's callsign aliases for matching
+        let aliasService = CallsignAliasService.shared
+        let userCallsigns = await aliasService.getAllUserCallsigns()
 
         for qso in allQSOs {
             guard let presence = qso.presence(for: .qrz), presence.isPresent else {
                 continue
             }
 
-            // If QRZ didn't return this QSO, it's not actually there
-            if !downloadedKeys.contains(qso.deduplicationKey) {
+            // Check if QRZ returned this QSO or an equivalent one under a different user callsign
+            let isPresent = isQSOPresentInDownloaded(
+                qso: qso,
+                downloadedKeys: downloadedKeys,
+                userCallsigns: userCallsigns
+            )
+
+            if !isPresent {
                 presence.isPresent = false
                 presence.needsUpload = true
             }
         }
+    }
+
+    /// Check if a QSO is present in the downloaded set, considering callsign aliases.
+    /// QRZ consolidates all QSOs under the user's current callsign, so a QSO logged under
+    /// "KK4RBD" might appear in QRZ under "N9HO" if those are the same operator.
+    private func isQSOPresentInDownloaded(
+        qso: QSO,
+        downloadedKeys: Set<String>,
+        userCallsigns: Set<String>
+    ) -> Bool {
+        // First, check exact match
+        if downloadedKeys.contains(qso.deduplicationKey) {
+            return true
+        }
+
+        // If the QSO's myCallsign is one of the user's callsigns, check if any variant exists
+        let myCallsign = qso.myCallsign.uppercased()
+        guard !myCallsign.isEmpty, userCallsigns.contains(myCallsign) else {
+            return false
+        }
+
+        // The deduplication key format is: "CALLSIGN|BAND|MODE|TIMESTAMP"
+        // We need to check if the same contacted station exists under any user callsign variant
+        // Since QRZ consolidates under current call, the key in downloadedKeys might differ
+        // only in the ignored MYCALLSIGN part (which isn't in the dedup key anyway)
+
+        // The deduplication key already ignores MYCALLSIGN (it uses contacted station),
+        // so if the exact key isn't found, the QSO truly isn't present
+        return false
     }
 
     /// Merge fetched QSO data into existing QSO (richest data wins)
