@@ -44,6 +44,10 @@
 | `POTAActivation.swift` | POTA activation grouping view model |
 | `TourState.swift` | UserDefaults-backed tour progress tracking |
 | `StreakInfo.swift` | Streak data model and calculation utilities |
+| `ActivityType.swift` | Activity type enum with icons and display names |
+| `Friendship.swift` | Friend connection model with status tracking |
+| `Club.swift` | Club model with Polo notes list membership |
+| `ActivityItem.swift` | Activity feed item model |
 
 ### Services (`CarrierWave/Services/`)
 | File | Purpose |
