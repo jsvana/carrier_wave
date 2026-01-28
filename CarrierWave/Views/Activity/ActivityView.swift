@@ -60,6 +60,9 @@ struct ActivityView: View {
                 if clubsSyncService == nil {
                     clubsSyncService = ClubsSyncService(modelContext: modelContext)
                 }
+                if feedSyncService == nil {
+                    feedSyncService = ActivityFeedSyncService(modelContext: modelContext)
+                }
             }
             .alert("Error", isPresented: $showingError) {
                 Button("OK") { showingError = false }
@@ -117,6 +120,7 @@ struct ActivityView: View {
     @State private var syncService: ChallengesSyncService?
     @State private var friendsSyncService: FriendsSyncService?
     @State private var clubsSyncService: ClubsSyncService?
+    @State private var feedSyncService: ActivityFeedSyncService?
     @State private var errorMessage: String?
     @State private var showingError = false
 
@@ -264,6 +268,11 @@ struct ActivityView: View {
                 syncService.progressEngine.reevaluateAllQSOs(for: participation)
             }
             try modelContext.save()
+
+            // Sync activity feed from server
+            if let feedService = feedSyncService {
+                try await feedService.syncFeed(sourceURL: "https://challenges.example.com")
+            }
         } catch {
             errorMessage = error.localizedDescription
             showingError = true
