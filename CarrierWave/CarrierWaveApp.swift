@@ -21,6 +21,9 @@ struct CarrierWaveApp: App {
             ChallengeDefinition.self,
             ChallengeParticipation.self,
             LeaderboardCache.self,
+            Friendship.self,
+            Club.self,
+            ActivityItem.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,
