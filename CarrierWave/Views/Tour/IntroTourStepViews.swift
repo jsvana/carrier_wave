@@ -193,7 +193,7 @@ struct IntroTourStatisticsStep: View {
             Text("Track Your Progress")
                 .font(.title)
                 .fontWeight(.bold)
-                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
             Text(
                 "Stay motivated with detailed statistics and streak tracking. " +
@@ -201,7 +201,7 @@ struct IntroTourStatisticsStep: View {
             )
             .font(.body)
             .foregroundStyle(.secondary)
-            .multilineTextAlignment(.center)
+            .frame(maxWidth: .infinity, alignment: .leading)
 
             VStack(alignment: .leading, spacing: 12) {
                 IntroTourFeatureRow(icon: "flame.fill", text: "Daily QSO streaks")
@@ -209,6 +209,7 @@ struct IntroTourStatisticsStep: View {
                 IntroTourFeatureRow(icon: "waveform.path", text: "Mode and band streaks")
                 IntroTourFeatureRow(icon: "chart.bar.fill", text: "Activity grid visualization")
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.top, 8)
         }
     }
@@ -331,6 +332,7 @@ struct IntroTourFeatureRow: View {
         HStack(spacing: 12) {
             Image(systemName: icon)
                 .foregroundStyle(.green)
+                .frame(width: 24)
             Text(text)
                 .font(.subheadline)
         }
