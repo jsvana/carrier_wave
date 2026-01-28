@@ -25,7 +25,9 @@
       "Skill(documentation-driven-development:*)",
       "mcp__acp__Write",
       "mcp__acp__Edit",
-      "mcp__acp__Bash"
+      "mcp__acp__Bash",
+      "Bash(swiftlint lint:*)",
+      "Bash(sqlite3:*)"
     ]
   }
 }

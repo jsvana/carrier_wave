@@ -16,6 +16,7 @@ struct SyncSourcesSection: View {
     let lotwIsConfigured: Bool
     let lotwUsername: String?
     let challengeSources: [ChallengeSource]
+    let tourState: TourState
 
     var body: some View {
         Section {
@@ -40,7 +41,7 @@ struct SyncSourcesSection: View {
 
             // POTA
             NavigationLink {
-                POTASettingsView(potaAuth: potaAuth)
+                POTASettingsView(potaAuth: potaAuth, tourState: tourState)
             } label: {
                 HStack {
                     Label("POTA", systemImage: "leaf")
@@ -59,7 +60,7 @@ struct SyncSourcesSection: View {
 
             // LoFi
             NavigationLink {
-                LoFiSettingsView()
+                LoFiSettingsView(tourState: tourState)
             } label: {
                 HStack {
                     Label("Ham2K LoFi", systemImage: "antenna.radiowaves.left.and.right")

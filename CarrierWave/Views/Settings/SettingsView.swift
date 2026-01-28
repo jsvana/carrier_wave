@@ -56,7 +56,8 @@ struct SettingsMainView: View {
                     qrzCallsign: qrzCallsign,
                     lotwIsConfigured: lotwIsConfigured,
                     lotwUsername: lotwUsername,
-                    challengeSources: challengeSources
+                    challengeSources: challengeSources,
+                    tourState: tourState
                 )
                 deduplicationSection
                 developerSection
