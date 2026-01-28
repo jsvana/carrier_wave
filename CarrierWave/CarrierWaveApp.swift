@@ -112,4 +112,5 @@ extension Notification.Name {
     static let didReceiveADIFFile = Notification.Name("didReceiveADIFFile")
     static let didReceiveChallengeInvite = Notification.Name("didReceiveChallengeInvite")
     static let didSyncQSOs = Notification.Name("didSyncQSOs")
+    static let didDetectActivities = Notification.Name("didDetectActivities")
 }

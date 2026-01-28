@@ -101,8 +101,17 @@ class SyncService: ObservableObject {
     let hamrsClient: HAMRSClient
     let lotwClient: LoTWClient
 
+    // Activity detection (internal for extension access)
+    var activityDetector: ActivityDetector?
+    var activityReporter: ActivityReporter?
+    let activitySourceURL = "https://challenges.example.com"
+
     /// Timeout for individual service sync operations (in seconds)
-    let syncTimeoutSeconds: TimeInterval = 60
+    let syncTimeoutSeconds: TimeInterval = 180
+
+    /// Extended timeout for services with internal adaptive handling (POTA, LoTW)
+    /// These services handle their own per-request timeouts and retries
+    let extendedSyncTimeoutSeconds: TimeInterval = 600 // 10 minutes
 
     /// Check if read-only mode is enabled (disables uploads)
     var isReadOnlyMode: Bool {
@@ -138,7 +147,12 @@ class SyncService: ObservableObject {
         result.mergedQSOs = processResult.merged
         notifyNewQSOsIfNeeded(count: processResult.created)
 
-        // PHASE 2.5: Reconcile QRZ presence against what QRZ actually returned
+        // PHASE 2.5a: Process activities for newly created QSOs
+        if !processResult.createdQSOs.isEmpty {
+            await processActivities(newQSOs: processResult.createdQSOs)
+        }
+
+        // PHASE 2.5b: Reconcile QRZ presence against what QRZ actually returned
         let qrzDownloadedKeys = Set(allFetched.filter { $0.source == .qrz }.map(\.deduplicationKey))
         if !qrzDownloadedKeys.isEmpty {
             try await reconcileQRZPresence(downloadedKeys: qrzDownloadedKeys)
@@ -177,6 +191,11 @@ class SyncService: ObservableObject {
         syncPhase = .processing
         let processResult = try processDownloadedQSOs(fetched)
         downloaded = processResult.created
+
+        // Process activities for newly created QSOs
+        if !processResult.createdQSOs.isEmpty {
+            await processActivities(newQSOs: processResult.createdQSOs)
+        }
 
         // Reconcile QRZ presence against what QRZ actually returned
         let qrzDownloadedKeys = Set(fetched.map(\.deduplicationKey))
@@ -225,6 +244,12 @@ class SyncService: ObservableObject {
         syncPhase = .processing
         let processResult = try processDownloadedQSOs(fetched)
         downloaded = processResult.created
+
+        // Process activities for newly created QSOs
+        if !processResult.createdQSOs.isEmpty {
+            await processActivities(newQSOs: processResult.createdQSOs)
+        }
+
         try modelContext.save()
 
         // Upload with timeout (unless read-only mode)
@@ -263,6 +288,12 @@ class SyncService: ObservableObject {
 
         syncPhase = .processing
         let processResult = try processDownloadedQSOs(fetched)
+
+        // Process activities for newly created QSOs
+        if !processResult.createdQSOs.isEmpty {
+            await processActivities(newQSOs: processResult.createdQSOs)
+        }
+
         try modelContext.save()
 
         return processResult.created
@@ -285,6 +316,12 @@ class SyncService: ObservableObject {
 
         syncPhase = .processing
         let processResult = try processDownloadedQSOs(fetched)
+
+        // Process activities for newly created QSOs
+        if !processResult.createdQSOs.isEmpty {
+            await processActivities(newQSOs: processResult.createdQSOs)
+        }
+
         try modelContext.save()
 
         return processResult.created
@@ -307,6 +344,11 @@ class SyncService: ObservableObject {
 
         syncPhase = .processing
         let processResult = try processDownloadedQSOs(fetched)
+
+        // Process activities for newly created QSOs
+        if !processResult.createdQSOs.isEmpty {
+            await processActivities(newQSOs: processResult.createdQSOs)
+        }
 
         // Save timestamp for incremental sync
         if let lastQSORx = response.lastQSORx {
@@ -355,6 +397,11 @@ class SyncService: ObservableObject {
         let processResult = try processDownloadedQSOs(allFetched)
         result.newQSOs = processResult.created
         result.mergedQSOs = processResult.merged
+
+        // Process activities for newly created QSOs
+        if !processResult.createdQSOs.isEmpty {
+            await processActivities(newQSOs: processResult.createdQSOs)
+        }
 
         try modelContext.save()
 

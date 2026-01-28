@@ -7,6 +7,7 @@ extension SyncService {
     struct ProcessResult {
         let created: Int
         let merged: Int
+        let createdQSOs: [QSO]
     }
 
     func processDownloadedQSOs(_ fetched: [FetchedQSO]) throws -> ProcessResult {
@@ -30,6 +31,7 @@ extension SyncService {
 
         var created = 0
         var merged = 0
+        var createdQSOs: [QSO] = []
 
         for (key, fetchedGroup) in byKey {
             if let existing = existingByKey[key]?.first {
@@ -38,13 +40,14 @@ extension SyncService {
                 }
                 merged += 1
             } else {
-                createNewQSOFromGroup(fetchedGroup)
+                let newQSO = createNewQSOFromGroup(fetchedGroup)
+                createdQSOs.append(newQSO)
                 created += 1
             }
         }
 
         debugLog.info("Process result: created=\(created), merged=\(merged)")
-        return ProcessResult(created: created, merged: merged)
+        return ProcessResult(created: created, merged: merged, createdQSOs: createdQSOs)
     }
 
     private func buildSourceBreakdown(_ fetched: [FetchedQSO]) -> String {
@@ -55,7 +58,8 @@ extension SyncService {
         return sourceBreakdown.map { "\($0.key.displayName)=\($0.value)" }.joined(separator: ", ")
     }
 
-    private func createNewQSOFromGroup(_ fetchedGroup: [FetchedQSO]) {
+    @discardableResult
+    private func createNewQSOFromGroup(_ fetchedGroup: [FetchedQSO]) -> QSO {
         let mergedFetched = mergeFetchedGroup(fetchedGroup)
         let newQSO = createQSO(from: mergedFetched)
         modelContext.insert(newQSO)
@@ -79,6 +83,8 @@ extension SyncService {
             modelContext.insert(presence)
             newQSO.servicePresence.append(presence)
         }
+
+        return newQSO
     }
 
     /// Reconcile QRZ presence records against what QRZ actually returned.
