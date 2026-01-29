@@ -111,6 +111,14 @@
 | `CWSignalProcessor.swift` | DSP pipeline: bandpass filter, envelope follower, threshold detection |
 | `MorseCode.swift` | Morse code lookup table, timing constants, QSO abbreviations |
 | `MorseDecoder.swift` | Timing state machine for dit/dah classification, adaptive WPM |
+| `CWTranscriptionService.swift` | Coordinates audio capture, signal processing, and morse decoding |
+
+### Views - CW Transcription (`CarrierWave/Views/CWTranscription/`)
+| File | Purpose |
+|------|---------|
+| `CWTranscriptionView.swift` | Main CW transcription container with controls |
+| `CWWaveformView.swift` | Real-time audio waveform visualization |
+| `CWTranscriptView.swift` | Decoded text display with timestamps |
 
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |
