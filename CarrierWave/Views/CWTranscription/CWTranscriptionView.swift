@@ -147,8 +147,8 @@ struct CWTranscriptionView: View {
 
     private var settingsControls: some View {
         HStack(spacing: 12) {
-            // WPM display/button
-            Button {
+            // WPM box
+            CWSpeedBox(wpm: service.estimatedWPM) {
                 // Cycle through common WPM values
                 let presets = [15, 20, 25, 30]
                 if let currentIndex = presets.firstIndex(of: service.estimatedWPM) {
@@ -157,77 +157,56 @@ struct CWTranscriptionView: View {
                 } else {
                     service.setWPM(20)
                 }
-            } label: {
-                Text("\(service.estimatedWPM)")
-                    .font(.subheadline.weight(.semibold).monospaced())
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color(.systemGray4))
-                    .foregroundStyle(.primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
-            .buttonStyle(.plain)
 
-            Text("WPM")
-                .font(.caption)
-                .foregroundStyle(.secondary)
+            // Frequency meter
+            VStack(spacing: 4) {
+                CWFrequencyMeter(
+                    centerFrequency: 600,
+                    detectedFrequency: service.detectedFrequency,
+                    frequencyRange: 200,
+                    isListening: service.isListening
+                )
 
-            Spacer()
-
-            // Frequency display
-            frequencyIndicator
-
-            Spacer()
+                // Auto/Fixed indicator with detected frequency
+                HStack(spacing: 4) {
+                    if service.adaptiveFrequencyEnabled {
+                        Image(systemName: "a.circle.fill")
+                            .font(.caption2)
+                            .foregroundStyle(.blue)
+                        if let detected = service.detectedFrequency {
+                            Text("\(Int(detected)) Hz")
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        Text("Fixed: \(Int(service.toneFrequency)) Hz")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            }
 
             // Pre-amp toggle
             Button {
                 service.preAmpEnabled.toggle()
             } label: {
-                Text("PRE")
-                    .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(service.preAmpEnabled ? Color.orange : Color(.systemGray4))
-                    .foregroundStyle(service.preAmpEnabled ? .white : .primary)
-                    .clipShape(RoundedRectangle(cornerRadius: 6))
+                VStack(spacing: 2) {
+                    Image(systemName: "speaker.wave.3.fill")
+                        .font(.title3)
+                    Text("PRE")
+                        .font(.caption2.weight(.medium))
+                }
+                .frame(width: 56, height: 56)
+                .background(service.preAmpEnabled ? Color.orange : Color(.systemGray5))
+                .foregroundStyle(service.preAmpEnabled ? .white : .primary)
+                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
             .buttonStyle(.plain)
         }
         .padding(12)
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-
-    // MARK: - Frequency Indicator
-
-    private var frequencyIndicator: some View {
-        HStack(spacing: 4) {
-            if service.adaptiveFrequencyEnabled {
-                // Show detected frequency or scanning indicator
-                if let detected = service.detectedFrequency {
-                    Text("\(Int(detected))")
-                        .font(.subheadline.weight(.semibold).monospaced())
-                } else {
-                    Text("---")
-                        .font(.subheadline.weight(.semibold).monospaced())
-                }
-                Text("Hz")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                // Auto indicator
-                Image(systemName: "a.circle.fill")
-                    .font(.caption)
-                    .foregroundStyle(.blue)
-            } else {
-                // Fixed frequency
-                Text("\(Int(service.toneFrequency))")
-                    .font(.subheadline.weight(.semibold).monospaced())
-                Text("Hz")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-        }
     }
 
     // MARK: - Noise Floor Section

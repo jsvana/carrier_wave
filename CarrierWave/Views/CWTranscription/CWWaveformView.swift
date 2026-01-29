@@ -274,6 +274,156 @@ struct CWNoiseFloorIndicator: View {
     }
 }
 
+// MARK: - CWFrequencyMeter
+
+/// A frequency deviation meter centered around 600Hz.
+/// Shows green in the center (on-frequency) transitioning to yellow/orange at the edges.
+struct CWFrequencyMeter: View {
+    // MARK: Internal
+
+    /// Center frequency in Hz
+    let centerFrequency: Double
+
+    /// Detected frequency in Hz (nil if not detected)
+    let detectedFrequency: Double?
+
+    /// Frequency range displayed (±deviation from center)
+    var frequencyRange: Double = 200
+
+    /// Whether currently listening
+    let isListening: Bool
+
+    var body: some View {
+        VStack(spacing: 4) {
+            // Segmented bar with center indicator
+            ZStack {
+                HStack(spacing: 2) {
+                    ForEach(0 ..< segmentCount, id: \.self) { index in
+                        segmentView(at: index)
+                    }
+                }
+                .frame(height: 20)
+
+                // Center indicator line
+                Rectangle()
+                    .fill(Color.white.opacity(0.6))
+                    .frame(width: 2, height: 24)
+            }
+
+            // Labels
+            HStack {
+                Text("\(Int(centerFrequency - frequencyRange))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text("\(Int(centerFrequency))")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.primary)
+
+                Spacer()
+
+                Text("\(Int(centerFrequency + frequencyRange))")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.horizontal, 4)
+        .opacity(isListening ? 1.0 : 0.5)
+    }
+
+    // MARK: Private
+
+    /// Number of segments in the meter
+    private let segmentCount = 15
+
+    /// Compute which segment the detected frequency falls into
+    private var activeSegment: Int? {
+        guard let freq = detectedFrequency else {
+            return nil
+        }
+        let deviation = freq - centerFrequency
+        let normalizedPosition = (deviation + frequencyRange) / (2 * frequencyRange)
+        let clampedPosition = max(0, min(1, normalizedPosition))
+        return Int(clampedPosition * Double(segmentCount - 1))
+    }
+
+    @ViewBuilder
+    private func segmentView(at index: Int) -> some View {
+        let isActive = activeSegment == index
+
+        RoundedRectangle(cornerRadius: 2)
+            .fill(segmentColor(at: index, isLit: isActive))
+            .animation(.easeOut(duration: 0.05), value: isActive)
+    }
+
+    private func segmentColor(at index: Int, isLit: Bool) -> Color {
+        let baseColor = colorForSegment(at: index)
+
+        if isLit {
+            return baseColor
+        } else {
+            return baseColor.opacity(0.25)
+        }
+    }
+
+    private func colorForSegment(at index: Int) -> Color {
+        // Distance from center (0 = center, 1 = edge)
+        let centerIndex = Double(segmentCount - 1) / 2.0
+        let distanceFromCenter = abs(Double(index) - centerIndex) / centerIndex
+
+        switch distanceFromCenter {
+        case 0 ..< 0.2:
+            // Center - bright green (on frequency)
+            return Color(red: 0.2, green: 0.7, blue: 0.3)
+        case 0.2 ..< 0.4:
+            // Near center - green
+            return Color(red: 0.3, green: 0.6, blue: 0.3)
+        case 0.4 ..< 0.6:
+            // Getting off - yellow-green
+            return Color(red: 0.5, green: 0.55, blue: 0.2)
+        case 0.6 ..< 0.8:
+            // Off frequency - yellow/orange
+            return Color(red: 0.6, green: 0.45, blue: 0.15)
+        default:
+            // Far off - orange
+            return Color(red: 0.65, green: 0.35, blue: 0.15)
+        }
+    }
+}
+
+// MARK: - CWSpeedBox
+
+/// A compact WPM display box.
+struct CWSpeedBox: View {
+    /// Current speed in WPM
+    let wpm: Int
+
+    /// Callback when tapped to cycle speed
+    var onTap: (() -> Void)?
+
+    var body: some View {
+        Button {
+            onTap?()
+        } label: {
+            VStack(spacing: 2) {
+                Text("\(wpm)")
+                    .font(.title2.weight(.bold).monospaced())
+                    .foregroundStyle(.primary)
+
+                Text("WPM")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 56, height: 56)
+            .background(Color(.systemGray5))
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -303,6 +453,39 @@ struct CWNoiseFloorIndicator: View {
             CWNoiseFloorIndicator(noiseFloor: 0.25, quality: .fair, isListening: true)
             CWNoiseFloorIndicator(noiseFloor: 0.4, quality: .poor, isListening: true)
             CWNoiseFloorIndicator(noiseFloor: 0.6, quality: .unusable, isListening: true)
+        }
+        .padding()
+
+        // Frequency meter examples
+        VStack(spacing: 12) {
+            CWFrequencyMeter(
+                centerFrequency: 600,
+                detectedFrequency: 600,
+                isListening: true
+            )
+            CWFrequencyMeter(
+                centerFrequency: 600,
+                detectedFrequency: 550,
+                isListening: true
+            )
+            CWFrequencyMeter(
+                centerFrequency: 600,
+                detectedFrequency: 700,
+                isListening: true
+            )
+            CWFrequencyMeter(
+                centerFrequency: 600,
+                detectedFrequency: nil,
+                isListening: true
+            )
+        }
+        .padding()
+
+        // Speed box examples
+        HStack(spacing: 16) {
+            CWSpeedBox(wpm: 15)
+            CWSpeedBox(wpm: 20)
+            CWSpeedBox(wpm: 25)
         }
         .padding()
     }

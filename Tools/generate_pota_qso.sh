@@ -10,33 +10,44 @@ cd "$OUTPUT_DIR"
 
 echo "Generating CW audio files..."
 
+# Function to generate CW audio from text
+# Args: text, wpm, frequency, output_basename
+generate_cw() {
+    local text="$1"
+    local wpm="$2"
+    local freq="$3"
+    local output="$4"
+
+    echo "$text" | ebook2cw -w "$wpm" -f "$freq" -o "$output" -T 1 -
+}
+
 # Each transmission with format: "text" wpm frequency filename
 # W6JSV (activator) at 600Hz, 20wpm
 # N9HO (hunter) at 650Hz, 25wpm
 
 # 1. CQ CQ POTA DE W6JSV K (W6JSV, 600Hz, 20wpm)
-ebook2cw -w 20 -f 600 -o 01_cq1 -T 1 "CQ CQ POTA DE W6JSV K"
+generate_cw "CQ CQ POTA DE W6JSV K" 20 600 "01_cq1"
 
 # 2. CQ CQ POTA DE W6JSV K (W6JSV, 600Hz, 20wpm) - second call
-ebook2cw -w 20 -f 600 -o 02_cq2 -T 1 "CQ CQ POTA DE W6JSV K"
+generate_cw "CQ CQ POTA DE W6JSV K" 20 600 "02_cq2"
 
 # 3. N9HO (N9HO responds, 650Hz, 25wpm)
-ebook2cw -w 25 -f 650 -o 03_n9ho_call -T 1 "N9HO"
+generate_cw "N9HO" 25 650 "03_n9ho_call"
 
 # 4. N9? (W6JSV partial copy, 600Hz, 20wpm)
-ebook2cw -w 20 -f 600 -o 04_n9q -T 1 "N9?"
+generate_cw "N9?" 20 600 "04_n9q"
 
 # 5. N9HO (N9HO repeats, 650Hz, 25wpm)
-ebook2cw -w 25 -f 650 -o 05_n9ho_repeat -T 1 "N9HO"
+generate_cw "N9HO" 25 650 "05_n9ho_repeat"
 
 # 6. N9HO TU ES GM UR 599 599 CA BK (W6JSV exchange, 600Hz, 20wpm)
-ebook2cw -w 20 -f 600 -o 06_w6jsv_exchange -T 1 "N9HO TU ES GM UR 599 599 CA BK"
+generate_cw "N9HO TU ES GM UR 599 599 CA BK" 20 600 "06_w6jsv_exchange"
 
 # 7. BK RR TU UR 599 599 AL AL BK (N9HO exchange, 650Hz, 25wpm)
-ebook2cw -w 25 -f 650 -o 07_n9ho_exchange -T 1 "BK RR TU UR 599 599 AL AL BK"
+generate_cw "BK RR TU UR 599 599 AL AL BK" 25 650 "07_n9ho_exchange"
 
-# 8. BK RR FB TU ES 72 EE (W6JSV signoff, 650Hz per user request, 20wpm)
-ebook2cw -w 20 -f 650 -o 08_signoff -T 1 "BK RR FB TU ES 72 EE"
+# 8. BK RR FB TU ES 72 EE (signoff, 650Hz per user request, 20wpm)
+generate_cw "BK RR FB TU ES 72 EE" 20 650 "08_signoff"
 
 echo "Converting MP3 files to WAV..."
 
@@ -58,19 +69,19 @@ echo "Concatenating all files..."
 
 # Build the final audio with appropriate gaps
 sox \
-    01_cq10001.wav silence_2s.wav \
-    02_cq20001.wav silence_2s.wav \
-    03_n9ho_call0001.wav silence_1s.wav \
-    04_n9q0001.wav silence_1s.wav \
-    05_n9ho_repeat0001.wav silence_1s.wav \
-    06_w6jsv_exchange0001.wav silence_1s.wav \
-    07_n9ho_exchange0001.wav silence_1s.wav \
-    08_signoff0001.wav \
+    01_cq10000.wav silence_2s.wav \
+    02_cq20000.wav silence_2s.wav \
+    03_n9ho_call0000.wav silence_1s.wav \
+    04_n9q0000.wav silence_1s.wav \
+    05_n9ho_repeat0000.wav silence_1s.wav \
+    06_w6jsv_exchange0000.wav silence_1s.wav \
+    07_n9ho_exchange0000.wav silence_1s.wav \
+    08_signoff0000.wav \
     pota_qso_raw.wav
 
-echo "Normalizing and adding slight noise for realism..."
+echo "Normalizing..."
 
-# Normalize and optionally add slight background noise
+# Normalize
 sox pota_qso_raw.wav pota_qso_final.wav norm -1
 
 # Convert to mp3 for easier sharing
