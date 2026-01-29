@@ -8,6 +8,7 @@ struct DashboardView: View {
 
     @Environment(\.modelContext) var modelContext
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
+    @Environment(\.verticalSizeClass) var verticalSizeClass
     @Query var qsos: [QSO]
     @Query var allPresence: [ServicePresence]
 
@@ -80,8 +81,13 @@ struct DashboardView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     activityCard
-                    streaksCard
-                    summaryCard
+                    // In landscape on iPhone (compact vertical), combine streaks and stats
+                    if verticalSizeClass == .compact {
+                        combinedStreaksAndStatsCard
+                    } else {
+                        streaksCard
+                        summaryCard
+                    }
                     favoritesCard
                     servicesList
                 }
@@ -228,6 +234,57 @@ struct DashboardView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
+    // MARK: - Combined Streaks and Stats Card (Landscape)
+
+    private var combinedStreaksAndStatsCard: some View {
+        HStack(alignment: .top, spacing: 16) {
+            // Streaks section (left side)
+            NavigationLink {
+                StreakDetailView(stats: stats, tourState: tourState)
+            } label: {
+                VStack(alignment: .leading, spacing: 12) {
+                    HStack {
+                        Text("Streaks")
+                            .font(.headline)
+                        Spacer()
+                        if stats.dailyStreak.isAtRisk || stats.potaActivationStreak.isAtRisk {
+                            Image(systemName: "exclamationmark.triangle.fill")
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+
+                    VStack(spacing: 12) {
+                        streakRow(title: "Daily", streak: stats.dailyStreak)
+                        streakRow(title: "POTA", streak: stats.potaActivationStreak)
+                    }
+                }
+            }
+            .buttonStyle(.plain)
+
+            Divider()
+
+            // Stats section (right side)
+            VStack(alignment: .leading, spacing: 12) {
+                HStack {
+                    Text("Statistics")
+                        .font(.headline)
+                    Spacer()
+                    if let lastSync = lastSyncDate {
+                        Text("Synced \(lastSync, style: .relative) ago")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                statsGrid
+            }
+        }
+        .padding()
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
     // MARK: - Favorites Card
 
     private var favoritesCard: some View {
@@ -248,7 +305,9 @@ struct DashboardView: View {
             .buttonStyle(.plain)
 
             NavigationLink {
-                StatDetailView(category: .qsls, items: stats.items(for: .qsls), tourState: tourState)
+                StatDetailView(
+                    category: .qsls, items: stats.items(for: .qsls), tourState: tourState
+                )
             } label: {
                 StatBox(title: "QSLs", value: "\(stats.confirmedQSLs)", icon: "checkmark.seal")
             }
@@ -256,7 +315,10 @@ struct DashboardView: View {
 
             if lotwIsConfigured {
                 NavigationLink {
-                    StatDetailView(category: .entities, items: stats.items(for: .entities), tourState: tourState)
+                    StatDetailView(
+                        category: .entities, items: stats.items(for: .entities),
+                        tourState: tourState
+                    )
                 } label: {
                     StatBox(title: "DXCC Entities", value: "\(stats.uniqueEntities)", icon: "globe")
                 }
@@ -267,25 +329,42 @@ struct DashboardView: View {
             }
 
             NavigationLink {
-                StatDetailView(category: .grids, items: stats.items(for: .grids), tourState: tourState)
+                StatDetailView(
+                    category: .grids, items: stats.items(for: .grids), tourState: tourState
+                )
             } label: {
                 StatBox(title: "Grids", value: "\(stats.uniqueGrids)", icon: "square.grid.3x3")
             }
             .buttonStyle(.plain)
 
             NavigationLink {
-                StatDetailView(category: .bands, items: stats.items(for: .bands), tourState: tourState)
+                StatDetailView(
+                    category: .bands, items: stats.items(for: .bands), tourState: tourState
+                )
             } label: {
                 StatBox(title: "Bands", value: "\(stats.uniqueBands)", icon: "waveform")
             }
             .buttonStyle(.plain)
 
             NavigationLink {
-                StatDetailView(category: .parks, items: stats.items(for: .parks), tourState: tourState)
+                StatDetailView(
+                    category: .parks, items: stats.items(for: .parks), tourState: tourState
+                )
             } label: {
                 ActivationsStatBox(successful: stats.successfulActivations)
             }
             .buttonStyle(.plain)
+        }
+    }
+
+    private func streakRow(title: String, streak: StreakInfo) -> some View {
+        HStack(spacing: 12) {
+            Text(title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .frame(width: 40, alignment: .leading)
+            StreakStatBox(streak: streak)
+            StreakStatBox(streak: streak, showLongest: true)
         }
     }
 }

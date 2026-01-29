@@ -178,7 +178,9 @@ struct ActivityGrid: View {
                     ForEach(0 ..< columnCount, id: \.self) { column in
                         VStack(spacing: spacing) {
                             ForEach(0 ..< rows, id: \.self) { row in
-                                let date = dateFor(column: column, row: row, totalColumns: columnCount)
+                                let date = dateFor(
+                                    column: column, row: row, totalColumns: columnCount
+                                )
                                 let count = activityData[date] ?? 0
 
                                 RoundedRectangle(cornerRadius: 2)

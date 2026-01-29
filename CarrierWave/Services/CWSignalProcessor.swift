@@ -439,7 +439,7 @@ actor CWSignalProcessor {
         bandpassFilter = BiquadFilter(
             centerFrequency: frequency,
             sampleRate: sampleRate,
-            q: 2.0
+            qFactor: 2.0
         )
         bandpassFilter.reset()
     }

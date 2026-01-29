@@ -40,8 +40,8 @@ struct GoertzelFilter {
     /// - Parameter samples: Audio samples (should be exactly blockSize samples)
     /// - Returns: Magnitude at the target frequency (normalized by block size)
     func processSamples(_ samples: [Float]) -> Float {
-        var s1: Double = 0.0
-        var s2: Double = 0.0
+        var s1 = 0.0
+        var s2 = 0.0
 
         // Main Goertzel recursion
         for sample in samples {
@@ -62,8 +62,8 @@ struct GoertzelFilter {
     /// - Parameter samples: Audio samples
     /// - Returns: Tuple of (real, imaginary) components
     func processComplex(_ samples: [Float]) -> (real: Double, imag: Double) {
-        var s1: Double = 0.0
-        var s2: Double = 0.0
+        var s1 = 0.0
+        var s2 = 0.0
 
         for sample in samples {
             let s0 = Double(sample) + coefficient * s1 - s2
@@ -113,7 +113,9 @@ struct GoertzelThreshold {
 
     /// Signal-to-noise ratio
     var signalToNoiseRatio: Float {
-        guard noiseFloor > 0.0001 else { return 0 }
+        guard noiseFloor > 0.0001 else {
+            return 0
+        }
         return signalPeak / noiseFloor
     }
 
@@ -393,7 +395,7 @@ actor GoertzelSignalProcessor {
     private let blockSize: Int
     private let blockDuration: Double
 
-    // Buffer for samples that don't fill a complete block
+    /// Buffer for samples that don't fill a complete block
     private var leftoverSamples: [Float] = []
 
     // Visualization
@@ -404,7 +406,7 @@ actor GoertzelSignalProcessor {
     private var runningMax: Float = 0.001
     private let maxDecay: Float = 0.9995
 
-    // Pre-computed Hamming window
+    /// Pre-computed Hamming window
     private lazy var hammingWindow: [Float] = {
         var window = [Float](repeating: 0, count: blockSize)
         for i in 0 ..< blockSize {

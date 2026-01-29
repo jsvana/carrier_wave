@@ -12,7 +12,9 @@ enum CWDecoderBackend: String, CaseIterable, Identifiable {
 
     // MARK: Internal
 
-    var id: String { rawValue }
+    var id: String {
+        rawValue
+    }
 
     var description: String {
         switch self {

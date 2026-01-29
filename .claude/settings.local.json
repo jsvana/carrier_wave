@@ -33,7 +33,8 @@
       "Bash(bd migrate:*)",
       "Bash(bd --no-daemon list:*)",
       "Bash(bd close:*)",
-      "Bash(make format:*)"
+      "Bash(make format:*)",
+      "Bash(swiftformat:*)"
     ]
   }
 }
