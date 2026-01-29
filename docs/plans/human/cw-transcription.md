@@ -16,6 +16,10 @@ A real-time CW (Morse code) transcription view that listens via the device micro
 
 ### Audio Processing Pipeline
 
+Two signal processing backends are available, selectable at runtime:
+
+#### Backend 1: Bandpass Filter (Default)
+
 Based on [cw-companion](https://github.com/cerkit/cw-companion) approach:
 
 ```
@@ -24,6 +28,23 @@ Microphone → Bandpass Filter → Envelope Detector → Threshold → Timing De
 AVAudioEngine   vDSP Biquad      Envelope         Adaptive      State Machine
                 @ 600Hz          Follower         Threshold     (dit/dah/space)
 ```
+
+#### Backend 2: Goertzel Algorithm
+
+Uses the Goertzel algorithm for efficient single-frequency detection:
+
+```
+Microphone → Block Buffer → Hamming Window → Goertzel DFT → Threshold → Timing Decoder → Text
+     ↓            ↓              ↓                ↓              ↓              ↓
+AVAudioEngine  128 samples    Reduce         Magnitude at    Adaptive      State Machine
+               (~3ms blocks)  Leakage        target freq     Threshold     (dit/dah/space)
+```
+
+The Goertzel algorithm computes `magnitude = sqrt(s1² + s2² - coeff*s1*s2)` where:
+- `coeff = 2 * cos(2π * targetFreq / sampleRate)`
+- Main recursion: `s0 = sample + coeff * s1 - s2`
+
+This approach is more computationally efficient for detecting a single frequency compared to FFT or bandpass filtering.
 
 #### 1. Audio Capture (AVFoundation)
 
@@ -274,24 +295,64 @@ final class CWTranscriptionService: ObservableObject {
 }
 ```
 
-### CWSignalProcessor
+### CWSignalProcessor Protocol
+
+Both backends conform to `CWSignalProcessorProtocol`:
 
 ```swift
-actor CWSignalProcessor {
-    private let bandpassFilter: BandpassFilter
-    private let envelopeFollower: EnvelopeFollower
-    private let threshold: AdaptiveThreshold
-
-    var toneFrequency: Float = 600  // Configurable
-
-    func process(_ audioBuffer: [Float]) -> CWSignalResult
+protocol CWSignalProcessorProtocol: Actor {
+    var currentToneFrequency: Double { get }
+    func process(samples: [Float], timestamp: TimeInterval) -> CWSignalResult
+    func setToneFrequency(_ frequency: Double)
+    func reset()
 }
 
+enum CWDecoderBackend: String, CaseIterable {
+    case bandpass = "Bandpass Filter"
+    case goertzel = "Goertzel"
+}
+```
+
+#### CWSignalProcessor (Bandpass Backend)
+
+```swift
+actor CWSignalProcessor: CWSignalProcessorProtocol {
+    private var bandpassFilter: BiquadFilter
+    private var envelopeFollower: EnvelopeFollower
+    private var threshold: AdaptiveThreshold
+
+    func process(samples: [Float], timestamp: TimeInterval) -> CWSignalResult
+}
+```
+
+#### GoertzelSignalProcessor (Goertzel Backend)
+
+```swift
+actor GoertzelSignalProcessor: CWSignalProcessorProtocol {
+    private var goertzelFilter: GoertzelFilter
+    private var threshold: GoertzelThreshold
+    private let blockSize: Int = 128  // ~3ms at 44.1kHz
+
+    func process(samples: [Float], timestamp: TimeInterval) -> CWSignalResult
+}
+
+struct GoertzelFilter {
+    let coefficient: Double  // 2 * cos(2π * k / N)
+    func processSamples(_ samples: [Float]) -> Float  // Returns magnitude
+}
+```
+
+#### CWSignalResult
+
+```swift
 struct CWSignalResult {
-    let filteredSamples: [Float]
-    let envelope: [Float]
-    let keyStates: [(isDown: Bool, duration: TimeInterval)]
+    let keyEvents: [(isDown: Bool, timestamp: TimeInterval)]
     let peakAmplitude: Float
+    let isKeyDown: Bool
+    let envelopeSamples: [Float]
+    let isCalibrating: Bool
+    let noiseFloor: Float
+    let signalToNoiseRatio: Float
 }
 ```
 
@@ -337,30 +398,30 @@ struct CWTranscriptionSettings {
 ## Implementation Phases
 
 ### Phase 1: Core Audio Pipeline
-- [ ] AVAudioEngine microphone capture
-- [ ] Bandpass filter implementation (vDSP)
-- [ ] Envelope follower
-- [ ] Basic threshold detection
+- [x] AVAudioEngine microphone capture
+- [x] Bandpass filter implementation (vDSP)
+- [x] Envelope follower
+- [x] Basic threshold detection
 - [ ] Unit tests with sample audio
 
 ### Phase 2: Morse Decoder
-- [ ] Timing state machine
-- [ ] Dit/dah/space classification
-- [ ] Character/word assembly
-- [ ] Adaptive WPM estimation
-- [ ] Morse code lookup table
+- [x] Timing state machine
+- [x] Dit/dah/space classification
+- [x] Character/word assembly
+- [x] Adaptive WPM estimation
+- [x] Morse code lookup table
 
 ### Phase 3: Basic UI
-- [ ] CWTranscriptionView layout
-- [ ] WaveformView visualization
-- [ ] TranscriptView with scrolling
-- [ ] Start/stop controls
-- [ ] WPM display
+- [x] CWTranscriptionView layout
+- [x] WaveformView visualization
+- [x] TranscriptView with scrolling
+- [x] Start/stop controls
+- [x] WPM display
 
 ### Phase 4: Callsign Detection
-- [ ] Callsign regex patterns
-- [ ] Highlight callsigns in transcript
-- [ ] DetectedCallsignBar with "Use" button
+- [x] Callsign regex patterns
+- [x] Highlight callsigns in transcript
+- [x] DetectedCallsignBar with "Use" button
 - [ ] QSO pattern recognition
 
 ### Phase 5: Logging Integration
@@ -371,10 +432,16 @@ struct CWTranscriptionSettings {
 
 ### Phase 6: Polish
 - [ ] Audio recording option
-- [ ] Copy transcript
-- [ ] Settings view
+- [x] Copy transcript
+- [x] Settings view (WPM, tone frequency, backend selection)
 - [ ] Haptic feedback
 - [ ] iPad layout
+
+### Phase 7: Alternative Backends
+- [x] CWSignalProcessorProtocol for backend abstraction
+- [x] GoertzelSignalProcessor implementation
+- [x] Backend selection UI (segmented control + menu)
+- [ ] Performance comparison/benchmarking
 
 ## Technical Considerations
 
@@ -396,7 +463,15 @@ struct CWTranscriptionSettings {
 
 ## References
 
+### Bandpass Filter Approach
 - [cw-companion](https://github.com/cerkit/cw-companion) - macOS CW decoder
 - [Apple Accelerate vDSP](https://developer.apple.com/documentation/accelerate/vdsp)
 - [AVAudioEngine](https://developer.apple.com/documentation/avfaudio/avaudioengine)
+
+### Goertzel Algorithm
+- [Goertzel Algorithm - Wikipedia](https://en.wikipedia.org/wiki/Goertzel_algorithm)
+- [Hackaday.io - Goertzel Algorithm](https://hackaday.io/project/180672/log/195058-getting-goertzels-algorithm-to-work)
+- [CWDecoder ESP32 + Goertzel](https://github.com/Christian-ALLEGRE/CWDecoder)
+
+### Morse Code
 - [Morse Code Timing](https://morsecode.world/international/timing.html)
