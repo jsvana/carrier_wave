@@ -286,3 +286,49 @@ extension View {
         )
     }
 }
+
+// MARK: - POTAPresenceRepairAlert
+
+/// Helper view modifier to show POTA presence repair alerts
+struct POTAPresenceRepairAlert: ViewModifier {
+    @Binding var mismarkedCount: Int
+    @Binding var showingAlert: Bool
+
+    let onRepair: () async -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .alert("POTA Upload Queue Issue", isPresented: $showingAlert) {
+                Button("Fix Now") {
+                    Task { await onRepair() }
+                }
+                Button("Not Now", role: .cancel) {}
+            } message: {
+                Text(
+                    """
+                    Found \(mismarkedCount) QSOs incorrectly marked for POTA upload. \
+                    These QSOs don't have a park reference and shouldn't be uploaded to POTA.
+
+                    Tap "Fix Now" to correct this. If you skip this, the POTA upload count \
+                    will be inflated and these QSOs will fail to upload.
+                    """
+                )
+            }
+    }
+}
+
+extension View {
+    func potaPresenceRepairAlert(
+        mismarkedCount: Binding<Int>,
+        showingAlert: Binding<Bool>,
+        onRepair: @escaping () async -> Void
+    ) -> some View {
+        modifier(
+            POTAPresenceRepairAlert(
+                mismarkedCount: mismarkedCount,
+                showingAlert: showingAlert,
+                onRepair: onRepair
+            )
+        )
+    }
+}

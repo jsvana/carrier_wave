@@ -151,6 +151,10 @@ class ImportService: ObservableObject {
                 modelContext.insert(presence)
                 qso.servicePresence.append(presence)
             } else if service.supportsUpload {
+                // POTA uploads only apply to QSOs where user was activating from a park
+                if service == .pota, qso.parkReference?.isEmpty ?? true {
+                    continue
+                }
                 let presence = ServicePresence.needsUpload(to: service, qso: qso)
                 modelContext.insert(presence)
                 qso.servicePresence.append(presence)

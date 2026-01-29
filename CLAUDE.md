@@ -105,6 +105,7 @@
 | `ActivityReporter.swift` | Report detected activities to server |
 | `SyncService+Activity.swift` | Hook activity detection into sync flow |
 | `ActivityFeedSyncService.swift` | Sync activity feed from server |
+| `POTAPresenceRepairService.swift` | Detect and fix incorrectly marked POTA service presence |
 
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |

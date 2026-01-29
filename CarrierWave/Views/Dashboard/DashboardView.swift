@@ -54,6 +54,10 @@ struct DashboardView: View {
     @State var unconfiguredCallsigns: Set<String> = []
     @State var showingCallsignAliasAlert = false
 
+    /// POTA presence repair state
+    @State var mismarkedPOTACount = 0
+    @State var showingPOTARepairAlert = false
+
     let lofiClient = LoFiClient()
     let qrzClient = QRZClient()
     let hamrsClient = HAMRSClient()
@@ -89,6 +93,7 @@ struct DashboardView: View {
             }
             .task {
                 await checkForUnconfiguredCallsigns()
+                await checkForMismarkedPOTAPresence()
             }
             .callsignAliasDetectionAlert(
                 unconfiguredCallsigns: $unconfiguredCallsigns,
@@ -98,6 +103,11 @@ struct DashboardView: View {
                     selectedTab = .settings
                     settingsDestination = nil
                 }
+            )
+            .potaPresenceRepairAlert(
+                mismarkedCount: $mismarkedPOTACount,
+                showingAlert: $showingPOTARepairAlert,
+                onRepair: { await repairMismarkedPOTAPresence() }
             )
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {

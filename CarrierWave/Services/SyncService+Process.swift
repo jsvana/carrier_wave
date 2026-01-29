@@ -69,11 +69,14 @@ extension SyncService {
 
         // Create presence record for ALL services
         for service in ServiceType.allCases {
+            // POTA uploads only apply to QSOs where user was activating from a park
+            let skipPOTAUpload = service == .pota && (newQSO.parkReference?.isEmpty ?? true)
+
             let presence =
                 if sources.contains(service) {
                     // QSO came from this service - mark as present
                     ServicePresence.downloaded(from: service, qso: newQSO)
-                } else if service.supportsUpload {
+                } else if service.supportsUpload, !skipPOTAUpload {
                     // Bidirectional service without this QSO - needs upload
                     ServicePresence.needsUpload(to: service, qso: newQSO)
                 } else {
@@ -254,9 +257,12 @@ extension SyncService {
     /// Create presence records for a newly created QSO
     private func createPresenceForNewQSO(_ qso: QSO, source: ServiceType) {
         for service in ServiceType.allCases {
+            // POTA uploads only apply to QSOs where user was activating from a park
+            let skipPOTAUpload = service == .pota && (qso.parkReference?.isEmpty ?? true)
+
             let presence = if service == source {
                 ServicePresence.downloaded(from: service, qso: qso)
-            } else if service.supportsUpload {
+            } else if service.supportsUpload, !skipPOTAUpload {
                 ServicePresence.needsUpload(to: service, qso: qso)
             } else {
                 ServicePresence(serviceType: service, isPresent: false, qso: qso)

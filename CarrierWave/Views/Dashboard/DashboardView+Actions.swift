@@ -266,4 +266,32 @@ extension DashboardView {
         }
         unconfiguredCallsigns = []
     }
+
+    // MARK: - POTA Presence Repair
+
+    /// Check for QSOs incorrectly marked for POTA upload (no park reference but needsUpload=true)
+    func checkForMismarkedPOTAPresence() async {
+        let repairService = POTAPresenceRepairService(modelContext: modelContext)
+        do {
+            let count = try repairService.countMismarkedQSOs()
+            if count > 0 {
+                mismarkedPOTACount = count
+                showingPOTARepairAlert = true
+            }
+        } catch {
+            print("Failed to check for mismarked POTA presence: \(error)")
+        }
+    }
+
+    /// Repair incorrectly marked POTA service presence records
+    func repairMismarkedPOTAPresence() async {
+        let repairService = POTAPresenceRepairService(modelContext: modelContext)
+        do {
+            let result = try repairService.repairMismarkedQSOs()
+            print("Repaired \(result.repairedCount) mismarked POTA presence records")
+            mismarkedPOTACount = 0
+        } catch {
+            print("Failed to repair mismarked POTA presence: \(error)")
+        }
+    }
 }
