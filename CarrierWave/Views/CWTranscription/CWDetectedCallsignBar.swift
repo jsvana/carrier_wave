@@ -4,6 +4,8 @@ import SwiftUI
 
 /// Displays the most recently detected callsign with a "Use" button
 struct CWDetectedCallsignBar: View {
+    // MARK: Internal
+
     /// The detected callsign to display
     let callsign: DetectedCallsign?
 
@@ -12,8 +14,6 @@ struct CWDetectedCallsignBar: View {
 
     /// Callback when user taps "Use"
     let onUse: (String) -> Void
-
-    @State private var showingPicker = false
 
     var body: some View {
         if let detected = callsign {
@@ -69,6 +69,10 @@ struct CWDetectedCallsignBar: View {
         }
     }
 
+    // MARK: Private
+
+    @State private var showingPicker = false
+
     private func callsignColor(for context: DetectedCallsign.CallsignContext) -> Color {
         switch context {
         case .cqCall:
@@ -109,6 +113,8 @@ struct CWCallsignChip: View {
 
 /// Displays CW text with highlighted callsigns and prosigns
 struct CWHighlightedText: View {
+    // MARK: Internal
+
     let elements: [CWTextElement]
 
     var body: some View {
@@ -116,6 +122,8 @@ struct CWHighlightedText: View {
             result + text(for: element)
         }
     }
+
+    // MARK: Private
 
     private func text(for element: CWTextElement) -> Text {
         switch element {

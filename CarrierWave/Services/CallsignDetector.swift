@@ -4,10 +4,7 @@ import Foundation
 
 /// A callsign detected in the transcript with context
 struct DetectedCallsign: Identifiable, Equatable {
-    let id: UUID
-    let callsign: String
-    let context: CallsignContext
-    let timestamp: Date
+    // MARK: Lifecycle
 
     init(id: UUID = UUID(), callsign: String, context: CallsignContext, timestamp: Date = Date()) {
         self.id = id
@@ -16,6 +13,8 @@ struct DetectedCallsign: Identifiable, Equatable {
         self.timestamp = timestamp
     }
 
+    // MARK: Internal
+
     /// Context in which the callsign was detected
     enum CallsignContext: Equatable {
         case cqCall // Station calling CQ
@@ -23,6 +22,11 @@ struct DetectedCallsign: Identifiable, Equatable {
         case response // Station responding
         case unknown // Callsign without clear context
     }
+
+    let id: UUID
+    let callsign: String
+    let context: CallsignContext
+    let timestamp: Date
 }
 
 // MARK: - CWTextElement
@@ -34,6 +38,15 @@ enum CWTextElement: Identifiable, Equatable {
     case prosign(String)
     case signalReport(String)
 
+    // MARK: Internal
+
+    /// Role of the callsign in the QSO
+    enum CallsignRole: Equatable {
+        case caller // Station calling (after CQ or before DE)
+        case callee // Station being called (after DE)
+        case unknown
+    }
+
     var id: String {
         switch self {
         case let .text(str): "text-\(str)"
@@ -42,43 +55,13 @@ enum CWTextElement: Identifiable, Equatable {
         case let .signalReport(str): "rst-\(str)"
         }
     }
-
-    /// Role of the callsign in the QSO
-    enum CallsignRole: Equatable {
-        case caller // Station calling (after CQ or before DE)
-        case callee // Station being called (after DE)
-        case unknown
-    }
 }
 
 // MARK: - CallsignDetector
 
 /// Detects and extracts callsigns from decoded CW text
-struct CallsignDetector {
-    // MARK: - Callsign Pattern
-
-    /// International amateur radio callsign pattern
-    /// Format: Prefix (1-3 alphanumeric) + Number + Suffix (1-4 letters)
-    /// Examples: W1AW, VK2ABC, JA1XYZ, 9A2AA, 3DA0RS
-    private static let callsignPattern = #"[A-Z0-9]{1,3}[0-9][A-Z]{1,4}"#
-
-    /// Signal report pattern (RST format)
-    private static let signalReportPattern = #"\b[1-5][1-9][1-9]?\b"#
-
-    /// Common prosigns to identify
-    private static let prosigns = Set(["CQ", "DE", "K", "KN", "BK", "SK", "AR", "BT", "AS", "R", "TU", "QSL"])
-
-    /// Compiled regex for callsigns
-    private static let callsignRegex = try? NSRegularExpression(
-        pattern: callsignPattern,
-        options: [.caseInsensitive]
-    )
-
-    /// Compiled regex for signal reports
-    private static let rstRegex = try? NSRegularExpression(
-        pattern: signalReportPattern,
-        options: []
-    )
+enum CallsignDetector {
+    // MARK: Internal
 
     // MARK: - Public API
 
@@ -86,7 +69,9 @@ struct CallsignDetector {
     /// - Parameter text: Decoded CW text
     /// - Returns: Array of unique callsigns found
     static func extractCallsigns(from text: String) -> [String] {
-        guard let regex = callsignRegex else { return [] }
+        guard let regex = callsignRegex else {
+            return []
+        }
 
         let range = NSRange(text.startIndex..., in: text)
         let matches = regex.matches(in: text.uppercased(), options: [], range: range)
@@ -119,7 +104,9 @@ struct CallsignDetector {
         var candidates: [DetectedCallsign] = []
 
         for (index, word) in words.enumerated() {
-            guard isValidCallsign(word) else { continue }
+            guard isValidCallsign(word) else {
+                continue
+            }
 
             // Check context
             let context = determineContext(for: word, at: index, in: words)
@@ -156,10 +143,14 @@ struct CallsignDetector {
         let matches = regex.matches(in: uppercased, options: [], range: nsRange)
 
         for match in matches {
-            guard let range = Range(match.range, in: uppercased) else { continue }
+            guard let range = Range(match.range, in: uppercased) else {
+                continue
+            }
 
             let callsign = String(uppercased[range])
-            guard isValidCallsign(callsign) else { continue }
+            guard isValidCallsign(callsign) else {
+                continue
+            }
 
             // Add text before this callsign
             if currentIndex < range.lowerBound {
@@ -185,22 +176,57 @@ struct CallsignDetector {
         return elements.isEmpty ? [.text(text)] : elements
     }
 
+    // MARK: Private
+
+    // MARK: - Callsign Pattern
+
+    /// International amateur radio callsign pattern
+    /// Format: Prefix (1-3 alphanumeric) + Number + Suffix (1-4 letters)
+    /// Examples: W1AW, VK2ABC, JA1XYZ, 9A2AA, 3DA0RS
+    private static let callsignPattern = #"[A-Z0-9]{1,3}[0-9][A-Z]{1,4}"#
+
+    /// Signal report pattern (RST format)
+    private static let signalReportPattern = #"\b[1-5][1-9][1-9]?\b"#
+
+    /// Common prosigns to identify
+    private static let prosigns = Set(["CQ", "DE", "K", "KN", "BK", "SK", "AR", "BT", "AS", "R", "TU", "QSL"])
+
+    /// Compiled regex for callsigns
+    private static let callsignRegex = try? NSRegularExpression(
+        pattern: callsignPattern,
+        options: [.caseInsensitive]
+    )
+
+    /// Compiled regex for signal reports
+    private static let rstRegex = try? NSRegularExpression(
+        pattern: signalReportPattern,
+        options: []
+    )
+
     // MARK: - Private Helpers
 
     /// Validate that a string is a plausible callsign
     private static func isValidCallsign(_ candidate: String) -> Bool {
         // Must be at least 4 characters (e.g., W1AW)
-        guard candidate.count >= 4 else { return false }
+        guard candidate.count >= 4 else {
+            return false
+        }
 
         // Must not be all numbers
-        guard candidate.contains(where: { $0.isLetter }) else { return false }
+        guard candidate.contains(where: \.isLetter) else {
+            return false
+        }
 
         // Must contain at least one number
-        guard candidate.contains(where: { $0.isNumber }) else { return false }
+        guard candidate.contains(where: \.isNumber) else {
+            return false
+        }
 
         // Filter out common false positives
         let falsePositives = Set(["1ST", "2ND", "3RD", "4TH", "5TH", "73S", "88S", "599S"])
-        if falsePositives.contains(candidate) { return false }
+        if falsePositives.contains(candidate) {
+            return false
+        }
 
         return true
     }
@@ -270,7 +296,9 @@ struct CallsignDetector {
 
         for word in words {
             let trimmed = word.trimmingCharacters(in: .whitespaces)
-            guard !trimmed.isEmpty else { continue }
+            guard !trimmed.isEmpty else {
+                continue
+            }
 
             if prosigns.contains(trimmed) {
                 elements.append(.prosign(trimmed))
@@ -292,15 +320,25 @@ struct CallsignDetector {
 
     /// Check if text is a signal report (RST format)
     private static func isSignalReport(_ text: String) -> Bool {
-        guard text.count == 3 || text.count == 2 else { return false }
-        guard text.allSatisfy({ $0.isNumber }) else { return false }
+        guard text.count == 3 || text.count == 2 else {
+            return false
+        }
+        guard text.allSatisfy(\.isNumber) else {
+            return false
+        }
 
         // RST: R=1-5, S=1-9, T=1-9 (optional)
         let chars = Array(text)
-        guard let r = chars[0].wholeNumberValue, r >= 1, r <= 5 else { return false }
-        guard let s = chars[1].wholeNumberValue, s >= 1, s <= 9 else { return false }
+        guard let readability = chars[0].wholeNumberValue, readability >= 1, readability <= 5 else {
+            return false
+        }
+        guard let strength = chars[1].wholeNumberValue, strength >= 1, strength <= 9 else {
+            return false
+        }
         if chars.count == 3 {
-            guard let t = chars[2].wholeNumberValue, t >= 1, t <= 9 else { return false }
+            guard let tone = chars[2].wholeNumberValue, tone >= 1, tone <= 9 else {
+                return false
+            }
         }
 
         return true

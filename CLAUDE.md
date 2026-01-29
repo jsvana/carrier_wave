@@ -120,7 +120,7 @@
 | File | Purpose |
 |------|---------|
 | `CWTranscriptionView.swift` | Main CW transcription container with controls |
-| `CWWaveformView.swift` | Real-time audio waveform visualization |
+| `CWWaveformView.swift` | Real-time audio waveform visualization, includes CWLevelMeter |
 | `CWTranscriptView.swift` | Decoded text display with timestamps |
 | `CWDetectedCallsignBar.swift` | Detected callsign display with "Use" button, highlighted text |
 

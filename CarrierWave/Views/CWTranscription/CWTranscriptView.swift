@@ -5,18 +5,13 @@ import SwiftUI
 /// Displays the decoded CW transcript with timestamps.
 /// Auto-scrolls to show the latest decoded text.
 struct CWTranscriptView: View {
+    // MARK: Internal
+
     /// Completed transcript entries
     let entries: [CWTranscriptEntry]
 
     /// Current line being assembled
     let currentLine: String
-
-    /// Formatter for timestamps
-    private let timeFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm:ss"
-        return formatter
-    }()
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -55,30 +50,15 @@ struct CWTranscriptView: View {
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
-    @ViewBuilder
-    private func transcriptRow(entry: CWTranscriptEntry) -> some View {
-        HStack(alignment: .top, spacing: 8) {
-            // Timestamp
-            Text(timeFormatter.string(from: entry.timestamp))
-                .font(.caption.monospaced())
-                .foregroundStyle(.secondary)
-                .frame(width: 60, alignment: .leading)
+    // MARK: Private
 
-            // Decoded text with highlighting
-            if !entry.elements.isEmpty {
-                CWHighlightedText(elements: entry.elements)
-                    .font(.body.monospaced())
-            } else {
-                Text(entry.text)
-                    .font(.body.monospaced())
-                    .foregroundStyle(.primary)
-            }
+    /// Formatter for timestamps
+    private let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm:ss"
+        return formatter
+    }()
 
-            Spacer()
-        }
-    }
-
-    @ViewBuilder
     private var currentLineRow: some View {
         HStack(alignment: .top, spacing: 8) {
             // Timestamp placeholder
@@ -100,13 +80,35 @@ struct CWTranscriptView: View {
             Spacer()
         }
     }
+
+    private func transcriptRow(entry: CWTranscriptEntry) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            // Timestamp
+            Text(timeFormatter.string(from: entry.timestamp))
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .frame(width: 60, alignment: .leading)
+
+            // Decoded text with highlighting
+            if !entry.elements.isEmpty {
+                CWHighlightedText(elements: entry.elements)
+                    .font(.body.monospaced())
+            } else {
+                Text(entry.text)
+                    .font(.body.monospaced())
+                    .foregroundStyle(.primary)
+            }
+
+            Spacer()
+        }
+    }
 }
 
 // MARK: - CursorView
 
 /// Blinking cursor indicator
 private struct CursorView: View {
-    @State private var isVisible = true
+    // MARK: Internal
 
     var body: some View {
         Rectangle()
@@ -119,6 +121,10 @@ private struct CursorView: View {
                 }
             }
     }
+
+    // MARK: Private
+
+    @State private var isVisible = true
 }
 
 // MARK: - CWEmptyTranscriptView

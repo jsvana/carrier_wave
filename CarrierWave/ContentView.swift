@@ -6,6 +6,7 @@ import SwiftUI
 enum AppTab: Hashable, CaseIterable {
     case dashboard
     case logs
+    case cwDecoder
     case map
     case activity
     case settings
@@ -16,6 +17,7 @@ enum AppTab: Hashable, CaseIterable {
         switch self {
         case .dashboard: "Dashboard"
         case .logs: "Logs"
+        case .cwDecoder: "CW"
         case .map: "Map"
         case .activity: "Activity"
         case .settings: "Settings"
@@ -26,6 +28,7 @@ enum AppTab: Hashable, CaseIterable {
         switch self {
         case .dashboard: "square.grid.2x2"
         case .logs: "list.bullet"
+        case .cwDecoder: "waveform"
         case .map: "map"
         case .activity: "person.2"
         case .settings: "gear"
@@ -182,6 +185,9 @@ struct ContentView: View {
                 lotwClient: lotwClient,
                 tourState: tourState
             )
+
+        case .cwDecoder:
+            CWTranscriptionView()
 
         case .map:
             NavigationStack {

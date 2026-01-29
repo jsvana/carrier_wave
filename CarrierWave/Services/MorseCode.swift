@@ -4,6 +4,41 @@ import Foundation
 
 /// Morse code lookup table and utilities
 enum MorseCode {
+    // MARK: - Timing Constants
+
+    /// Standard Morse timing relationships
+    /// All times are relative to one "unit" (the length of a dit)
+    enum Timing {
+        /// Dit length = 1 unit
+        static let ditUnits: Double = 1.0
+
+        /// Dah length = 3 units
+        static let dahUnits: Double = 3.0
+
+        /// Inter-element gap (within character) = 1 unit
+        static let elementGapUnits: Double = 1.0
+
+        /// Inter-character gap = 3 units
+        static let charGapUnits: Double = 3.0
+
+        /// Inter-word gap = 7 units
+        static let wordGapUnits: Double = 7.0
+
+        /// Calculate unit duration in seconds from WPM
+        /// PARIS standard: "PARIS" = 50 units, so at W WPM, unit = 1.2/W seconds
+        static func unitDuration(forWPM wpm: Int) -> TimeInterval {
+            1.2 / Double(wpm)
+        }
+
+        /// Calculate WPM from unit duration
+        static func wpm(fromUnitDuration duration: TimeInterval) -> Int {
+            guard duration > 0 else {
+                return 20
+            }
+            return max(5, min(60, Int(1.2 / duration)))
+        }
+    }
+
     // MARK: - Morse to Character Mapping
 
     /// Standard International Morse Code mapping
@@ -71,79 +106,25 @@ enum MorseCode {
         ".--.-.": "@",
 
         // Prosigns (procedural signals) - common in amateur radio
+        // Note: Some prosigns share patterns with punctuation/letters.
+        // The standard characters are preferred; prosigns are documented in abbreviations.
         "-.-.-": "<CT>", // Start copying / attention
         ".-.-": "<AA>", // New line / new section
-        "...-.-": "<SK>", // End of contact
-        "-...-": "<BT>", // Break / pause
-        ".-...": "<AS>", // Wait
         "...-.": "<SN>", // Understood / verified
-        "-.-": "<K>", // Go ahead / over (same as K letter)
-        "-.--.": "<KN>", // Go ahead, named station only
-        "-.--.-": "<KN>", // Alternative KN
-        "...-.-": "<VA>", // End of work (same as SK)
         "........": "<HH>", // Error / correction
+        // SK/VA = "...-.-", BT = "-...-", AS = ".-...", K = "-.-", KN = "-.--."
+        // These conflict with =, &, (, ), K - standard chars take precedence
     ]
 
     /// Character to Morse mapping (reverse of morseToChar)
     static let charToMorse: [String: String] = {
         var result: [String: String] = [:]
-        for (morse, char) in morseToChar {
+        for (morse, char) in morseToChar where !char.hasPrefix("<") {
             // Skip prosigns for reverse lookup (use letter form)
-            if !char.hasPrefix("<") {
-                result[char] = morse
-            }
+            result[char] = morse
         }
         return result
     }()
-
-    // MARK: - Timing Constants
-
-    /// Standard Morse timing relationships
-    /// All times are relative to one "unit" (the length of a dit)
-    enum Timing {
-        /// Dit length = 1 unit
-        static let ditUnits: Double = 1.0
-
-        /// Dah length = 3 units
-        static let dahUnits: Double = 3.0
-
-        /// Inter-element gap (within character) = 1 unit
-        static let elementGapUnits: Double = 1.0
-
-        /// Inter-character gap = 3 units
-        static let charGapUnits: Double = 3.0
-
-        /// Inter-word gap = 7 units
-        static let wordGapUnits: Double = 7.0
-
-        /// Calculate unit duration in seconds from WPM
-        /// PARIS standard: "PARIS" = 50 units, so at W WPM, unit = 1.2/W seconds
-        static func unitDuration(forWPM wpm: Int) -> TimeInterval {
-            1.2 / Double(wpm)
-        }
-
-        /// Calculate WPM from unit duration
-        static func wpm(fromUnitDuration duration: TimeInterval) -> Int {
-            guard duration > 0 else { return 20 }
-            return max(5, min(60, Int(1.2 / duration)))
-        }
-    }
-
-    // MARK: - Decoding
-
-    /// Decode a morse pattern to a character
-    /// - Parameter pattern: Morse pattern string (e.g., ".-" for A)
-    /// - Returns: Decoded character or nil if not found
-    static func decode(_ pattern: String) -> String? {
-        morseToChar[pattern]
-    }
-
-    /// Encode a character to morse
-    /// - Parameter char: Character to encode
-    /// - Returns: Morse pattern or nil if not encodable
-    static func encode(_ char: Character) -> String? {
-        charToMorse[String(char).uppercased()]
-    }
 
     // MARK: - Common QSO Abbreviations
 
@@ -199,4 +180,20 @@ enum MorseCode {
         "XYL": "Wife",
         "YL": "Young lady (female operator)",
     ]
+
+    // MARK: - Decoding
+
+    /// Decode a morse pattern to a character
+    /// - Parameter pattern: Morse pattern string (e.g., ".-" for A)
+    /// - Returns: Decoded character or nil if not found
+    static func decode(_ pattern: String) -> String? {
+        morseToChar[pattern]
+    }
+
+    /// Encode a character to morse
+    /// - Parameter char: Character to encode
+    /// - Returns: Morse pattern or nil if not encodable
+    static func encode(_ char: Character) -> String? {
+        charToMorse[String(char).uppercased()]
+    }
 }
