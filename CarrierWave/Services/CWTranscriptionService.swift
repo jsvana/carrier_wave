@@ -6,19 +6,23 @@ import SwiftUI
 
 /// A single entry in the CW transcript
 struct CWTranscriptEntry: Identifiable, Equatable {
-    let id: UUID
-    let timestamp: Date
-    let text: String
-    let elements: [CWTextElement]
-    let isWordSpace: Bool
+    // MARK: Lifecycle
 
     init(id: UUID = UUID(), timestamp: Date = Date(), text: String, isWordSpace: Bool = false) {
         self.id = id
         self.timestamp = timestamp
         self.text = text
-        self.elements = CallsignDetector.parseElements(from: text)
+        elements = CallsignDetector.parseElements(from: text)
         self.isWordSpace = isWordSpace
     }
+
+    // MARK: Internal
+
+    let id: UUID
+    let timestamp: Date
+    let text: String
+    let elements: [CWTextElement]
+    let isWordSpace: Bool
 }
 
 // MARK: - CWTranscriptionState
@@ -30,21 +34,41 @@ enum CWTranscriptionState: Equatable {
     case error(String)
 }
 
+// MARK: - NoiseFloorQuality
+
+/// Quality assessment of the noise floor
+enum NoiseFloorQuality: String {
+    case excellent = "Excellent"
+    case good = "Good"
+    case fair = "Fair"
+    case poor = "Poor"
+    case unusable = "Too Noisy"
+
+    // MARK: Internal
+
+    var color: String {
+        switch self {
+        case .excellent: "green"
+        case .good: "green"
+        case .fair: "yellow"
+        case .poor: "orange"
+        case .unusable: "red"
+        }
+    }
+}
+
 // MARK: - CWTranscriptionService
 
 /// Main service coordinating CW audio capture, signal processing, and decoding.
 /// Publishes state updates for UI consumption.
 @MainActor
 final class CWTranscriptionService: ObservableObject {
+    // MARK: Internal
+
     // MARK: - Published State
 
     /// Current transcription state
     @Published private(set) var state: CWTranscriptionState = .idle
-
-    /// Whether currently listening
-    var isListening: Bool {
-        state == .listening
-    }
 
     /// Estimated WPM from decoder
     @Published private(set) var estimatedWPM: Int = 20
@@ -61,14 +85,50 @@ final class CWTranscriptionService: ObservableObject {
     /// Peak amplitude for level meter (0.0-1.0)
     @Published private(set) var peakAmplitude: Float = 0
 
+    /// Whether still in calibration period
+    @Published private(set) var isCalibrating: Bool = true
+
     /// Recent envelope samples for waveform visualization
     @Published private(set) var waveformSamples: [Float] = []
+
+    /// Current noise floor level (0.0-1.0, normalized)
+    @Published private(set) var noiseFloor: Float = 0
+
+    /// Current signal-to-noise ratio
+    @Published private(set) var signalToNoiseRatio: Float = 0
 
     /// Most recently detected callsign from transcript
     @Published private(set) var detectedCallsign: DetectedCallsign?
 
     /// All callsigns detected in current session
     @Published private(set) var detectedCallsigns: [String] = []
+
+    /// Whether currently listening
+    var isListening: Bool {
+        state == .listening
+    }
+
+    /// Whether noise floor is too high for reliable CW detection
+    /// Noise is considered too high when it's above 0.3 (30% of dynamic range)
+    var isNoiseTooHigh: Bool {
+        noiseFloor > 0.3
+    }
+
+    /// Noise floor quality description for UI
+    var noiseFloorQuality: NoiseFloorQuality {
+        switch noiseFloor {
+        case 0 ..< 0.1:
+            .excellent
+        case 0.1 ..< 0.2:
+            .good
+        case 0.2 ..< 0.3:
+            .fair
+        case 0.3 ..< 0.5:
+            .poor
+        default:
+            .unusable
+        }
+    }
 
     /// Tone frequency for bandpass filter
     @Published var toneFrequency: Double = 600 {
@@ -79,33 +139,22 @@ final class CWTranscriptionService: ObservableObject {
         }
     }
 
-    // MARK: - Private Properties
-
-    private var audioCapture: CWAudioCapture?
-    private var signalProcessor: CWSignalProcessor?
-    private var morseDecoder: MorseDecoder?
-
-    private var captureTask: Task<Void, Never>?
-    private var timeoutTask: Task<Void, Never>?
-
-    /// Maximum entries to keep in transcript
-    private let maxTranscriptEntries = 100
-
-    /// Characters per line before wrapping
-    private let lineWrapLength = 40
-
     // MARK: - Public API
 
     /// Start listening and transcribing CW
     func startListening() async {
-        guard state != .listening else { return }
+        guard state != .listening else {
+            return
+        }
 
         do {
             // Create fresh instances
             audioCapture = CWAudioCapture()
-            guard let capture = audioCapture else { return }
+            guard let capture = audioCapture else {
+                return
+            }
 
-            let sampleRate = 44100.0 // Standard sample rate
+            let sampleRate = 44_100.0 // Standard sample rate
             signalProcessor = CWSignalProcessor(
                 sampleRate: sampleRate,
                 toneFrequency: toneFrequency
@@ -123,9 +172,8 @@ final class CWTranscriptionService: ObservableObject {
 
             // Start timeout checker
             startTimeoutChecker()
-
         } catch let error as CWError {
-            state = .error(error.localizedDescription ?? "Unknown error")
+            state = .error(error.localizedDescription)
         } catch {
             state = .error(error.localizedDescription)
         }
@@ -149,6 +197,9 @@ final class CWTranscriptionService: ObservableObject {
         state = .idle
         isKeyDown = false
         peakAmplitude = 0
+        isCalibrating = true
+        noiseFloor = 0
+        signalToNoiseRatio = 0
     }
 
     /// Clear the transcript
@@ -175,14 +226,35 @@ final class CWTranscriptionService: ObservableObject {
         }
     }
 
+    // MARK: Private
+
+    // MARK: - Private Properties
+
+    private var audioCapture: CWAudioCapture?
+    private var signalProcessor: CWSignalProcessor?
+    private var morseDecoder: MorseDecoder?
+
+    private var captureTask: Task<Void, Never>?
+    private var timeoutTask: Task<Void, Never>?
+
+    /// Maximum entries to keep in transcript
+    private let maxTranscriptEntries = 100
+
+    /// Characters per line before wrapping
+    private let lineWrapLength = 40
+
     // MARK: - Private Methods
 
     private func processAudioStream(_ stream: AsyncStream<CWAudioCapture.AudioBuffer>) async {
         for await buffer in stream {
-            guard !Task.isCancelled else { break }
+            guard !Task.isCancelled else {
+                break
+            }
 
             // Process through signal processor
-            guard let processor = signalProcessor else { continue }
+            guard let processor = signalProcessor else {
+                continue
+            }
             let result = await processor.process(samples: buffer.samples, timestamp: buffer.timestamp)
 
             // Update UI state
@@ -190,10 +262,15 @@ final class CWTranscriptionService: ObservableObject {
                 self.isKeyDown = result.isKeyDown
                 self.peakAmplitude = result.peakAmplitude
                 self.waveformSamples = result.envelopeSamples
+                self.isCalibrating = result.isCalibrating
+                self.noiseFloor = result.noiseFloor
+                self.signalToNoiseRatio = result.signalToNoiseRatio
             }
 
             // Process key events through decoder
-            guard let decoder = morseDecoder else { continue }
+            guard let decoder = morseDecoder else {
+                continue
+            }
             for event in result.keyEvents {
                 let outputs = await decoder.processKeyEvent(isKeyDown: event.isDown, timestamp: event.timestamp)
                 await processDecoderOutputs(outputs)
@@ -213,10 +290,12 @@ final class CWTranscriptionService: ObservableObject {
         for output in outputs {
             switch output {
             case let .character(char):
+                print("[CW] Service received character: '\(char)'")
                 await MainActor.run {
                     appendCharacter(char)
                 }
             case .wordSpace:
+                print("[CW] Service received word space")
                 await MainActor.run {
                     appendWordSpace()
                 }
@@ -244,7 +323,9 @@ final class CWTranscriptionService: ObservableObject {
     }
 
     private func flushCurrentLine() {
-        guard !currentLine.isEmpty else { return }
+        guard !currentLine.isEmpty else {
+            return
+        }
 
         // Find last space for word boundary
         let text: String
@@ -292,7 +373,9 @@ final class CWTranscriptionService: ObservableObject {
             while !Task.isCancelled {
                 try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
 
-                guard let decoder = morseDecoder else { continue }
+                guard let decoder = morseDecoder else {
+                    continue
+                }
                 let outputs = await decoder.checkTimeout(currentTime: Date().timeIntervalSinceReferenceDate)
                 await processDecoderOutputs(outputs)
             }

@@ -10,6 +10,8 @@ enum MorseElement: Equatable {
     case charGap // Gap between characters
     case wordGap // Gap between words
 
+    // MARK: Internal
+
     var symbol: String {
         switch self {
         case .dit: "."
@@ -40,55 +42,21 @@ enum DecodedOutput: Equatable {
 /// Decodes morse code from key timing events.
 /// Uses adaptive timing to estimate WPM and classify elements.
 actor MorseDecoder {
-    // MARK: - Configuration
+    // MARK: Lifecycle
 
-    /// Minimum WPM to consider (prevents unreasonably slow detection)
-    private let minWPM: Int = 5
+    // MARK: - Initialization
 
-    /// Maximum WPM to consider (prevents unreasonably fast detection)
-    private let maxWPM: Int = 60
+    init(initialWPM: Int = 20) {
+        estimatedWPM = initialWPM
+        unitDuration = MorseCode.Timing.unitDuration(forWPM: initialWPM)
+    }
 
-    /// Initial WPM estimate
-    private let initialWPM: Int = 20
-
-    /// Tolerance factor for timing classification (allows for human variation)
-    private let timingTolerance: Double = 0.5
+    // MARK: Internal
 
     // MARK: - State
 
     /// Current estimated WPM
     private(set) var estimatedWPM: Int
-
-    /// Estimated unit duration in seconds
-    private var unitDuration: TimeInterval
-
-    /// Current morse pattern being assembled
-    private var currentPattern: String = ""
-
-    /// Last key state
-    private var lastKeyDown: Bool = false
-
-    /// Timestamp of last state change
-    private var lastStateChange: TimeInterval = 0
-
-    /// Recent element durations for WPM estimation (key-down only)
-    private var recentDurations: [TimeInterval] = []
-
-    /// Maximum durations to keep for averaging
-    private let maxDurationSamples: Int = 20
-
-    /// Time since last element (for detecting timeouts)
-    private var lastElementTime: TimeInterval = 0
-
-    /// Timeout for completing a character (in unit durations)
-    private let charTimeoutUnits: Double = 5.0
-
-    // MARK: - Initialization
-
-    init(initialWPM: Int = 20) {
-        self.estimatedWPM = initialWPM
-        unitDuration = MorseCode.Timing.unitDuration(forWPM: initialWPM)
-    }
 
     // MARK: - Public API
 
@@ -112,21 +80,42 @@ actor MorseDecoder {
 
         if lastKeyDown, !isKeyDown {
             // Key was down, now up: classify the tone duration
+            // Filter out noise spikes that are too short to be valid morse
+            if duration < minimumToneDuration {
+                let durationMs = String(format: "%.1f", duration * 1_000)
+                let minMs = String(format: "%.1f", minimumToneDuration * 1_000)
+                print("[CW] Ignoring noise spike: \(durationMs)ms (min: \(minMs)ms)")
+                lastKeyDown = isKeyDown
+                lastStateChange = timestamp
+                return outputs
+            }
+
             let element = classifyToneDuration(duration)
             outputs.append(.element(element))
 
             // Add to pattern
             currentPattern += element.symbol
+            let elementName = element == .dit ? "DIT" : "DAH"
+            let durationMs = String(format: "%.0f", duration * 1_000)
+            print("[CW] Tone ended: \(elementName) (\(durationMs)ms) - pattern: \(currentPattern)")
 
             // Update WPM estimate from this element
             updateWPMEstimate(duration: duration, element: element)
-
             lastElementTime = timestamp
-
         } else if !lastKeyDown, isKeyDown {
             // Key was up, now down: classify the gap duration
+            // Filter out micro-gaps that are false triggers
+            if duration < minimumGapDuration {
+                let durationMs = String(format: "%.1f", duration * 1_000)
+                let minMs = String(format: "%.1f", minimumGapDuration * 1_000)
+                print("[CW] Ignoring micro-gap: \(durationMs)ms (min: \(minMs)ms)")
+                // Don't update state - treat as if key was still down
+                return outputs
+            }
+
             let gapOutput = processGap(duration: duration, timestamp: timestamp)
             outputs.append(contentsOf: gapOutput)
+            print("[CW] Gap ended: \(String(format: "%.0f", duration * 1_000))ms - outputs: \(gapOutput)")
 
             lastElementTime = timestamp
         }
@@ -142,7 +131,9 @@ actor MorseDecoder {
     /// - Parameter currentTime: Current timestamp
     /// - Returns: Any decoded output from timeout
     func checkTimeout(currentTime: TimeInterval) -> [DecodedOutput] {
-        guard !currentPattern.isEmpty else { return [] }
+        guard !currentPattern.isEmpty else {
+            return []
+        }
 
         let silenceDuration = currentTime - lastElementTime
         let timeoutDuration = unitDuration * charTimeoutUnits
@@ -177,6 +168,57 @@ actor MorseDecoder {
         unitDuration = MorseCode.Timing.unitDuration(forWPM: estimatedWPM)
     }
 
+    // MARK: Private
+
+    // MARK: - Configuration
+
+    /// Minimum WPM to consider (prevents unreasonably slow detection)
+    private let minWPM: Int = 5
+
+    /// Maximum WPM to consider (prevents unreasonably fast detection)
+    private let maxWPM: Int = 60
+
+    /// Initial WPM estimate
+    private let initialWPM: Int = 20
+
+    /// Tolerance factor for timing classification (allows for human variation)
+    private let timingTolerance: Double = 0.5
+
+    /// Minimum tone duration to consider valid (filters noise spikes)
+    /// At 40 WPM, a dit is 30ms, so 25ms is a reasonable minimum
+    private let minimumToneDuration: TimeInterval = 0.025
+
+    /// Minimum gap duration to consider valid (filters false key-up triggers)
+    /// At 40 WPM, element gap is 30ms, so 20ms is a reasonable minimum
+    private let minimumGapDuration: TimeInterval = 0.020
+
+    /// Minimum samples needed before adapting WPM
+    private let minSamplesForAdaptation: Int = 5
+
+    /// Estimated unit duration in seconds
+    private var unitDuration: TimeInterval
+
+    /// Current morse pattern being assembled
+    private var currentPattern: String = ""
+
+    /// Last key state
+    private var lastKeyDown: Bool = false
+
+    /// Timestamp of last state change
+    private var lastStateChange: TimeInterval = 0
+
+    /// Recent element durations for WPM estimation (key-down only)
+    private var recentDurations: [TimeInterval] = []
+
+    /// Maximum durations to keep for averaging
+    private let maxDurationSamples: Int = 20
+
+    /// Time since last element (for detecting timeouts)
+    private var lastElementTime: TimeInterval = 0
+
+    /// Timeout for completing a character (in unit durations)
+    private let charTimeoutUnits: Double = 5.0
+
     // MARK: - Private Methods
 
     /// Classify a tone (key-down) duration as dit or dah
@@ -208,19 +250,21 @@ actor MorseDecoder {
         // Element gap: 1 unit (within character)
         // Character gap: 3 units (between characters)
         // Word gap: 7 units (between words)
+        //
+        // Use more conservative thresholds to avoid breaking up characters:
+        // - Character gap threshold at 2.5 units (closer to actual 3 unit gap)
+        // - Word gap threshold at 5.5 units (closer to actual 7 unit gap)
 
-        let charGapThreshold = unitDuration * 2.0 // Between 1 and 3 units
-        let wordGapThreshold = unitDuration * 5.0 // Between 3 and 7 units
+        let charGapThreshold = unitDuration * 2.5
+        let wordGapThreshold = unitDuration * 5.5
 
         if duration < charGapThreshold {
             // Element gap - within character, no action needed
             outputs.append(.element(.elementGap))
-
         } else if duration < wordGapThreshold {
             // Character gap - decode current pattern
             outputs.append(.element(.charGap))
             outputs.append(contentsOf: flushCurrentCharacter())
-
         } else {
             // Word gap - decode current pattern and add space
             outputs.append(.element(.wordGap))
@@ -233,14 +277,18 @@ actor MorseDecoder {
 
     /// Decode and clear the current pattern
     private func flushCurrentCharacter() -> [DecodedOutput] {
-        guard !currentPattern.isEmpty else { return [] }
+        guard !currentPattern.isEmpty else {
+            return []
+        }
 
         var outputs: [DecodedOutput] = []
 
         if let decoded = MorseCode.decode(currentPattern) {
+            print("[CW] Decoded: '\(currentPattern)' -> '\(decoded)'")
             outputs.append(.character(decoded))
         } else {
             // Unknown pattern - output as-is with marker
+            print("[CW] Unknown pattern: '\(currentPattern)'")
             outputs.append(.character("[\(currentPattern)]"))
         }
 
@@ -251,14 +299,23 @@ actor MorseDecoder {
     /// Update WPM estimate based on a classified element
     private func updateWPMEstimate(duration: TimeInterval, element: MorseElement) {
         // Only use dits and dahs for estimation
-        guard element == .dit || element == .dah else { return }
+        guard element == .dit || element == .dah else {
+            return
+        }
 
         // Calculate what the unit duration would be for this element
-        let estimatedUnit: TimeInterval
-        if element == .dit {
-            estimatedUnit = duration / MorseCode.Timing.ditUnits
+        let estimatedUnit: TimeInterval = if element == .dit {
+            duration / MorseCode.Timing.ditUnits
         } else {
-            estimatedUnit = duration / MorseCode.Timing.dahUnits
+            duration / MorseCode.Timing.dahUnits
+        }
+
+        // Sanity check: reject unreasonable unit durations
+        let minUnit = MorseCode.Timing.unitDuration(forWPM: maxWPM)
+        let maxUnit = MorseCode.Timing.unitDuration(forWPM: minWPM)
+        guard estimatedUnit >= minUnit, estimatedUnit <= maxUnit else {
+            print("[CW] Rejecting unreasonable unit estimate: \(String(format: "%.1f", estimatedUnit * 1_000))ms")
+            return
         }
 
         // Add to recent samples
@@ -267,20 +324,20 @@ actor MorseDecoder {
             recentDurations.removeFirst()
         }
 
-        // Calculate average unit duration
-        guard recentDurations.count >= 3 else { return } // Need enough samples
+        // Need enough samples before adapting
+        guard recentDurations.count >= minSamplesForAdaptation else {
+            return
+        }
 
         // Use median for robustness against outliers
         let sorted = recentDurations.sorted()
         let medianUnit = sorted[sorted.count / 2]
 
-        // Update unit duration with smoothing
-        let smoothingFactor = 0.3
+        // Update unit duration with very gentle smoothing to prevent rapid changes
+        let smoothingFactor = 0.15
         unitDuration = unitDuration * (1 - smoothingFactor) + medianUnit * smoothingFactor
 
         // Clamp to valid range
-        let minUnit = MorseCode.Timing.unitDuration(forWPM: maxWPM)
-        let maxUnit = MorseCode.Timing.unitDuration(forWPM: minWPM)
         unitDuration = max(minUnit, min(maxUnit, unitDuration))
 
         // Update WPM

@@ -16,6 +16,15 @@ struct CWSignalResult {
 
     /// Recent envelope samples for visualization
     let envelopeSamples: [Float]
+
+    /// Whether still in calibration period
+    let isCalibrating: Bool
+
+    /// Current noise floor level (0.0-1.0, normalized)
+    let noiseFloor: Float
+
+    /// Current signal-to-noise ratio (higher = cleaner signal)
+    let signalToNoiseRatio: Float
 }
 
 // MARK: - BiquadFilter
@@ -23,22 +32,20 @@ struct CWSignalResult {
 /// Digital biquad bandpass filter using vDSP
 /// Isolates CW tone frequency while attenuating noise
 struct BiquadFilter {
-    // Biquad coefficients: [b0, b1, b2, a1, a2]
-    private var coefficients: [Double]
-    private var delays: [Double] = [0, 0, 0, 0] // Two delays per section
+    // MARK: Lifecycle
 
     /// Create a bandpass filter centered at the specified frequency
     /// - Parameters:
     ///   - centerFrequency: Center frequency in Hz (typically 500-800 Hz for CW)
     ///   - sampleRate: Audio sample rate
     ///   - q: Q factor (higher = narrower band). Default 5.0 is good for CW
-    init(centerFrequency: Double, sampleRate: Double, q: Double = 5.0) {
+    init(centerFrequency: Double, sampleRate: Double, qFactor: Double = 5.0) {
         // Calculate biquad coefficients for bandpass filter
         // Using Audio EQ Cookbook formulas
         let omega = 2.0 * Double.pi * centerFrequency / sampleRate
         let sinOmega = sin(omega)
         let cosOmega = cos(omega)
-        let alpha = sinOmega / (2.0 * q)
+        let alpha = sinOmega / (2.0 * qFactor)
 
         let b0 = alpha
         let b1 = 0.0
@@ -56,6 +63,8 @@ struct BiquadFilter {
             a2 / a0, // a2
         ]
     }
+
+    // MARK: Internal
 
     /// Process samples through the bandpass filter
     /// - Parameter samples: Input audio samples
@@ -92,28 +101,34 @@ struct BiquadFilter {
     mutating func reset() {
         delays = [0, 0, 0, 0]
     }
+
+    // MARK: Private
+
+    // Biquad coefficients: [b0, b1, b2, a1, a2]
+    private var coefficients: [Double]
+    private var delays: [Double] = [0, 0, 0, 0] // Two delays per section
 }
 
 // MARK: - EnvelopeFollower
 
 /// Extracts amplitude envelope from filtered signal
-/// Uses fast attack and slower decay for clean CW detection
+/// Uses fast attack and fast decay for clean CW element detection
 struct EnvelopeFollower {
-    private var envelope: Float = 0
-    private let attackCoeff: Float
-    private let decayCoeff: Float
+    // MARK: Lifecycle
 
     /// Create an envelope follower
     /// - Parameters:
-    ///   - attackTime: Attack time in seconds (fast, ~5ms for CW)
-    ///   - decayTime: Decay time in seconds (slower, ~20ms for CW)
+    ///   - attackTime: Attack time in seconds (fast, ~3ms for CW)
+    ///   - decayTime: Decay time in seconds (fast, ~8ms for CW to catch element gaps)
     ///   - sampleRate: Audio sample rate
-    init(attackTime: Double = 0.005, decayTime: Double = 0.02, sampleRate: Double) {
+    init(attackTime: Double = 0.003, decayTime: Double = 0.008, sampleRate: Double) {
         // Calculate coefficients from time constants
         // coeff = exp(-1 / (time * sampleRate))
         attackCoeff = Float(exp(-1.0 / (attackTime * sampleRate)))
         decayCoeff = Float(exp(-1.0 / (decayTime * sampleRate)))
     }
+
+    // MARK: Internal
 
     /// Process samples to extract envelope
     /// - Parameter samples: Filtered audio samples
@@ -144,28 +159,50 @@ struct EnvelopeFollower {
     mutating func reset() {
         envelope = 0
     }
+
+    // MARK: Private
+
+    private var envelope: Float = 0
+    private let attackCoeff: Float
+    private let decayCoeff: Float
 }
 
 // MARK: - AdaptiveThreshold
 
 /// Adaptive threshold for detecting CW key-down/key-up states
-/// Automatically adjusts to varying signal levels
+/// Uses both noise floor comparison AND relative drop detection
 struct AdaptiveThreshold {
-    private var signalPeak: Float = 0
-    private var noiseFloor: Float = 0
-    private var isKeyDown = false
+    // MARK: Internal
 
-    // Adaptation rates
-    private let peakDecay: Float = 0.9995 // Slow decay for peak tracking
-    private let noiseRise: Float = 0.9999 // Very slow rise for noise floor
-    private let hysteresis: Float = 0.3 // Hysteresis ratio to prevent chatter
+    /// Current key state
+    var currentKeyState: Bool {
+        isKeyDown
+    }
+
+    /// Whether still in calibration period
+    var isCalibrating: Bool {
+        sampleCount < minSamplesForDetection
+    }
+
+    /// Current noise floor level
+    var currentNoiseFloor: Float {
+        noiseFloor
+    }
+
+    /// Current signal peak level
+    var currentSignalPeak: Float {
+        signalPeak
+    }
+
+    /// Signal-to-noise ratio (signal peak / noise floor)
+    var signalToNoiseRatio: Float {
+        guard noiseFloor > 0.0001 else {
+            return 0
+        }
+        return signalPeak / noiseFloor
+    }
 
     /// Process envelope samples and detect key state changes
-    /// - Parameters:
-    ///   - envelope: Envelope samples from EnvelopeFollower
-    ///   - sampleRate: Audio sample rate
-    ///   - bufferStartTime: Timestamp of buffer start
-    /// - Returns: Array of (isKeyDown, timestamp) events
     mutating func process(
         envelope: [Float],
         sampleRate: Double,
@@ -177,54 +214,133 @@ struct AdaptiveThreshold {
         for i in 0 ..< envelope.count {
             let sample = envelope[i]
             let timestamp = bufferStartTime + Double(i) * samplePeriod
+            sampleCount += 1
 
-            // Update peak and noise floor estimates
-            if sample > signalPeak {
-                signalPeak = sample
-            } else {
-                signalPeak *= peakDecay
+            updateSignalEstimates(sample: sample)
+
+            if sampleCount < minSamplesForDetection {
+                logCalibrationProgress()
+                continue
             }
 
-            if sample < noiseFloor || noiseFloor == 0 {
-                noiseFloor = sample
-            } else {
-                noiseFloor = noiseFloor * noiseRise + sample * (1 - noiseRise)
+            if let event = processSample(sample: sample, timestamp: timestamp) {
+                events.append(event)
             }
 
-            // Ensure minimum separation between peak and noise
-            let effectivePeak = max(signalPeak, noiseFloor + 0.01)
-
-            // Calculate threshold with hysteresis
-            let range = effectivePeak - noiseFloor
-            let onThreshold = noiseFloor + range * (0.5 + hysteresis / 2)
-            let offThreshold = noiseFloor + range * (0.5 - hysteresis / 2)
-
-            // Detect state changes
-            let wasKeyDown = isKeyDown
-            if !isKeyDown, sample > onThreshold {
-                isKeyDown = true
-            } else if isKeyDown, sample < offThreshold {
-                isKeyDown = false
-            }
-
-            if isKeyDown != wasKeyDown {
-                events.append((isDown: isKeyDown, timestamp: timestamp))
-            }
+            logPeriodicStatus(sample: sample)
         }
 
         return events
     }
 
-    /// Current key state
-    var currentKeyState: Bool {
-        isKeyDown
-    }
-
     /// Reset threshold state
     mutating func reset() {
         signalPeak = 0
-        noiseFloor = 0
+        noiseFloor = 1.0
         isKeyDown = false
+        sampleCount = 0
+        activeSignalLevel = 0
+        lastStateChangeTime = 0
+        samplesAboveThreshold = 0
+        samplesBelowThreshold = 0
+    }
+
+    // MARK: Private
+
+    private var signalPeak: Float = 0
+    private var noiseFloor: Float = 1.0 // Start high, will decay to actual noise
+    private var isKeyDown = false
+    private var sampleCount: Int = 0
+
+    /// Track the active signal level during key-down for relative drop detection
+    private var activeSignalLevel: Float = 0
+
+    // Debouncing: track last state change time to avoid rapid toggling
+    private var lastStateChangeTime: TimeInterval = 0
+    private let minimumStateDuration: TimeInterval = 0.015 // 15ms minimum between state changes
+
+    // Confirmation: require signal to stay above/below threshold for multiple samples
+    private var samplesAboveThreshold: Int = 0
+    private var samplesBelowThreshold: Int = 0
+    private let confirmationSamples: Int = 50 // ~1ms at 44.1kHz, requires sustained signal
+
+    // Adaptation rates
+    private let peakDecay: Float = 0.999 // Decay for peak tracking
+    private let noiseDecay: Float = 0.995 // Noise floor decays toward quiet level
+    private let activeDecay: Float = 0.9995 // Slow decay for active signal tracking
+    private let minSamplesForDetection: Int = 100 // Calibration period
+
+    private mutating func updateSignalEstimates(sample: Float) {
+        if sample > signalPeak {
+            signalPeak = sample
+        } else {
+            signalPeak *= peakDecay
+        }
+
+        if sample < noiseFloor {
+            noiseFloor = noiseFloor * 0.9 + sample * 0.1
+        } else {
+            noiseFloor *= noiseDecay
+        }
+        noiseFloor = max(noiseFloor, 0.0001)
+    }
+
+    private func logCalibrationProgress() {
+        guard sampleCount == 1 || sampleCount == 50 || sampleCount == 99 else {
+            return
+        }
+        print("[CW] Cal \(sampleCount)/\(minSamplesForDetection) n:\(String(format: "%.4f", noiseFloor))")
+    }
+
+    private mutating func processSample(sample: Float,
+                                        timestamp: TimeInterval) -> (isDown: Bool, timestamp: TimeInterval)?
+    {
+        let ratio = sample / max(noiseFloor, 0.0001)
+        let onTh: Float = 8.0, offTh: Float = 5.0, dropTh: Float = 0.35
+
+        // Update confirmation counters
+        if ratio > onTh {
+            samplesAboveThreshold += 1; samplesBelowThreshold = 0
+        } else if ratio < offTh {
+            samplesBelowThreshold += 1; samplesAboveThreshold = 0
+        } else {
+            samplesAboveThreshold = max(0, samplesAboveThreshold - 1); samplesBelowThreshold = max(
+                0,
+                samplesBelowThreshold - 1
+            )
+        }
+
+        let timeSince = timestamp - lastStateChangeTime
+        let wasKeyDown = isKeyDown
+        let relDrop = sample / max(activeSignalLevel, 0.0001)
+
+        // Update key state
+        if !isKeyDown {
+            if samplesAboveThreshold >= confirmationSamples, timeSince >= minimumStateDuration {
+                isKeyDown = true; activeSignalLevel = sample; samplesAboveThreshold = 0
+            }
+        } else {
+            activeSignalLevel = sample > activeSignalLevel ? sample : activeSignalLevel * activeDecay
+            if timeSince >= minimumStateDuration, samplesBelowThreshold >= confirmationSamples || relDrop < dropTh {
+                isKeyDown = false; samplesBelowThreshold = 0
+            }
+        }
+
+        if isKeyDown != wasKeyDown {
+            let state = isKeyDown ? "DN" : "UP"
+            print("[CW] \(state) r:\(String(format: "%.1f", ratio)) d:\(String(format: "%.2f", relDrop))")
+            lastStateChangeTime = timestamp
+            return (isDown: isKeyDown, timestamp: timestamp)
+        }
+        return nil
+    }
+
+    private func logPeriodicStatus(sample: Float) {
+        guard sampleCount.isMultiple(of: 5_000) else {
+            return
+        }
+        let ratio = sample / max(noiseFloor, 0.0001)
+        print("[CW] n:\(String(format: "%.4f", noiseFloor)) r:\(String(format: "%.1f", ratio)) k:\(isKeyDown)")
     }
 }
 
@@ -233,18 +349,7 @@ struct AdaptiveThreshold {
 /// Main signal processing pipeline for CW audio
 /// Combines bandpass filter, envelope follower, and adaptive threshold
 actor CWSignalProcessor {
-    // MARK: - Properties
-
-    private var bandpassFilter: BiquadFilter
-    private var envelopeFollower: EnvelopeFollower
-    private var threshold: AdaptiveThreshold
-
-    private let sampleRate: Double
-    private var toneFrequency: Double
-
-    // For visualization - keep last N envelope samples
-    private let visualizationSampleCount = 128
-    private var recentEnvelope: [Float] = []
+    // MARK: Lifecycle
 
     // MARK: - Initialization
 
@@ -252,19 +357,26 @@ actor CWSignalProcessor {
     /// - Parameters:
     ///   - sampleRate: Audio sample rate (typically 44100)
     ///   - toneFrequency: CW sidetone frequency (default 600 Hz)
-    ///   - filterQ: Bandpass filter Q factor (default 5.0)
-    init(sampleRate: Double, toneFrequency: Double = 600, filterQ: Double = 5.0) {
+    ///   - filterQ: Bandpass filter Q factor (default 2.0 for wider passband)
+    init(sampleRate: Double, toneFrequency: Double = 600, filterQ: Double = 2.0) {
         self.sampleRate = sampleRate
         self.toneFrequency = toneFrequency
 
         bandpassFilter = BiquadFilter(
             centerFrequency: toneFrequency,
             sampleRate: sampleRate,
-            q: filterQ
+            qFactor: filterQ
         )
 
         envelopeFollower = EnvelopeFollower(sampleRate: sampleRate)
         threshold = AdaptiveThreshold()
+    }
+
+    // MARK: Internal
+
+    /// Get current tone frequency
+    var currentToneFrequency: Double {
+        toneFrequency
     }
 
     // MARK: - Public API
@@ -292,14 +404,31 @@ actor CWSignalProcessor {
         var peak: Float = 0
         vDSP_maxv(envelope, 1, &peak, vDSP_Length(envelope.count))
 
+        // Update running max for normalization
+        if peak > runningMax {
+            runningMax = peak
+        } else {
+            runningMax *= maxDecay
+        }
+
+        // Normalize peak to 0-1 range based on running max
+        let normalizedPeak = min(1.0, peak / max(runningMax, 0.001))
+
         // Update visualization buffer (downsample if needed)
         updateVisualizationBuffer(envelope)
 
+        // Calculate noise floor normalized to 0-1 range
+        // Use running max for consistent scaling with peak amplitude
+        let normalizedNoiseFloor = min(1.0, threshold.currentNoiseFloor / max(runningMax, 0.001))
+
         return CWSignalResult(
             keyEvents: events,
-            peakAmplitude: peak,
+            peakAmplitude: normalizedPeak,
             isKeyDown: threshold.currentKeyState,
-            envelopeSamples: recentEnvelope
+            envelopeSamples: recentEnvelope,
+            isCalibrating: threshold.isCalibrating,
+            noiseFloor: normalizedNoiseFloor,
+            signalToNoiseRatio: threshold.signalToNoiseRatio
         )
     }
 
@@ -310,7 +439,7 @@ actor CWSignalProcessor {
         bandpassFilter = BiquadFilter(
             centerFrequency: frequency,
             sampleRate: sampleRate,
-            q: 5.0
+            q: 2.0
         )
         bandpassFilter.reset()
     }
@@ -321,12 +450,25 @@ actor CWSignalProcessor {
         envelopeFollower.reset()
         threshold.reset()
         recentEnvelope = []
+        runningMax = 0.001
     }
 
-    /// Get current tone frequency
-    var currentToneFrequency: Double {
-        toneFrequency
-    }
+    // MARK: Private
+
+    private var bandpassFilter: BiquadFilter
+    private var envelopeFollower: EnvelopeFollower
+    private var threshold: AdaptiveThreshold
+
+    private let sampleRate: Double
+    private var toneFrequency: Double
+
+    // For visualization - keep last N envelope samples
+    private let visualizationSampleCount = 128
+    private var recentEnvelope: [Float] = []
+
+    // For level meter normalization - track running max
+    private var runningMax: Float = 0.001 // Start with small non-zero value
+    private let maxDecay: Float = 0.9999 // Slow decay to track varying levels
 
     // MARK: - Private Methods
 

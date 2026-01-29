@@ -4,8 +4,10 @@ import SwiftUI
 
 /// Main CW transcription view with audio visualization and decoded transcript.
 struct CWTranscriptionView: View {
-    @StateObject private var service = CWTranscriptionService()
-    @Environment(\.dismiss) private var dismiss
+    // MARK: Internal
+
+    /// Whether the view is presented modally (shows Close button)
+    var isModal: Bool = false
 
     /// Optional callback when user wants to log a QSO
     var onLog: ((String) -> Void)?
@@ -23,7 +25,20 @@ struct CWTranscriptionView: View {
                     samples: service.waveformSamples,
                     isKeyDown: service.isKeyDown
                 )
-                .padding()
+                .padding(.horizontal)
+                .padding(.top)
+
+                // Level meter
+                CWLevelMeter(
+                    level: service.isListening ? Double(service.peakAmplitude) : 0,
+                    isActive: service.isKeyDown
+                )
+                .padding(.horizontal)
+
+                // Noise floor indicator
+                noiseFloorSection
+                    .padding(.horizontal)
+                    .padding(.bottom)
 
                 // Transcript area
                 transcriptArea
@@ -52,10 +67,12 @@ struct CWTranscriptionView: View {
             .navigationTitle("CW Transcription")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Close") {
-                        service.stopListening()
-                        dismiss()
+                if isModal {
+                    ToolbarItem(placement: .topBarLeading) {
+                        Button("Close") {
+                            service.stopListening()
+                            dismiss()
+                        }
                     }
                 }
 
@@ -70,46 +87,23 @@ struct CWTranscriptionView: View {
         }
     }
 
-    // MARK: - Status Bar
+    // MARK: Private
 
-    @ViewBuilder
-    private var statusBar: some View {
-        HStack {
-            // Listening indicator
-            HStack(spacing: 8) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 10, height: 10)
-
-                Text(statusText)
-                    .font(.subheadline.weight(.medium))
-                    .foregroundStyle(statusColor)
-            }
-
-            Spacer()
-
-            // WPM display
-            HStack(spacing: 4) {
-                Text("\(service.estimatedWPM)")
-                    .font(.title3.weight(.semibold).monospaced())
-
-                Text("WPM")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color(.systemGray5))
-            .clipShape(Capsule())
-        }
-    }
+    @StateObject private var service = CWTranscriptionService()
+    @Environment(\.dismiss) private var dismiss
 
     private var statusColor: Color {
         switch service.state {
         case .idle:
             .secondary
         case .listening:
-            .green
+            if service.isCalibrating {
+                .orange
+            } else if service.isNoiseTooHigh {
+                .yellow
+            } else {
+                .green
+            }
         case .error:
             .red
         }
@@ -120,9 +114,113 @@ struct CWTranscriptionView: View {
         case .idle:
             "Ready"
         case .listening:
-            "Listening"
+            if service.isCalibrating {
+                "Calibrating..."
+            } else if service.isNoiseTooHigh {
+                "High Noise"
+            } else {
+                "Listening"
+            }
         case let .error(message):
             message
+        }
+    }
+
+    // MARK: - Status Bar
+
+    private var statusBar: some View {
+        VStack(spacing: 12) {
+            // Status indicator row
+            HStack {
+                HStack(spacing: 8) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 10, height: 10)
+
+                    Text(statusText)
+                        .font(.subheadline.weight(.medium))
+                        .foregroundStyle(statusColor)
+                }
+
+                Spacer()
+            }
+
+            // Settings controls
+            settingsControls
+        }
+    }
+
+    // MARK: - Settings Controls
+
+    private var settingsControls: some View {
+        VStack(spacing: 8) {
+            // WPM control
+            HStack {
+                Text("WPM")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 50, alignment: .leading)
+
+                Slider(
+                    value: Binding(
+                        get: { Double(service.estimatedWPM) },
+                        set: { service.setWPM(Int($0)) }
+                    ),
+                    in: 5 ... 50,
+                    step: 1
+                )
+
+                Text("\(service.estimatedWPM)")
+                    .font(.subheadline.monospaced())
+                    .frame(width: 30, alignment: .trailing)
+            }
+
+            // Tone frequency control
+            HStack {
+                Text("Tone")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 50, alignment: .leading)
+
+                Slider(
+                    value: $service.toneFrequency,
+                    in: 400 ... 1_000,
+                    step: 10
+                )
+
+                Text("\(Int(service.toneFrequency))")
+                    .font(.subheadline.monospaced())
+                    .frame(width: 40, alignment: .trailing)
+            }
+        }
+        .padding(12)
+        .background(Color(.systemGray6))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    // MARK: - Noise Floor Section
+
+    private var noiseFloorSection: some View {
+        VStack(spacing: 4) {
+            HStack {
+                Text("Noise Floor")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                if service.isListening, service.isNoiseTooHigh {
+                    Label("Move away from noise source", systemImage: "exclamationmark.triangle.fill")
+                        .font(.caption2)
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            CWNoiseFloorIndicator(
+                noiseFloor: service.noiseFloor,
+                quality: service.noiseFloorQuality,
+                isListening: service.isListening
+            )
         }
     }
 
@@ -144,17 +242,8 @@ struct CWTranscriptionView: View {
 
     // MARK: - Control Bar
 
-    @ViewBuilder
     private var controlBar: some View {
         VStack(spacing: 16) {
-            // Level meter
-            if service.isListening {
-                CWLevelMeter(
-                    level: service.peakAmplitude,
-                    isActive: service.isKeyDown
-                )
-            }
-
             // Action buttons
             HStack(spacing: 16) {
                 // Copy button
@@ -205,15 +294,15 @@ struct CWTranscriptionView: View {
 
     @ViewBuilder
     private var settingsMenu: some View {
-        // Tone frequency picker
-        Menu("Tone Frequency") {
-            ForEach([500, 550, 600, 650, 700, 750, 800], id: \.self) { freq in
+        // WPM presets for quick access
+        Section("WPM Presets") {
+            ForEach([15, 20, 25, 30], id: \.self) { wpm in
                 Button {
-                    service.toneFrequency = Double(freq)
+                    service.setWPM(wpm)
                 } label: {
                     HStack {
-                        Text("\(freq) Hz")
-                        if Int(service.toneFrequency) == freq {
+                        Text("\(wpm) WPM")
+                        if service.estimatedWPM == wpm {
                             Image(systemName: "checkmark")
                         }
                     }
@@ -221,17 +310,15 @@ struct CWTranscriptionView: View {
             }
         }
 
-        Divider()
-
-        // WPM presets
-        Menu("Set WPM") {
-            ForEach([10, 15, 20, 25, 30, 35, 40], id: \.self) { wpm in
+        // Tone presets for quick access
+        Section("Tone Presets") {
+            ForEach([600, 700, 800], id: \.self) { freq in
                 Button {
-                    service.setWPM(wpm)
+                    service.toneFrequency = Double(freq)
                 } label: {
                     HStack {
-                        Text("\(wpm) WPM")
-                        if service.estimatedWPM == wpm {
+                        Text("\(freq) Hz")
+                        if Int(service.toneFrequency) == freq {
                             Image(systemName: "checkmark")
                         }
                     }
