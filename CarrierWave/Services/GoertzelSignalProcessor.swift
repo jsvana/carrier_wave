@@ -1,260 +1,13 @@
 import Accelerate
 import Foundation
 
-// MARK: - GoertzelFilter
+// MARK: - FrequencyBin
 
-/// Goertzel algorithm implementation for efficient single-frequency detection
-/// More computationally efficient than FFT when detecting only one frequency
-struct GoertzelFilter {
-    // MARK: Lifecycle
-
-    /// Create a Goertzel filter for a specific frequency
-    /// - Parameters:
-    ///   - targetFrequency: The frequency to detect (Hz)
-    ///   - sampleRate: Audio sample rate (Hz)
-    ///   - blockSize: Number of samples per block (affects frequency resolution)
-    init(targetFrequency: Double, sampleRate: Double, blockSize: Int) {
-        self.targetFrequency = targetFrequency
-        self.sampleRate = sampleRate
-        self.blockSize = blockSize
-
-        // Calculate the Goertzel coefficient: 2 * cos(2 * pi * k / N)
-        // where k = targetFrequency * N / sampleRate
-        let k = targetFrequency * Double(blockSize) / sampleRate
-        let omega = 2.0 * Double.pi * k / Double(blockSize)
-        coefficient = 2.0 * cos(omega)
-
-        // Pre-calculate for power computation
-        cosOmega = cos(omega)
-        sinOmega = sin(omega)
-    }
-
-    // MARK: Internal
-
-    let targetFrequency: Double
-    let sampleRate: Double
-    let blockSize: Int
-    let coefficient: Double
-
-    /// Process a block of samples and return the magnitude at the target frequency
-    /// - Parameter samples: Audio samples (should be exactly blockSize samples)
-    /// - Returns: Magnitude at the target frequency (normalized by block size)
-    func processSamples(_ samples: [Float]) -> Float {
-        var s1 = 0.0
-        var s2 = 0.0
-
-        // Main Goertzel recursion
-        for sample in samples {
-            let s0 = Double(sample) + coefficient * s1 - s2
-            s2 = s1
-            s1 = s0
-        }
-
-        // Compute power: |X[k]|² = s1² + s2² - coeff * s1 * s2
-        let power = s1 * s1 + s2 * s2 - coefficient * s1 * s2
-
-        // Return magnitude normalized by block size
-        let magnitude = sqrt(max(0, power)) / Double(blockSize)
-        return Float(magnitude)
-    }
-
-    /// Process samples and return both real and imaginary components
-    /// - Parameter samples: Audio samples
-    /// - Returns: Tuple of (real, imaginary) components
-    func processComplex(_ samples: [Float]) -> (real: Double, imag: Double) {
-        var s1 = 0.0
-        var s2 = 0.0
-
-        for sample in samples {
-            let s0 = Double(sample) + coefficient * s1 - s2
-            s2 = s1
-            s1 = s0
-        }
-
-        // Real = s1 - s2 * cos(omega)
-        // Imag = s2 * sin(omega)
-        let real = s1 - s2 * cosOmega
-        let imag = s2 * sinOmega
-
-        return (real, imag)
-    }
-
-    // MARK: Private
-
-    private let cosOmega: Double
-    private let sinOmega: Double
-}
-
-// MARK: - GoertzelThreshold
-
-/// Adaptive threshold for Goertzel magnitude-based key detection
-struct GoertzelThreshold {
-    // MARK: Internal
-
-    /// Current key state
-    var currentKeyState: Bool {
-        isKeyDown
-    }
-
-    /// Whether still in calibration period
-    var isCalibrating: Bool {
-        blockCount < calibrationBlocks
-    }
-
-    /// Current noise floor level
-    var currentNoiseFloor: Float {
-        noiseFloor
-    }
-
-    /// Current signal peak level
-    var currentSignalPeak: Float {
-        signalPeak
-    }
-
-    /// Signal-to-noise ratio
-    var signalToNoiseRatio: Float {
-        guard noiseFloor > 0.0001 else {
-            return 0
-        }
-        return signalPeak / noiseFloor
-    }
-
-    /// Process a magnitude value and detect key state changes
-    /// - Parameters:
-    ///   - magnitude: Goertzel magnitude for this block
-    ///   - blockDuration: Duration of the block in seconds
-    ///   - blockStartTime: Timestamp of block start
-    /// - Returns: Key event if state changed, nil otherwise
-    mutating func process(
-        magnitude: Float,
-        blockDuration: Double,
-        blockStartTime: TimeInterval
-    ) -> (isDown: Bool, timestamp: TimeInterval)? {
-        blockCount += 1
-
-        // Update signal estimates
-        updateSignalEstimates(magnitude: magnitude)
-
-        // Don't detect during calibration
-        guard !isCalibrating else {
-            return nil
-        }
-
-        // Calculate threshold dynamically
-        let ratio = magnitude / max(noiseFloor, 0.0001)
-
-        // Update confirmation counters
-        if ratio > onThreshold {
-            blocksAboveThreshold += 1
-            blocksBelowThreshold = 0
-        } else if ratio < offThreshold {
-            blocksBelowThreshold += 1
-            blocksAboveThreshold = 0
-        } else {
-            // In hysteresis zone - gradual decay
-            blocksAboveThreshold = max(0, blocksAboveThreshold - 1)
-            blocksBelowThreshold = max(0, blocksBelowThreshold - 1)
-        }
-
-        let wasKeyDown = isKeyDown
-        let timeSinceChange = blockStartTime - lastStateChangeTime
-
-        // State transitions with confirmation
-        if !isKeyDown {
-            if blocksAboveThreshold >= confirmationBlocks, timeSinceChange >= minimumStateDuration {
-                isKeyDown = true
-                activeSignalLevel = magnitude
-                blocksAboveThreshold = 0
-            }
-        } else {
-            // Update active signal level
-            if magnitude > activeSignalLevel {
-                activeSignalLevel = magnitude
-            } else {
-                activeSignalLevel *= activeDecay
-            }
-
-            // Check for key-up: either relative drop or absolute threshold
-            let relativeDrop = magnitude / max(activeSignalLevel, 0.0001)
-            if timeSinceChange >= minimumStateDuration {
-                if blocksBelowThreshold >= confirmationBlocks || relativeDrop < dropThreshold {
-                    isKeyDown = false
-                    blocksBelowThreshold = 0
-                }
-            }
-        }
-
-        // Return event if state changed
-        if isKeyDown != wasKeyDown {
-            lastStateChangeTime = blockStartTime
-            let eventTime = blockStartTime + blockDuration / 2 // Mid-block timing
-            return (isDown: isKeyDown, timestamp: eventTime)
-        }
-
-        return nil
-    }
-
-    /// Reset threshold state
-    mutating func reset() {
-        signalPeak = 0
-        noiseFloor = 0.01 // Start at reasonable level, will adapt quickly
-        isKeyDown = false
-        blockCount = 0
-        activeSignalLevel = 0
-        lastStateChangeTime = 0
-        blocksAboveThreshold = 0
-        blocksBelowThreshold = 0
-    }
-
-    // MARK: Private
-
-    private var signalPeak: Float = 0
-    private var noiseFloor: Float = 0.01 // Start at reasonable level
-    private var isKeyDown = false
-    private var blockCount: Int = 0
-    private var activeSignalLevel: Float = 0
-    private var lastStateChangeTime: TimeInterval = 0
-
-    // Confirmation counters
-    private var blocksAboveThreshold: Int = 0
-    private var blocksBelowThreshold: Int = 0
-
-    // Configuration
-    private let calibrationBlocks: Int = 10
-    private let confirmationBlocks: Int = 2
-    private let minimumStateDuration: TimeInterval = 0.015
-
-    // Thresholds (with hysteresis)
-    private let onThreshold: Float = 6.0 // Ratio to trigger key-down
-    private let offThreshold: Float = 3.0 // Ratio to trigger key-up
-    private let dropThreshold: Float = 0.4 // Relative drop to trigger key-up
-
-    // Adaptation rates
-    private let peakDecay: Float = 0.995
-    private let noiseDecay: Float = 0.99
-    private let activeDecay: Float = 0.98
-
-    private mutating func updateSignalEstimates(magnitude: Float) {
-        // Update peak (fast attack, slow decay)
-        if magnitude > signalPeak {
-            signalPeak = magnitude
-        } else {
-            signalPeak *= peakDecay
-        }
-
-        // Update noise floor with bidirectional adaptation
-        if magnitude < noiseFloor {
-            // Below current estimate - drop quickly to track quieter conditions
-            noiseFloor = noiseFloor * 0.9 + magnitude * 0.1
-        } else if magnitude < noiseFloor * onThreshold {
-            // Above current estimate but below signal threshold - rise to track actual noise
-            // Use faster adaptation during calibration
-            let adaptRate: Float = blockCount < calibrationBlocks ? 0.1 : 0.02
-            noiseFloor = noiseFloor * (1.0 - adaptRate) + magnitude * adaptRate
-        }
-        // When signal is present (above threshold), don't adapt noise floor
-        noiseFloor = max(noiseFloor, 0.0001)
-    }
+/// A single frequency bin in the adaptive filter bank
+private struct FrequencyBin {
+    let frequency: Double
+    let filter: GoertzelFilter
+    var recentMagnitude: Float = 0
 }
 
 // MARK: - GoertzelSignalProcessor
@@ -262,10 +15,13 @@ struct GoertzelThreshold {
 /// Signal processor using the Goertzel algorithm for CW tone detection
 /// Alternative to bandpass filter approach - more computationally efficient
 /// for single-frequency detection
+///
+/// Supports adaptive frequency detection: when initialized with a frequency range,
+/// uses a bank of Goertzel filters to find the strongest tone automatically.
 actor GoertzelSignalProcessor {
     // MARK: Lifecycle
 
-    /// Create a Goertzel-based signal processor
+    /// Create a Goertzel-based signal processor with fixed frequency
     /// - Parameters:
     ///   - sampleRate: Audio sample rate (typically 44100)
     ///   - toneFrequency: CW sidetone frequency (default 600 Hz)
@@ -274,6 +30,10 @@ actor GoertzelSignalProcessor {
         self.sampleRate = sampleRate
         self.toneFrequency = toneFrequency
         self.blockSize = blockSize
+        adaptiveMode = false
+        minFrequency = toneFrequency
+        maxFrequency = toneFrequency
+        frequencyStep = 50
 
         goertzelFilter = GoertzelFilter(
             targetFrequency: toneFrequency,
@@ -281,6 +41,56 @@ actor GoertzelSignalProcessor {
             blockSize: blockSize
         )
         threshold = GoertzelThreshold()
+        filterBank = []
+
+        blockDuration = Double(blockSize) / sampleRate
+    }
+
+    /// Create a Goertzel-based signal processor with adaptive frequency detection
+    /// - Parameters:
+    ///   - sampleRate: Audio sample rate (typically 44100)
+    ///   - minFrequency: Minimum frequency to scan (Hz)
+    ///   - maxFrequency: Maximum frequency to scan (Hz)
+    ///   - frequencyStep: Step size between frequency bins (Hz, default 50)
+    ///   - blockSize: Samples per Goertzel block (default 128, ~3ms at 44.1kHz)
+    init(
+        sampleRate: Double,
+        minFrequency: Double = 400,
+        maxFrequency: Double = 900,
+        frequencyStep: Double = 50,
+        blockSize: Int = 128
+    ) {
+        self.sampleRate = sampleRate
+        self.blockSize = blockSize
+        adaptiveMode = true
+        self.minFrequency = minFrequency
+        self.maxFrequency = maxFrequency
+        self.frequencyStep = frequencyStep
+
+        // Start with center frequency
+        let centerFrequency = (minFrequency + maxFrequency) / 2
+        toneFrequency = centerFrequency
+
+        goertzelFilter = GoertzelFilter(
+            targetFrequency: centerFrequency,
+            sampleRate: sampleRate,
+            blockSize: blockSize
+        )
+        threshold = GoertzelThreshold()
+
+        // Build filter bank
+        var bins: [FrequencyBin] = []
+        var freq = minFrequency
+        while freq <= maxFrequency {
+            let filter = GoertzelFilter(
+                targetFrequency: freq,
+                sampleRate: sampleRate,
+                blockSize: blockSize
+            )
+            bins.append(FrequencyBin(frequency: freq, filter: filter))
+            freq += frequencyStep
+        }
+        filterBank = bins
 
         blockDuration = Double(blockSize) / sampleRate
     }
@@ -293,73 +103,15 @@ actor GoertzelSignalProcessor {
     }
 
     /// Process an audio buffer through the Goertzel pipeline
-    /// - Parameters:
-    ///   - samples: Raw audio samples from microphone
-    ///   - timestamp: Timestamp of buffer start
-    /// - Returns: Signal processing result with key events and visualization data
     func process(samples: [Float], timestamp: TimeInterval) -> CWSignalResult {
-        var keyEvents: [(isDown: Bool, timestamp: TimeInterval)] = []
-        var magnitudes: [Float] = []
-
-        // Process samples in blocks
-        var sampleIndex = 0
-        var blockStartTime = timestamp
-
-        // Include leftover samples from previous buffer
-        var workingSamples = leftoverSamples + samples
-        leftoverSamples = []
-
-        while sampleIndex + blockSize <= workingSamples.count {
-            let blockStart = sampleIndex
-            let blockEnd = sampleIndex + blockSize
-            let block = Array(workingSamples[blockStart ..< blockEnd])
-
-            // Apply Hamming window to reduce spectral leakage
-            let windowedBlock = applyHammingWindow(block)
-
-            // Compute Goertzel magnitude
-            let magnitude = goertzelFilter.processSamples(windowedBlock)
-            magnitudes.append(magnitude)
-
-            // Detect key state changes
-            if let event = threshold.process(
-                magnitude: magnitude,
-                blockDuration: blockDuration,
-                blockStartTime: blockStartTime
-            ) {
-                keyEvents.append(event)
-                let state = event.isDown ? "DN" : "UP"
-                let ratio = magnitude / max(threshold.currentNoiseFloor, 0.0001)
-                print(
-                    "[CW-G] \(state) mag:\(String(format: "%.4f", magnitude)) r:\(String(format: "%.1f", ratio))"
-                )
-            }
-
-            sampleIndex += blockSize
-            blockStartTime += blockDuration
-        }
-
-        // Save leftover samples for next buffer
-        if sampleIndex < workingSamples.count {
-            leftoverSamples = Array(workingSamples[sampleIndex...])
-        }
-
-        // Calculate peak magnitude
+        let (keyEvents, magnitudes) = processBlocks(samples: samples, timestamp: timestamp)
         let peakMagnitude = magnitudes.max() ?? 0
 
-        // Update running max for normalization
-        if peakMagnitude > runningMax {
-            runningMax = peakMagnitude
-        } else {
-            runningMax *= maxDecay
-        }
+        updateRunningMax(peakMagnitude: peakMagnitude)
+        updateVisualizationBuffer(magnitudes)
 
-        // Normalize values for UI
         let normalizedPeak = min(1.0, peakMagnitude / max(runningMax, 0.0001))
         let normalizedNoiseFloor = min(1.0, threshold.currentNoiseFloor / max(runningMax, 0.0001))
-
-        // Build visualization envelope from magnitudes
-        updateVisualizationBuffer(magnitudes)
 
         return CWSignalResult(
             keyEvents: keyEvents,
@@ -368,7 +120,8 @@ actor GoertzelSignalProcessor {
             envelopeSamples: recentMagnitudes,
             isCalibrating: threshold.isCalibrating,
             noiseFloor: normalizedNoiseFloor,
-            signalToNoiseRatio: threshold.signalToNoiseRatio
+            signalToNoiseRatio: threshold.signalToNoiseRatio,
+            detectedFrequency: adaptiveMode ? toneFrequency : nil
         )
     }
 
@@ -389,6 +142,27 @@ actor GoertzelSignalProcessor {
         leftoverSamples = []
         recentMagnitudes = []
         runningMax = 0.01 // Match initial noise floor
+
+        // Reset adaptive frequency state
+        frequencyLockCounter = 0
+        candidateFrequency = 0
+        isFrequencyLocked = false
+
+        // Reset bin magnitudes
+        for i in 0 ..< filterBank.count {
+            filterBank[i].recentMagnitude = 0
+        }
+
+        // Reset to center frequency in adaptive mode
+        if adaptiveMode {
+            let centerFrequency = (minFrequency + maxFrequency) / 2
+            toneFrequency = centerFrequency
+            goertzelFilter = GoertzelFilter(
+                targetFrequency: centerFrequency,
+                sampleRate: sampleRate,
+                blockSize: blockSize
+            )
+        }
     }
 
     // MARK: Private
@@ -400,6 +174,28 @@ actor GoertzelSignalProcessor {
     private var toneFrequency: Double
     private let blockSize: Int
     private let blockDuration: Double
+
+    // Adaptive frequency detection
+    private let adaptiveMode: Bool
+    private let minFrequency: Double
+    private let maxFrequency: Double
+    private let frequencyStep: Double
+    private var filterBank: [FrequencyBin]
+
+    /// Number of consecutive blocks a frequency must be strongest to lock
+    private let frequencyLockThreshold: Int = 15
+    /// Counter for frequency lock confirmation
+    private var frequencyLockCounter: Int = 0
+    /// Candidate frequency being evaluated
+    private var candidateFrequency: Double = 0
+    /// Whether frequency is currently locked (stable signal detected)
+    private var isFrequencyLocked: Bool = false
+    /// Minimum magnitude ratio vs noise to consider a frequency active
+    private let frequencyDetectionRatio: Float = 5.0
+    /// Smoothing factor for bin magnitudes (0-1, higher = more smoothing)
+    private let binMagnitudeSmoothing: Float = 0.85
+    /// Minimum absolute magnitude to consider (ignore very weak signals)
+    private let minimumDetectionMagnitude: Float = 0.0005
 
     /// Buffer for samples that don't fill a complete block
     private var leftoverSamples: [Float] = []
@@ -423,6 +219,58 @@ actor GoertzelSignalProcessor {
         return window
     }()
 
+    private func processBlocks(
+        samples: [Float],
+        timestamp: TimeInterval
+    ) -> (keyEvents: [(isDown: Bool, timestamp: TimeInterval)], magnitudes: [Float]) {
+        var keyEvents: [(isDown: Bool, timestamp: TimeInterval)] = []
+        var magnitudes: [Float] = []
+        var sampleIndex = 0
+        var blockStartTime = timestamp
+
+        var workingSamples = leftoverSamples + samples
+        leftoverSamples = []
+
+        while sampleIndex + blockSize <= workingSamples.count {
+            let block = Array(workingSamples[sampleIndex ..< sampleIndex + blockSize])
+            let windowedBlock = applyHammingWindow(block)
+
+            if adaptiveMode {
+                updateFrequencyTracking(
+                    windowedBlock: windowedBlock, currentNoiseFloor: threshold.currentNoiseFloor
+                )
+            }
+
+            let magnitude = goertzelFilter.processSamples(windowedBlock)
+            magnitudes.append(magnitude)
+
+            if let event = threshold.process(
+                magnitude: magnitude,
+                blockDuration: blockDuration,
+                blockStartTime: blockStartTime
+            ) {
+                keyEvents.append(event)
+            }
+
+            sampleIndex += blockSize
+            blockStartTime += blockDuration
+        }
+
+        if sampleIndex < workingSamples.count {
+            leftoverSamples = Array(workingSamples[sampleIndex...])
+        }
+
+        return (keyEvents, magnitudes)
+    }
+
+    private func updateRunningMax(peakMagnitude: Float) {
+        if peakMagnitude > runningMax {
+            runningMax = peakMagnitude
+        } else {
+            runningMax *= maxDecay
+        }
+    }
+
     private func applyHammingWindow(_ samples: [Float]) -> [Float] {
         var result = [Float](repeating: 0, count: samples.count)
         vDSP_vmul(samples, 1, hammingWindow, 1, &result, 1, vDSP_Length(samples.count))
@@ -436,5 +284,125 @@ actor GoertzelSignalProcessor {
         if recentMagnitudes.count > visualizationSampleCount {
             recentMagnitudes.removeFirst(recentMagnitudes.count - visualizationSampleCount)
         }
+    }
+
+    /// Update frequency tracking by scanning all bins in the filter bank
+    private func updateFrequencyTracking(windowedBlock: [Float], currentNoiseFloor: Float) {
+        guard !filterBank.isEmpty else {
+            return
+        }
+
+        let currentFreqMagnitude = goertzelFilter.processSamples(windowedBlock)
+
+        // If locked with no signal, decay bins and skip scanning
+        if isFrequencyLocked,
+           !hasActiveSignal(magnitude: currentFreqMagnitude, noiseFloor: currentNoiseFloor)
+        {
+            decayBinMagnitudes()
+            return
+        }
+
+        let (strongestFrequency, strongestMagnitude) = findStrongestBin(
+            windowedBlock: windowedBlock
+        )
+
+        guard hasStrongSignal(magnitude: strongestMagnitude, noiseFloor: currentNoiseFloor) else {
+            if frequencyLockCounter > 0, !isFrequencyLocked {
+                frequencyLockCounter -= 1
+            }
+            return
+        }
+
+        updateFrequencyCandidate(
+            strongestFrequency: strongestFrequency,
+            strongestMagnitude: strongestMagnitude,
+            currentFreqMagnitude: currentFreqMagnitude
+        )
+        checkForFrequencySwitch()
+    }
+
+    private func hasActiveSignal(magnitude: Float, noiseFloor: Float) -> Bool {
+        let ratio = magnitude / max(noiseFloor, 0.0001)
+        return ratio > frequencyDetectionRatio && magnitude > minimumDetectionMagnitude
+    }
+
+    private func hasStrongSignal(magnitude: Float, noiseFloor: Float) -> Bool {
+        let ratio = magnitude / max(noiseFloor, 0.0001)
+        return ratio > frequencyDetectionRatio && magnitude > minimumDetectionMagnitude
+    }
+
+    private func decayBinMagnitudes() {
+        for i in 0 ..< filterBank.count {
+            filterBank[i].recentMagnitude *= 0.9
+        }
+    }
+
+    private func findStrongestBin(windowedBlock: [Float]) -> (frequency: Double, magnitude: Float) {
+        var strongestBinIndex = 0
+        var strongestMagnitude: Float = 0
+
+        for i in 0 ..< filterBank.count {
+            let rawMagnitude = filterBank[i].filter.processSamples(windowedBlock)
+            let smoothed =
+                filterBank[i].recentMagnitude * binMagnitudeSmoothing
+                    + rawMagnitude * (1.0 - binMagnitudeSmoothing)
+            filterBank[i].recentMagnitude = smoothed
+
+            if smoothed > strongestMagnitude {
+                strongestMagnitude = smoothed
+                strongestBinIndex = i
+            }
+        }
+
+        return (filterBank[strongestBinIndex].frequency, strongestMagnitude)
+    }
+
+    private func updateFrequencyCandidate(
+        strongestFrequency: Double,
+        strongestMagnitude: Float,
+        currentFreqMagnitude: Float
+    ) {
+        if abs(strongestFrequency - candidateFrequency) < frequencyStep / 2 {
+            frequencyLockCounter += 1
+            if frequencyLockCounter >= frequencyLockThreshold, !isFrequencyLocked {
+                lockToFrequency(strongestFrequency)
+            }
+        } else if isFrequencyLocked {
+            if strongestMagnitude > currentFreqMagnitude * 2.5 {
+                candidateFrequency = strongestFrequency
+                frequencyLockCounter = 1
+            }
+        } else {
+            candidateFrequency = strongestFrequency
+            frequencyLockCounter = 1
+        }
+    }
+
+    private func checkForFrequencySwitch() {
+        if isFrequencyLocked, frequencyLockCounter >= frequencyLockThreshold,
+           abs(candidateFrequency - toneFrequency) > frequencyStep / 2
+        {
+            isFrequencyLocked = false
+            lockToFrequency(candidateFrequency)
+        }
+    }
+
+    /// Lock onto a frequency (confirmed stable signal)
+    private func lockToFrequency(_ frequency: Double) {
+        guard abs(frequency - toneFrequency) > 1.0 else {
+            // Already at this frequency, just mark as locked
+            isFrequencyLocked = true
+            return
+        }
+
+        toneFrequency = frequency
+        goertzelFilter = GoertzelFilter(
+            targetFrequency: frequency,
+            sampleRate: sampleRate,
+            blockSize: blockSize
+        )
+        // Reset threshold to recalibrate for the new frequency
+        threshold.reset()
+        isFrequencyLocked = true
     }
 }

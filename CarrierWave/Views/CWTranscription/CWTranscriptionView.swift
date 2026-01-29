@@ -71,7 +71,7 @@ struct CWTranscriptionView: View {
 
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
-                        settingsMenu
+                        CWSettingsMenu(service: service)
                     } label: {
                         Image(systemName: "ellipsis.circle")
                     }
@@ -174,6 +174,11 @@ struct CWTranscriptionView: View {
 
             Spacer()
 
+            // Frequency display
+            frequencyIndicator
+
+            Spacer()
+
             // Pre-amp toggle
             Button {
                 service.preAmpEnabled.toggle()
@@ -191,6 +196,38 @@ struct CWTranscriptionView: View {
         .padding(12)
         .background(Color(.systemGray6))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    // MARK: - Frequency Indicator
+
+    private var frequencyIndicator: some View {
+        HStack(spacing: 4) {
+            if service.adaptiveFrequencyEnabled {
+                // Show detected frequency or scanning indicator
+                if let detected = service.detectedFrequency {
+                    Text("\(Int(detected))")
+                        .font(.subheadline.weight(.semibold).monospaced())
+                } else {
+                    Text("---")
+                        .font(.subheadline.weight(.semibold).monospaced())
+                }
+                Text("Hz")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                // Auto indicator
+                Image(systemName: "a.circle.fill")
+                    .font(.caption)
+                    .foregroundStyle(.blue)
+            } else {
+                // Fixed frequency
+                Text("\(Int(service.toneFrequency))")
+                    .font(.subheadline.weight(.semibold).monospaced())
+                Text("Hz")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
     }
 
     // MARK: - Noise Floor Section
@@ -265,60 +302,6 @@ struct CWTranscriptionView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(service.isListening ? .red : .green)
-            }
-        }
-    }
-
-    // MARK: - Settings Menu
-
-    @ViewBuilder
-    private var settingsMenu: some View {
-        // WPM presets for quick access
-        Section("WPM") {
-            ForEach([15, 20, 25, 30], id: \.self) { wpm in
-                Button {
-                    service.setWPM(wpm)
-                } label: {
-                    HStack {
-                        Text("\(wpm) WPM")
-                        Spacer()
-                        if service.estimatedWPM == wpm {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        }
-
-        // Tone presets for quick access
-        Section("Tone") {
-            ForEach([600, 700, 800], id: \.self) { freq in
-                Button {
-                    service.toneFrequency = Double(freq)
-                } label: {
-                    HStack {
-                        Text("\(freq) Hz")
-                        Spacer()
-                        if Int(service.toneFrequency) == freq {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        }
-
-        // Signal options
-        Section("Signal") {
-            Button {
-                service.preAmpEnabled.toggle()
-            } label: {
-                HStack {
-                    Text("Pre-Amp (10x)")
-                    Spacer()
-                    if service.preAmpEnabled {
-                        Image(systemName: "checkmark")
-                    }
-                }
             }
         }
     }

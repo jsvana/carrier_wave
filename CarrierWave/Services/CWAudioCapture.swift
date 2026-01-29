@@ -49,6 +49,10 @@ actor CWAudioCapture {
         try await ensureMicrophonePermission()
         try setupAudioSession()
 
+        // Disable voice processing BEFORE getting the input format
+        // Voice processing (noise suppression, AGC) interferes with CW tone detection
+        disableVoiceProcessing()
+
         let inputNode = audioEngine.inputNode
         let inputFormat = inputNode.outputFormat(forBus: 0)
 
@@ -141,10 +145,31 @@ actor CWAudioCapture {
     private func setupAudioSession() throws {
         let session = AVAudioSession.sharedInstance()
         do {
-            try session.setCategory(.playAndRecord, mode: .measurement, options: [.defaultToSpeaker])
+            // Use .measurement mode to minimize iOS audio processing (AGC, noise suppression)
+            // This is critical for CW decoding where we need the raw signal
+            try session.setCategory(
+                .playAndRecord,
+                mode: .measurement,
+                options: [.defaultToSpeaker, .allowBluetooth]
+            )
             try session.setActive(true)
         } catch {
             throw CWError.audioSessionSetupFailed(error)
+        }
+    }
+
+    /// Disable voice processing on the audio engine's input node.
+    /// This prevents iOS from applying noise suppression and AGC that interfere with CW decoding.
+    private func disableVoiceProcessing() {
+        let inputNode = audioEngine.inputNode
+        // Disable all voice processing - we want the raw audio signal
+        // Voice processing includes noise suppression, AGC, and echo cancellation
+        // which are designed for speech and actively harm CW tone detection
+        do {
+            try inputNode.setVoiceProcessingEnabled(false)
+            print("[CW] Voice processing disabled on input node")
+        } catch {
+            print("[CW] Warning: Could not disable voice processing: \(error)")
         }
     }
 

@@ -267,17 +267,30 @@ actor MorseDecoder {
         // Character gap: 3 units (between characters)
         // Word gap: 7 units (between words)
         //
-        // Use conservative thresholds to avoid breaking up characters:
-        // - Character gap threshold at 2.5 units (closer to actual 3 unit gap)
-        // - Word gap threshold at 5.5 units (closer to actual 7 unit gap)
+        // Use adaptive thresholds based on WPM, but with absolute limits to prevent
+        // runaway feedback loops where wrong WPM causes wrong gap classification
+        // which causes even more wrong WPM.
 
-        let charGapThreshold = unitDuration * 2.5
-        let wordGapThreshold = unitDuration * 5.5
+        let charGapThreshold = unitDuration * 2.0 // Lowered from 2.5 to be more aggressive
+        let wordGapThreshold = unitDuration * 5.0 // Lowered from 5.5
 
-        if duration < charGapThreshold {
+        // Absolute minimum thresholds to prevent feedback loops
+        // At any reasonable WPM (5-40), character gaps should be at least 120ms
+        // and word gaps at least 280ms
+        let minCharGapThreshold: TimeInterval = 0.120
+        let minWordGapThreshold: TimeInterval = 0.280
+
+        let effectiveCharGap = max(charGapThreshold, minCharGapThreshold)
+        let effectiveWordGap = max(wordGapThreshold, minWordGapThreshold)
+
+        // Also use pattern length as a heuristic - if we've accumulated many elements,
+        // we're probably missing character boundaries
+        let patternTooLong = currentPattern.count >= 6
+
+        if duration < effectiveCharGap, !patternTooLong {
             // Element gap - within character, no action needed
             outputs.append(.element(.elementGap))
-        } else if duration < wordGapThreshold {
+        } else if duration < effectiveWordGap {
             // Character gap - decode current pattern
             outputs.append(.element(.charGap))
             outputs.append(contentsOf: flushCurrentCharacter())
@@ -316,6 +329,7 @@ actor MorseDecoder {
     private func updateWPMEstimate(duration: TimeInterval, element: MorseElement) {
         // Skip adaptation when user has manually set WPM
         guard !manualWPMMode else {
+            print("[CW] Skipping WPM adaptation - manual mode enabled")
             return
         }
 
@@ -357,22 +371,20 @@ actor MorseDecoder {
         let sorted = recentDurations.sorted()
         let medianUnit = sorted[sorted.count / 2]
 
-        // Use asymmetric smoothing: faster adaptation when speeding up (shorter durations)
-        // This helps track faster senders more quickly
-        let smoothingFactor = if medianUnit < unitDuration {
-            // Speeding up - adapt faster (30% of new value)
-            0.30
-        } else {
-            // Slowing down - adapt more gently (15% of new value)
-            0.15
-        }
+        // Use moderate smoothing - 25% new value, 75% old
+        // This balances responsiveness with stability
+        let smoothingFactor = 0.25
         unitDuration = unitDuration * (1 - smoothingFactor) + medianUnit * smoothingFactor
 
         // Clamp to valid range
         unitDuration = max(minUnit, min(maxUnit, unitDuration))
 
         // Update WPM
+        let oldWPM = estimatedWPM
         estimatedWPM = MorseCode.Timing.wpm(fromUnitDuration: unitDuration)
+        if estimatedWPM != oldWPM {
+            print("[CW] Adaptive WPM updated: \(oldWPM) -> \(estimatedWPM)")
+        }
     }
 }
 

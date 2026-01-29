@@ -106,6 +106,18 @@ final class CWTranscriptionService: ObservableObject {
     /// Pre-amplifier enabled (boosts weak signals)
     @Published var preAmpEnabled: Bool = false
 
+    /// Detected tone frequency when using adaptive mode (nil if fixed frequency)
+    @Published private(set) var detectedFrequency: Double?
+
+    /// Whether adaptive frequency detection is enabled
+    @Published var adaptiveFrequencyEnabled: Bool = true
+
+    /// Minimum frequency for adaptive detection (Hz)
+    @Published var minFrequency: Double = 400
+
+    /// Maximum frequency for adaptive detection (Hz)
+    @Published var maxFrequency: Double = 900
+
     /// Whether currently listening
     var isListening: Bool {
         state == .listening
@@ -157,13 +169,9 @@ final class CWTranscriptionService: ObservableObject {
                 return
             }
 
-            let sampleRate = 44_100.0 // Standard sample rate
-
-            // Create Goertzel signal processor
-            signalProcessor = GoertzelSignalProcessor(
-                sampleRate: sampleRate,
-                toneFrequency: toneFrequency
-            )
+            // Signal processor will be created on first audio buffer
+            // when we know the actual sample rate
+            signalProcessor = nil
 
             morseDecoder = MorseDecoder(initialWPM: estimatedWPM)
 
@@ -171,7 +179,7 @@ final class CWTranscriptionService: ObservableObject {
             let audioStream = try await capture.startCapture()
             state = .listening
 
-            // Process audio in background
+            // Process audio in background task
             captureTask = Task {
                 await processAudioStream(audioStream)
             }
@@ -206,6 +214,7 @@ final class CWTranscriptionService: ObservableObject {
         isCalibrating = true
         noiseFloor = 0
         signalToNoiseRatio = 0
+        detectedFrequency = nil
     }
 
     /// Clear the transcript
@@ -258,59 +267,82 @@ final class CWTranscriptionService: ObservableObject {
     // MARK: - Private Methods
 
     private func processAudioStream(_ stream: AsyncStream<CWAudioCapture.AudioBuffer>) async {
+        var bufferCount = 0
         for await buffer in stream {
+            bufferCount += 1
+            if bufferCount.isMultiple(of: 100) {
+                print("[CW] Processed \(bufferCount) audio buffers")
+            }
             guard !Task.isCancelled else {
                 break
             }
 
-            // Process through signal processor
-            guard let processor = signalProcessor else {
-                continue
-            }
-
-            // Apply pre-amp boost if enabled
-            let amplifiedSamples: [Float] = if preAmpEnabled {
-                buffer.samples.map { $0 * preAmpGain }
-            } else {
-                buffer.samples
-            }
-
-            let result = await processor.process(
-                samples: amplifiedSamples, timestamp: buffer.timestamp
-            )
-
-            // Track audio timestamp for timeout checking
-            lastAudioTimestamp = buffer.timestamp
-
-            // Update UI state
-            await MainActor.run {
-                self.isKeyDown = result.isKeyDown
-                self.peakAmplitude = result.peakAmplitude
-                self.waveformSamples = result.envelopeSamples
-                self.isCalibrating = result.isCalibrating
-                self.noiseFloor = result.noiseFloor
-                self.signalToNoiseRatio = result.signalToNoiseRatio
-            }
-
-            // Process key events through decoder
-            guard let decoder = morseDecoder else {
-                continue
-            }
-            for event in result.keyEvents {
-                let outputs = await decoder.processKeyEvent(
-                    isKeyDown: event.isDown, timestamp: event.timestamp
-                )
-                await processDecoderOutputs(outputs)
-            }
-
-            // Update WPM
-            let wpm = await decoder.estimatedWPM
-            await MainActor.run {
-                if self.estimatedWPM != wpm {
-                    self.estimatedWPM = wpm
-                }
-            }
+            await processAudioBuffer(buffer)
         }
+    }
+
+    private func processAudioBuffer(_ buffer: CWAudioCapture.AudioBuffer) async {
+        // Create signal processor on first buffer using actual sample rate
+        if signalProcessor == nil {
+            createSignalProcessor(sampleRate: buffer.sampleRate)
+        }
+
+        guard let processor = signalProcessor else {
+            return
+        }
+
+        // Apply pre-amp boost if enabled
+        let samples = preAmpEnabled ? buffer.samples.map { $0 * preAmpGain } : buffer.samples
+        let result = await processor.process(samples: samples, timestamp: buffer.timestamp)
+
+        lastAudioTimestamp = buffer.timestamp
+        updateUIState(from: result)
+
+        // Process key events through decoder
+        guard let decoder = morseDecoder else {
+            return
+        }
+        for event in result.keyEvents {
+            let outputs = await decoder.processKeyEvent(
+                isKeyDown: event.isDown, timestamp: event.timestamp
+            )
+            await processDecoderOutputs(outputs)
+        }
+
+        // Update WPM
+        let wpm = await decoder.estimatedWPM
+        if estimatedWPM != wpm {
+            estimatedWPM = wpm
+        }
+    }
+
+    private func createSignalProcessor(sampleRate: Double) {
+        if adaptiveFrequencyEnabled {
+            print(
+                "[CW] Creating adaptive signal processor: \(Int(minFrequency))-\(Int(maxFrequency)) Hz"
+            )
+            signalProcessor = GoertzelSignalProcessor(
+                sampleRate: sampleRate,
+                minFrequency: minFrequency,
+                maxFrequency: maxFrequency,
+                frequencyStep: 50
+            )
+        } else {
+            print("[CW] Creating fixed signal processor at \(Int(toneFrequency)) Hz")
+            signalProcessor = GoertzelSignalProcessor(
+                sampleRate: sampleRate, toneFrequency: toneFrequency
+            )
+        }
+    }
+
+    private func updateUIState(from result: CWSignalResult) {
+        isKeyDown = result.isKeyDown
+        peakAmplitude = result.peakAmplitude
+        waveformSamples = result.envelopeSamples
+        isCalibrating = result.isCalibrating
+        noiseFloor = result.noiseFloor
+        signalToNoiseRatio = result.signalToNoiseRatio
+        detectedFrequency = result.detectedFrequency
     }
 
     private func processDecoderOutputs(_ outputs: [DecodedOutput]) async {
@@ -335,6 +367,7 @@ final class CWTranscriptionService: ObservableObject {
 
     private func appendCharacter(_ char: String) {
         currentLine += char
+        print("[CW] currentLine is now: '\(currentLine)'")
 
         // Check for line wrap
         if currentLine.count >= lineWrapLength {

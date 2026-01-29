@@ -24,6 +24,9 @@ struct CWSignalResult {
 
     /// Current signal-to-noise ratio (higher = cleaner signal)
     let signalToNoiseRatio: Float
+
+    /// Detected tone frequency when using adaptive frequency mode (nil if fixed)
+    let detectedFrequency: Double?
 }
 
 // MARK: - CWSignalProcessorProtocol

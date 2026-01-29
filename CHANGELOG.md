@@ -5,11 +5,12 @@ All notable changes to Carrier Wave will be documented in this file.
 ## [Unreleased]
 
 ### Added
-- **CW Decoder Backend Selection** - Choose between two signal processing algorithms
-  - Bandpass Filter: Original implementation using bandpass filter, envelope follower, and adaptive threshold
-  - Goertzel: Alternative algorithm using the Goertzel DFT for efficient single-frequency detection
-  - Backend selector in CW transcription view settings (segmented control)
-  - Backend selection also available in settings menu with descriptions
+- **CW Adaptive Frequency Detection** - Automatically detects CW tone frequency within a configurable range
+  - Filter bank of Goertzel filters scans 400-900 Hz (default) with 50 Hz spacing
+  - Locks onto detected frequency after confirmation, stays locked during gaps between elements
+  - Three range presets: Wide (400-900 Hz), Normal (500-800 Hz), Narrow (550-700 Hz)
+  - Toggle between adaptive and fixed frequency modes in settings menu
+  - Detected frequency displayed in UI with auto-detect indicator
 
 ## [1.12.0] - 2026-01-28
 

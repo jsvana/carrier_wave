@@ -11,9 +11,10 @@ Microphone → Audio Capture → Signal Processor → Morse Decoder → UI
                                     ↓
                            ┌───────┴───────┐
                            ↓               ↓
-                    Bandpass Filter   Level Meter
+                    Goertzel Filter   Level Meter
+                    Bank (adaptive)
                            ↓
-                    Envelope Follower
+                    Frequency Tracking
                            ↓
                     Adaptive Threshold
                            ↓
@@ -25,7 +26,7 @@ Microphone → Audio Capture → Signal Processor → Morse Decoder → UI
 | Component | File | Purpose |
 |-----------|------|---------|
 | CWAudioCapture | `Services/CWAudioCapture.swift` | AVAudioEngine microphone capture, outputs `AsyncStream<AudioBuffer>` |
-| CWSignalProcessor | `Services/CWSignalProcessor.swift` | DSP pipeline: filter → envelope → threshold → key events |
+| GoertzelSignalProcessor | `Services/GoertzelSignalProcessor.swift` | Goertzel filter bank with adaptive frequency detection → key events |
 | MorseDecoder | `Services/MorseDecoder.swift` | Timing state machine, classifies dits/dahs, outputs characters |
 | MorseCode | `Services/MorseCode.swift` | Lookup tables, timing constants, abbreviations |
 | CallsignDetector | `Services/CallsignDetector.swift` | Regex-based callsign extraction from transcript |
@@ -41,41 +42,64 @@ Microphone → Audio Capture → Signal Processor → Morse Decoder → UI
 - Outputs `AsyncStream<AudioBuffer>` with samples + timestamps
 - Requires `NSMicrophoneUsageDescription` in Info.plist
 
-### 2. Bandpass Filter (`BiquadFilter`)
+### 2. Goertzel Signal Processor (`GoertzelSignalProcessor`)
 
-Digital biquad bandpass filter isolates CW tone from noise.
+Uses the Goertzel algorithm for efficient single-frequency detection. More computationally efficient than FFT when detecting only one frequency.
 
-**Parameters:**
-- Center frequency: Configurable (default 600 Hz, typical CW sidetone)
-- Q factor: 2.0 (wider passband for tolerance to frequency drift)
-- Uses Audio EQ Cookbook formulas for coefficient calculation
-
-**Implementation:** Direct Form II Transposed for numerical stability.
-
-### 3. Envelope Follower (`EnvelopeFollower`)
-
-Extracts amplitude envelope from filtered signal.
+**Goertzel Algorithm:**
+- Processes audio in small blocks (128 samples, ~3ms at 44.1kHz)
+- Computes magnitude at target frequency using recursive formula
+- Hamming window applied to reduce spectral leakage
 
 **Parameters:**
-- Attack time: ~5ms (fast rise to catch tone onset)
-- Decay time: ~20ms (slower fall to smooth gaps within characters)
-- Outputs rectified, smoothed amplitude values
+- Block size: 128 samples
+- Target frequency: 600 Hz default, or adaptive range
 
-### 4. Adaptive Threshold (`AdaptiveThreshold`)
+### 3. Adaptive Frequency Detection
 
-Detects key-down/key-up transitions from envelope.
+When enabled, automatically detects the CW tone frequency within a configurable range.
+
+**Filter Bank:**
+- Multiple Goertzel filters span the frequency range (e.g., 400-900 Hz)
+- 50 Hz spacing between bins (typically 11 filters)
+- Each bin's magnitude is smoothed (0.85 factor) to reduce noise
+
+**Frequency Tracking Algorithm:**
+1. Only scan for frequency changes when signal is actively present
+2. Find the bin with strongest smoothed magnitude
+3. Require signal to exceed both:
+   - Relative threshold: 5x noise floor
+   - Absolute threshold: 0.0005 magnitude
+4. Track candidate frequency over multiple blocks
+5. Lock to frequency after 15 consecutive blocks of confirmation
+6. When locked, only unlock if a different frequency is 2.5x stronger AND persists for 15 blocks
+7. During silence, decay bin magnitudes to prevent noise accumulation
+
+**Range Presets:**
+- Wide: 400-900 Hz (default)
+- Normal: 500-800 Hz
+- Narrow: 550-700 Hz
+
+### 4. Adaptive Threshold (`GoertzelThreshold`)
+
+Detects key-down/key-up transitions from Goertzel magnitude.
 
 **Algorithm:**
-1. Track `noiseFloor` (decays toward quiet level)
+1. Track `noiseFloor` (bidirectional adaptation)
 2. Track `signalPeak` (fast attack, slow decay)
-3. Calculate signal-to-noise ratio: `sample / noiseFloor`
-4. Key DOWN when ratio > 2.0x
-5. Key UP when ratio < 1.3x
-6. Hysteresis prevents chatter at threshold boundary
+3. Calculate signal-to-noise ratio
+4. Base on-threshold: 8.0x noise (adaptive down to 6.0x in poor SNR)
+5. Off-threshold: 50% of on-threshold (hysteresis)
+6. Confirmation: 3 consecutive blocks required for state change
+7. Relative drop detection for catching element gaps
+
+**Transmission Tracking:**
+- Locks noise floor at transmission start to prevent drift
+- Uses stricter off-confirmation during active transmission
+- Ends transmission after 2 seconds of silence
 
 **Calibration:**
-- First 100 samples used for calibration (no detection)
-- Noise floor starts high (1.0) and decays toward actual quiet level
+- First 30 blocks (~80ms) used for calibration
 - UI shows "Calibrating..." during this period
 
 **Output:** Array of `(isDown: Bool, timestamp: TimeInterval)` events
@@ -83,9 +107,9 @@ Detects key-down/key-up transitions from envelope.
 ### 5. Level Meter Normalization
 
 Peak amplitude is normalized for UI display:
-- Track running maximum of envelope values
+- Track running maximum of Goertzel magnitudes
 - Normalize current peak to 0-1 range: `peak / runningMax`
-- Running max decays slowly (0.9999) to adapt to level changes
+- Running max decays slowly (0.9995) to adapt to level changes
 
 ## Morse Decoding
 
@@ -172,6 +196,8 @@ Scrolling bar chart visualization:
    ├── .wordSpace → append space
    └── .element(MorseElement) → (debugging only)
 
+   Note: In adaptive mode, result includes detectedFrequency for UI display
+
 4. Timeout checker (100ms interval):
    MorseDecoder.checkTimeout(currentTime) → [DecodedOutput]
    └── Flushes pending character if silence > 5 units
@@ -222,11 +248,10 @@ Debug print statements at key points:
 - WPM mismatch (manual override may help)
 - Timing thresholds need adjustment for sender's fist
 
-**Characters splitting apart (Goertzel backend):**
-- Known issue: Manual WPM setting not fully respected yet
-- Adaptive WPM may override user setting, causing timing drift
-- Gap thresholds become too short, treating intra-character gaps as character gaps
-- Workaround: None currently; investigation ongoing
+**Frequency jumping around:**
+- If adaptive mode keeps switching frequencies, try narrowing the range
+- Use "Normal" or "Narrow" preset instead of "Wide"
+- Or disable adaptive mode and set fixed frequency manually
 
 ## Configuration
 
@@ -235,19 +260,26 @@ Debug print statements at key points:
 | Setting | Range | Default | Purpose |
 |---------|-------|---------|---------|
 | WPM | 5-50 | 20 | Manual WPM override (also adaptive) |
-| Tone Frequency | 400-1000 Hz | 600 Hz | Bandpass filter center frequency |
+| Adaptive Frequency | On/Off | On | Auto-detect tone frequency |
+| Frequency Range | Wide/Normal/Narrow | Wide | Range for adaptive detection |
+| Tone Frequency | 400-1000 Hz | 600 Hz | Fixed frequency (when adaptive off) |
+| Pre-Amp | On/Off | Off | 10x signal boost for weak signals |
 
 ### Internal Constants
 
 | Constant | Value | Location |
 |----------|-------|----------|
 | Buffer size | 1024 frames | CWAudioCapture |
-| Filter Q | 2.0 | CWSignalProcessor |
-| Attack time | 5ms | EnvelopeFollower |
-| Decay time | 20ms | EnvelopeFollower |
-| On threshold | 2.0x noise | AdaptiveThreshold |
-| Off threshold | 1.3x noise | AdaptiveThreshold |
-| Calibration samples | 100 | AdaptiveThreshold |
+| Goertzel block size | 128 samples | GoertzelSignalProcessor |
+| Frequency step | 50 Hz | GoertzelSignalProcessor |
+| Frequency lock threshold | 15 blocks | GoertzelSignalProcessor |
+| Bin smoothing factor | 0.85 | GoertzelSignalProcessor |
+| Detection ratio | 5.0x noise | GoertzelSignalProcessor |
+| Min detection magnitude | 0.0005 | GoertzelSignalProcessor |
+| Base on threshold | 8.0x noise | GoertzelThreshold |
+| Off threshold ratio | 0.5x on | GoertzelThreshold |
+| Calibration blocks | 30 | GoertzelThreshold |
+| Confirmation blocks | 3 | GoertzelThreshold |
 | Char timeout | 5 units | MorseDecoder |
 
 ## Future Improvements

@@ -109,7 +109,9 @@
 | `CWError.swift` | CW transcription error types |
 | `CWAudioCapture.swift` | AVAudioEngine microphone capture for CW decoding |
 | `CWSignalProcessorProtocol.swift` | Protocol for signal processors, CWSignalResult struct |
-| `GoertzelSignalProcessor.swift` | Goertzel algorithm-based CW signal processor |
+| `GoertzelFilter.swift` | Goertzel algorithm for single-frequency detection |
+| `GoertzelThreshold.swift` | Adaptive threshold for key state detection |
+| `GoertzelSignalProcessor.swift` | Goertzel-based CW processor with adaptive frequency detection |
 | `MorseCode.swift` | Morse code lookup table, timing constants, QSO abbreviations |
 | `MorseDecoder.swift` | Timing state machine for dit/dah classification, adaptive WPM |
 | `CWTranscriptionService.swift` | Coordinates audio capture, signal processing, and morse decoding |
@@ -119,6 +121,7 @@
 | File | Purpose |
 |------|---------|
 | `CWTranscriptionView.swift` | Main CW transcription container with controls |
+| `CWSettingsMenu.swift` | Settings menu for WPM, frequency, and signal options |
 | `CWWaveformView.swift` | Real-time audio waveform visualization, includes CWLevelMeter |
 | `CWTranscriptView.swift` | Decoded text display with timestamps |
 | `CWDetectedCallsignBar.swift` | Detected callsign display with "Use" button, highlighted text |
