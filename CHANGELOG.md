@@ -2,6 +2,16 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
+## [1.12.0] - 2026-01-28
+
+### Added
+- **iPad Support** - Full iPad-optimized layouts following Apple HIG
+  - Sidebar navigation on iPad (NavigationSplitView) instead of tab bar
+  - Activity view uses side-by-side layout (challenges + feed columns)
+  - Dashboard stats grid shows all 6 stats in one row on iPad
+  - Activity grid dynamically shows 26-52 weeks based on screen width
+  - iPhone retains existing TabView navigation (unchanged)
+
 ## [1.11.1] - 2026-01-28
 
 ### Fixed
