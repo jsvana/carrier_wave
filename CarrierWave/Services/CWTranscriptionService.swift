@@ -9,12 +9,14 @@ struct CWTranscriptEntry: Identifiable, Equatable {
     let id: UUID
     let timestamp: Date
     let text: String
+    let elements: [CWTextElement]
     let isWordSpace: Bool
 
     init(id: UUID = UUID(), timestamp: Date = Date(), text: String, isWordSpace: Bool = false) {
         self.id = id
         self.timestamp = timestamp
         self.text = text
+        self.elements = CallsignDetector.parseElements(from: text)
         self.isWordSpace = isWordSpace
     }
 }
@@ -61,6 +63,12 @@ final class CWTranscriptionService: ObservableObject {
 
     /// Recent envelope samples for waveform visualization
     @Published private(set) var waveformSamples: [Float] = []
+
+    /// Most recently detected callsign from transcript
+    @Published private(set) var detectedCallsign: DetectedCallsign?
+
+    /// All callsigns detected in current session
+    @Published private(set) var detectedCallsigns: [String] = []
 
     /// Tone frequency for bandpass filter
     @Published var toneFrequency: Double = 600 {
@@ -147,6 +155,8 @@ final class CWTranscriptionService: ObservableObject {
     func clearTranscript() {
         transcript = []
         currentLine = ""
+        detectedCallsign = nil
+        detectedCallsigns = []
     }
 
     /// Copy transcript to clipboard
@@ -255,6 +265,25 @@ final class CWTranscriptionService: ObservableObject {
         // Trim old entries
         if transcript.count > maxTranscriptEntries {
             transcript.removeFirst(transcript.count - maxTranscriptEntries)
+        }
+
+        // Update detected callsigns
+        updateDetectedCallsigns()
+    }
+
+    private func updateDetectedCallsigns() {
+        // Extract all callsigns from current transcript
+        let allText = transcript.map(\.text).joined(separator: " ") + " " + currentLine
+        let newCallsigns = CallsignDetector.extractCallsigns(from: allText)
+
+        // Update unique callsigns list
+        for callsign in newCallsigns where !detectedCallsigns.contains(callsign) {
+            detectedCallsigns.append(callsign)
+        }
+
+        // Update primary detected callsign
+        if let primary = CallsignDetector.detectPrimaryCallsign(from: transcript) {
+            detectedCallsign = primary
         }
     }
 

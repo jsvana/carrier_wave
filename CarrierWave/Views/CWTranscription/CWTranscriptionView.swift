@@ -29,6 +29,19 @@ struct CWTranscriptionView: View {
                 transcriptArea
                     .padding(.horizontal)
 
+                // Detected callsign bar
+                if service.detectedCallsign != nil {
+                    CWDetectedCallsignBar(
+                        callsign: service.detectedCallsign,
+                        allCallsigns: service.detectedCallsigns,
+                        onUse: { callsign in
+                            onLog?(callsign)
+                        }
+                    )
+                    .padding(.horizontal)
+                    .padding(.top, 8)
+                }
+
                 Spacer()
 
                 // Control buttons

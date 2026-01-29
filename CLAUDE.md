@@ -112,6 +112,7 @@
 | `MorseCode.swift` | Morse code lookup table, timing constants, QSO abbreviations |
 | `MorseDecoder.swift` | Timing state machine for dit/dah classification, adaptive WPM |
 | `CWTranscriptionService.swift` | Coordinates audio capture, signal processing, and morse decoding |
+| `CallsignDetector.swift` | Callsign regex detection, context analysis, text element parsing |
 
 ### Views - CW Transcription (`CarrierWave/Views/CWTranscription/`)
 | File | Purpose |
@@ -119,6 +120,7 @@
 | `CWTranscriptionView.swift` | Main CW transcription container with controls |
 | `CWWaveformView.swift` | Real-time audio waveform visualization |
 | `CWTranscriptView.swift` | Decoded text display with timestamps |
+| `CWDetectedCallsignBar.swift` | Detected callsign display with "Use" button, highlighted text |
 
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |

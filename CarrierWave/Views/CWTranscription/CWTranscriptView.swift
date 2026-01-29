@@ -64,10 +64,15 @@ struct CWTranscriptView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 60, alignment: .leading)
 
-            // Decoded text
-            Text(entry.text)
-                .font(.body.monospaced())
-                .foregroundStyle(.primary)
+            // Decoded text with highlighting
+            if !entry.elements.isEmpty {
+                CWHighlightedText(elements: entry.elements)
+                    .font(.body.monospaced())
+            } else {
+                Text(entry.text)
+                    .font(.body.monospaced())
+                    .foregroundStyle(.primary)
+            }
 
             Spacer()
         }
