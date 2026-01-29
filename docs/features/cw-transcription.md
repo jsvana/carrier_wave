@@ -222,6 +222,12 @@ Debug print statements at key points:
 - WPM mismatch (manual override may help)
 - Timing thresholds need adjustment for sender's fist
 
+**Characters splitting apart (Goertzel backend):**
+- Known issue: Manual WPM setting not fully respected yet
+- Adaptive WPM may override user setting, causing timing drift
+- Gap thresholds become too short, treating intra-character gaps as character gaps
+- Workaround: None currently; investigation ongoing
+
 ## Configuration
 
 ### User-Adjustable Settings

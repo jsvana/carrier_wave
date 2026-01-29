@@ -160,12 +160,23 @@ actor MorseDecoder {
         reset()
         estimatedWPM = wpm ?? initialWPM
         unitDuration = MorseCode.Timing.unitDuration(forWPM: estimatedWPM)
+        manualWPMMode = false // Re-enable adaptive estimation on full reset
     }
 
-    /// Manually set WPM (disables adaptive estimation temporarily)
+    /// Manually set WPM (disables adaptive estimation)
     func setWPM(_ wpm: Int) {
         estimatedWPM = max(minWPM, min(maxWPM, wpm))
         unitDuration = MorseCode.Timing.unitDuration(forWPM: estimatedWPM)
+        manualWPMMode = true
+        recentDurations = [] // Clear stale timing data
+        let unitMs = String(format: "%.1f", unitDuration * 1_000)
+        print("[CW] Manual WPM set to \(estimatedWPM), unit duration: \(unitMs)ms")
+    }
+
+    /// Enable adaptive WPM estimation (re-enables after manual set)
+    func enableAdaptiveWPM() {
+        manualWPMMode = false
+        recentDurations = []
     }
 
     // MARK: Private
@@ -197,6 +208,9 @@ actor MorseDecoder {
 
     /// Estimated unit duration in seconds
     private var unitDuration: TimeInterval
+
+    /// When true, adaptive WPM estimation is disabled (user set WPM manually)
+    private var manualWPMMode: Bool = false
 
     /// Current morse pattern being assembled
     private var currentPattern: String = ""
@@ -298,6 +312,11 @@ actor MorseDecoder {
 
     /// Update WPM estimate based on a classified element
     private func updateWPMEstimate(duration: TimeInterval, element: MorseElement) {
+        // Skip adaptation when user has manually set WPM
+        guard !manualWPMMode else {
+            return
+        }
+
         // Only use dits and dahs for estimation
         guard element == .dit || element == .dah else {
             return
