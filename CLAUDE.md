@@ -106,6 +106,9 @@
 | `SyncService+Activity.swift` | Hook activity detection into sync flow |
 | `ActivityFeedSyncService.swift` | Sync activity feed from server |
 | `POTAPresenceRepairService.swift` | Detect and fix incorrectly marked POTA service presence |
+| `CWError.swift` | CW transcription error types |
+| `CWAudioCapture.swift` | AVAudioEngine microphone capture for CW decoding |
+| `CWSignalProcessor.swift` | DSP pipeline: bandpass filter, envelope follower, threshold detection |
 
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |
