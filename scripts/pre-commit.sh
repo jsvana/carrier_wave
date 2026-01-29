@@ -10,8 +10,8 @@ GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
 NC='\033[0m' # No Color
 
-# Get staged Swift files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.swift$' || true)
+# Get staged Swift files (excluding Tools/ which contains standalone scripts)
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM | grep '\.swift$' | grep -v '^Tools/' || true)
 
 if [ -z "$STAGED_FILES" ]; then
     echo -e "${GREEN}No Swift files staged, skipping lint/format checks${NC}"
