@@ -276,6 +276,39 @@ When releasing a new version, update **both** locations:
 2. **Settings view** (`CarrierWave/Views/Settings/SettingsView.swift`):
    - Update the hardcoded version string in the "About" section (~line 232)
 
+## Changelog
+
+**Maintain the changelog incrementally as you work.** Do not construct it from git history.
+
+**File:** `CHANGELOG.md`
+
+**When to update:**
+- After completing a feature (add to "Added" section)
+- After fixing a bug (add to "Fixed" section)
+- After making breaking or notable changes (add to "Changed" section)
+
+**Format:** Follow [Keep a Changelog](https://keepachangelog.com/) conventions:
+
+```markdown
+## [Unreleased]
+
+### Added
+- New feature description
+
+### Fixed
+- Bug fix description
+
+### Changed
+- Notable change description
+```
+
+**Guidelines:**
+- Write entries immediately after completing work, while context is fresh
+- Use imperative mood ("Add feature" not "Added feature")
+- Be specific but concise - one line per change
+- Group related changes under a single bullet with sub-items if needed
+- When releasing, rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`
+
 ## Issue and feature ideas
 
 I'll occasionally store human-generated plans/bugs/etc in `docs/plans/human` and `docs/bugs`. Look through these to find new work to do. Mark the documents as done in a way that you can easily find once they're completed.
