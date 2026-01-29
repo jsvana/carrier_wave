@@ -115,7 +115,9 @@ actor MorseDecoder {
 
             let gapOutput = processGap(duration: duration, timestamp: timestamp)
             outputs.append(contentsOf: gapOutput)
-            print("[CW] Gap ended: \(String(format: "%.0f", duration * 1_000))ms - outputs: \(gapOutput)")
+            print(
+                "[CW] Gap ended: \(String(format: "%.0f", duration * 1_000))ms - outputs: \(gapOutput)"
+            )
 
             lastElementTime = timestamp
         }
@@ -224,8 +226,8 @@ actor MorseDecoder {
     /// Recent element durations for WPM estimation (key-down only)
     private var recentDurations: [TimeInterval] = []
 
-    /// Maximum durations to keep for averaging
-    private let maxDurationSamples: Int = 20
+    /// Maximum durations to keep for averaging (smaller = more responsive)
+    private let maxDurationSamples: Int = 10
 
     /// Time since last element (for detecting timeouts)
     private var lastElementTime: TimeInterval = 0
@@ -265,7 +267,7 @@ actor MorseDecoder {
         // Character gap: 3 units (between characters)
         // Word gap: 7 units (between words)
         //
-        // Use more conservative thresholds to avoid breaking up characters:
+        // Use conservative thresholds to avoid breaking up characters:
         // - Character gap threshold at 2.5 units (closer to actual 3 unit gap)
         // - Word gap threshold at 5.5 units (closer to actual 7 unit gap)
 
@@ -323,17 +325,20 @@ actor MorseDecoder {
         }
 
         // Calculate what the unit duration would be for this element
-        let estimatedUnit: TimeInterval = if element == .dit {
-            duration / MorseCode.Timing.ditUnits
-        } else {
-            duration / MorseCode.Timing.dahUnits
-        }
+        let estimatedUnit: TimeInterval =
+            if element == .dit {
+                duration / MorseCode.Timing.ditUnits
+            } else {
+                duration / MorseCode.Timing.dahUnits
+            }
 
         // Sanity check: reject unreasonable unit durations
         let minUnit = MorseCode.Timing.unitDuration(forWPM: maxWPM)
         let maxUnit = MorseCode.Timing.unitDuration(forWPM: minWPM)
         guard estimatedUnit >= minUnit, estimatedUnit <= maxUnit else {
-            print("[CW] Rejecting unreasonable unit estimate: \(String(format: "%.1f", estimatedUnit * 1_000))ms")
+            print(
+                "[CW] Rejecting unreasonable unit estimate: \(String(format: "%.1f", estimatedUnit * 1_000))ms"
+            )
             return
         }
 
@@ -352,8 +357,15 @@ actor MorseDecoder {
         let sorted = recentDurations.sorted()
         let medianUnit = sorted[sorted.count / 2]
 
-        // Update unit duration with very gentle smoothing to prevent rapid changes
-        let smoothingFactor = 0.15
+        // Use asymmetric smoothing: faster adaptation when speeding up (shorter durations)
+        // This helps track faster senders more quickly
+        let smoothingFactor = if medianUnit < unitDuration {
+            // Speeding up - adapt faster (30% of new value)
+            0.30
+        } else {
+            // Slowing down - adapt more gently (15% of new value)
+            0.15
+        }
         unitDuration = unitDuration * (1 - smoothingFactor) + medianUnit * smoothingFactor
 
         // Clamp to valid range

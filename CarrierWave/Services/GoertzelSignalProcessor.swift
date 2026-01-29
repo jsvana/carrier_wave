@@ -197,7 +197,7 @@ struct GoertzelThreshold {
     /// Reset threshold state
     mutating func reset() {
         signalPeak = 0
-        noiseFloor = 1.0
+        noiseFloor = 0.01 // Start at reasonable level, will adapt quickly
         isKeyDown = false
         blockCount = 0
         activeSignalLevel = 0
@@ -209,7 +209,7 @@ struct GoertzelThreshold {
     // MARK: Private
 
     private var signalPeak: Float = 0
-    private var noiseFloor: Float = 1.0
+    private var noiseFloor: Float = 0.01 // Start at reasonable level
     private var isKeyDown = false
     private var blockCount: Int = 0
     private var activeSignalLevel: Float = 0
@@ -242,13 +242,17 @@ struct GoertzelThreshold {
             signalPeak *= peakDecay
         }
 
-        // Update noise floor (only when magnitude is low)
+        // Update noise floor with bidirectional adaptation
         if magnitude < noiseFloor {
-            noiseFloor = noiseFloor * 0.8 + magnitude * 0.2
-        } else if magnitude < noiseFloor * 2 {
-            // Slow adaptation when slightly above noise
-            noiseFloor *= noiseDecay
+            // Below current estimate - drop quickly to track quieter conditions
+            noiseFloor = noiseFloor * 0.9 + magnitude * 0.1
+        } else if magnitude < noiseFloor * onThreshold {
+            // Above current estimate but below signal threshold - rise to track actual noise
+            // Use faster adaptation during calibration
+            let adaptRate: Float = blockCount < calibrationBlocks ? 0.1 : 0.02
+            noiseFloor = noiseFloor * (1.0 - adaptRate) + magnitude * adaptRate
         }
+        // When signal is present (above threshold), don't adapt noise floor
         noiseFloor = max(noiseFloor, 0.0001)
     }
 }
@@ -326,7 +330,9 @@ actor GoertzelSignalProcessor {
                 keyEvents.append(event)
                 let state = event.isDown ? "DN" : "UP"
                 let ratio = magnitude / max(threshold.currentNoiseFloor, 0.0001)
-                print("[CW-G] \(state) mag:\(String(format: "%.4f", magnitude)) r:\(String(format: "%.1f", ratio))")
+                print(
+                    "[CW-G] \(state) mag:\(String(format: "%.4f", magnitude)) r:\(String(format: "%.1f", ratio))"
+                )
             }
 
             sampleIndex += blockSize
@@ -382,7 +388,7 @@ actor GoertzelSignalProcessor {
         threshold.reset()
         leftoverSamples = []
         recentMagnitudes = []
-        runningMax = 0.001
+        runningMax = 0.01 // Match initial noise floor
     }
 
     // MARK: Private
@@ -403,14 +409,16 @@ actor GoertzelSignalProcessor {
     private var recentMagnitudes: [Float] = []
 
     // Normalization
-    private var runningMax: Float = 0.001
+    private var runningMax: Float = 0.01 // Match initial noise floor
     private let maxDecay: Float = 0.9995
 
     /// Pre-computed Hamming window
     private lazy var hammingWindow: [Float] = {
         var window = [Float](repeating: 0, count: blockSize)
         for i in 0 ..< blockSize {
-            window[i] = Float(0.54 - 0.46 * cos(2.0 * Double.pi * Double(i) / Double(blockSize - 1)))
+            window[i] = Float(
+                0.54 - 0.46 * cos(2.0 * Double.pi * Double(i) / Double(blockSize - 1))
+            )
         }
         return window
     }()

@@ -11,9 +11,11 @@
 import Accelerate
 import Foundation
 
-// MARK: - WAV File Reader
+// MARK: - WAVFile
 
 struct WAVFile {
+    // MARK: Internal
+
     let sampleRate: Int
     let channels: Int
     let bitsPerSample: Int
@@ -27,12 +29,12 @@ struct WAVFile {
             throw WAVError.invalidFormat("File too small")
         }
 
-        let riff = String(data: data[0..<4], encoding: .ascii)
+        let riff = String(data: data[0 ..< 4], encoding: .ascii)
         guard riff == "RIFF" else {
             throw WAVError.invalidFormat("Not a RIFF file")
         }
 
-        let wave = String(data: data[8..<12], encoding: .ascii)
+        let wave = String(data: data[8 ..< 12], encoding: .ascii)
         guard wave == "WAVE" else {
             throw WAVError.invalidFormat("Not a WAVE file")
         }
@@ -46,18 +48,18 @@ struct WAVFile {
         var bitsPerSample: UInt16 = 0
 
         while offset < data.count - 8 {
-            let chunkID = String(data: data[offset..<offset + 4], encoding: .ascii) ?? ""
-            let chunkSize = data.subdata(in: offset + 4..<offset + 8)
+            let chunkID = String(data: data[offset ..< offset + 4], encoding: .ascii) ?? ""
+            let chunkSize = data.subdata(in: offset + 4 ..< offset + 8)
                 .withUnsafeBytes { $0.load(as: UInt32.self) }
 
             if chunkID == "fmt " {
-                audioFormat = data.subdata(in: offset + 8..<offset + 10)
+                audioFormat = data.subdata(in: offset + 8 ..< offset + 10)
                     .withUnsafeBytes { $0.load(as: UInt16.self) }
-                channels = data.subdata(in: offset + 10..<offset + 12)
+                channels = data.subdata(in: offset + 10 ..< offset + 12)
                     .withUnsafeBytes { $0.load(as: UInt16.self) }
-                sampleRate = data.subdata(in: offset + 12..<offset + 16)
+                sampleRate = data.subdata(in: offset + 12 ..< offset + 16)
                     .withUnsafeBytes { $0.load(as: UInt32.self) }
-                bitsPerSample = data.subdata(in: offset + 22..<offset + 24)
+                bitsPerSample = data.subdata(in: offset + 22 ..< offset + 24)
                     .withUnsafeBytes { $0.load(as: UInt16.self) }
                 fmtChunkFound = true
             }
@@ -72,7 +74,7 @@ struct WAVFile {
 
                 let dataStart = offset + 8
                 let dataEnd = min(dataStart + Int(chunkSize), data.count)
-                let audioData = data.subdata(in: dataStart..<dataEnd)
+                let audioData = data.subdata(in: dataStart ..< dataEnd)
 
                 let samples = try parseSamples(
                     audioData,
@@ -94,6 +96,8 @@ struct WAVFile {
         throw WAVError.invalidFormat("data chunk not found")
     }
 
+    // MARK: Private
+
     private static func parseSamples(_ data: Data, bitsPerSample: Int, channels: Int) throws
         -> [Float]
     {
@@ -105,7 +109,7 @@ struct WAVFile {
             var offset = 0
             while offset + bytesPerSample <= data.count {
                 // Read first channel only for mono processing
-                let sample = data.subdata(in: offset..<offset + 2)
+                let sample = data.subdata(in: offset ..< offset + 2)
                     .withUnsafeBytes { $0.load(as: Int16.self) }
                 samples.append(Float(sample) / Float(Int16.max))
                 offset += bytesPerSample
@@ -127,19 +131,16 @@ struct WAVFile {
     }
 }
 
+// MARK: - WAVError
+
 enum WAVError: Error {
     case invalidFormat(String)
 }
 
-// MARK: - Goertzel Filter (copied from GoertzelSignalProcessor.swift)
+// MARK: - GoertzelFilter
 
 struct GoertzelFilter {
-    let targetFrequency: Double
-    let sampleRate: Double
-    let blockSize: Int
-    let coefficient: Double
-    private let cosOmega: Double
-    private let sinOmega: Double
+    // MARK: Lifecycle
 
     init(targetFrequency: Double, sampleRate: Double, blockSize: Int) {
         self.targetFrequency = targetFrequency
@@ -152,6 +153,13 @@ struct GoertzelFilter {
         cosOmega = cos(omega)
         sinOmega = sin(omega)
     }
+
+    // MARK: Internal
+
+    let targetFrequency: Double
+    let sampleRate: Double
+    let blockSize: Int
+    let coefficient: Double
 
     func processSamples(_ samples: [Float]) -> Float {
         var s1 = 0.0
@@ -167,34 +175,82 @@ struct GoertzelFilter {
         let magnitude = sqrt(max(0, power)) / Double(blockSize)
         return Float(magnitude)
     }
+
+    // MARK: Private
+
+    private let cosOmega: Double
+    private let sinOmega: Double
 }
 
-// MARK: - Goertzel Threshold
+// MARK: - ThresholdConfig
+
+struct ThresholdConfig {
+    static let `default` = ThresholdConfig()
+
+    static let noisy = ThresholdConfig(
+        calibrationBlocks: 30,
+        confirmationBlocks: 4,
+        minimumStateDuration: 0.025,
+        onThreshold: 12.0,
+        offThreshold: 5.0,
+        dropThreshold: 0.30,
+        peakDecay: 0.99,
+        noiseDecay: 0.998,
+        noiseRise: 0.7,
+        activeDecay: 0.96
+    )
+
+    static let aggressive = ThresholdConfig(
+        calibrationBlocks: 40,
+        confirmationBlocks: 5,
+        minimumStateDuration: 0.030,
+        onThreshold: 15.0,
+        offThreshold: 6.0,
+        dropThreshold: 0.25,
+        peakDecay: 0.985,
+        noiseDecay: 0.999,
+        noiseRise: 0.6,
+        activeDecay: 0.95
+    )
+
+    var calibrationBlocks: Int = 20 // Blocks to wait before detecting (was 10)
+    var confirmationBlocks: Int = 3 // Consecutive blocks needed to confirm state change (was 2)
+    var minimumStateDuration: TimeInterval = 0.020 // Min time between state changes (was 0.015)
+    var onThreshold: Float = 8.0 // Ratio to trigger key-down (was 6.0)
+    var offThreshold: Float = 4.0 // Ratio to trigger key-up (was 3.0)
+    var dropThreshold: Float = 0.35 // Relative drop to trigger key-up (was 0.4)
+    var peakDecay: Float = 0.995 // How fast peak estimate decays
+    var noiseDecay: Float = 0.995 // How fast noise floor decays when signal present (was 0.99)
+    var noiseRise: Float = 0.92 // How fast noise floor rises to match actual noise (was 0.8)
+    var activeDecay: Float = 0.97 // How fast active signal level decays (was 0.98)
+}
+
+// MARK: - GoertzelThreshold
 
 struct GoertzelThreshold {
-    private var signalPeak: Float = 0
-    private var noiseFloor: Float = 1.0
-    private var isKeyDown = false
-    private var blockCount: Int = 0
-    private var activeSignalLevel: Float = 0
-    private var lastStateChangeTime: TimeInterval = 0
-    private var blocksAboveThreshold: Int = 0
-    private var blocksBelowThreshold: Int = 0
+    // MARK: Lifecycle
 
-    private let calibrationBlocks: Int = 10
-    private let confirmationBlocks: Int = 2
-    private let minimumStateDuration: TimeInterval = 0.015
-    private let onThreshold: Float = 6.0
-    private let offThreshold: Float = 3.0
-    private let dropThreshold: Float = 0.4
-    private let peakDecay: Float = 0.995
-    private let noiseDecay: Float = 0.99
-    private let activeDecay: Float = 0.98
+    init(config: ThresholdConfig = .default) {
+        self.config = config
+    }
 
-    var currentKeyState: Bool { isKeyDown }
-    var isCalibrating: Bool { blockCount < calibrationBlocks }
-    var currentNoiseFloor: Float { noiseFloor }
-    var currentSignalPeak: Float { signalPeak }
+    // MARK: Internal
+
+    var currentKeyState: Bool {
+        isKeyDown
+    }
+
+    var isCalibrating: Bool {
+        blockCount < config.calibrationBlocks
+    }
+
+    var currentNoiseFloor: Float {
+        noiseFloor
+    }
+
+    var currentSignalPeak: Float {
+        signalPeak
+    }
 
     mutating func process(
         magnitude: Float,
@@ -204,14 +260,16 @@ struct GoertzelThreshold {
         blockCount += 1
         updateSignalEstimates(magnitude: magnitude)
 
-        guard !isCalibrating else { return nil }
+        guard !isCalibrating else {
+            return nil
+        }
 
         let ratio = magnitude / max(noiseFloor, 0.0001)
 
-        if ratio > onThreshold {
+        if ratio > config.onThreshold {
             blocksAboveThreshold += 1
             blocksBelowThreshold = 0
-        } else if ratio < offThreshold {
+        } else if ratio < config.offThreshold {
             blocksBelowThreshold += 1
             blocksAboveThreshold = 0
         } else {
@@ -223,7 +281,9 @@ struct GoertzelThreshold {
         let timeSinceChange = blockStartTime - lastStateChangeTime
 
         if !isKeyDown {
-            if blocksAboveThreshold >= confirmationBlocks, timeSinceChange >= minimumStateDuration {
+            if blocksAboveThreshold >= config.confirmationBlocks,
+               timeSinceChange >= config.minimumStateDuration
+            {
                 isKeyDown = true
                 activeSignalLevel = magnitude
                 blocksAboveThreshold = 0
@@ -232,12 +292,14 @@ struct GoertzelThreshold {
             if magnitude > activeSignalLevel {
                 activeSignalLevel = magnitude
             } else {
-                activeSignalLevel *= activeDecay
+                activeSignalLevel *= config.activeDecay
             }
 
             let relativeDrop = magnitude / max(activeSignalLevel, 0.0001)
-            if timeSinceChange >= minimumStateDuration {
-                if blocksBelowThreshold >= confirmationBlocks || relativeDrop < dropThreshold {
+            if timeSinceChange >= config.minimumStateDuration {
+                if blocksBelowThreshold >= config.confirmationBlocks
+                    || relativeDrop < config.dropThreshold
+                {
                     isKeyDown = false
                     blocksBelowThreshold = 0
                 }
@@ -253,25 +315,59 @@ struct GoertzelThreshold {
         return nil
     }
 
+    // MARK: Private
+
+    private var signalPeak: Float = 0
+    private var noiseFloor: Float = 1.0
+    private var isKeyDown = false
+    private var blockCount: Int = 0
+    private var activeSignalLevel: Float = 0
+    private var lastStateChangeTime: TimeInterval = 0
+    private var blocksAboveThreshold: Int = 0
+    private var blocksBelowThreshold: Int = 0
+
+    private let config: ThresholdConfig
+
     private mutating func updateSignalEstimates(magnitude: Float) {
         if magnitude > signalPeak {
             signalPeak = magnitude
         } else {
-            signalPeak *= peakDecay
+            signalPeak *= config.peakDecay
         }
 
         if magnitude < noiseFloor {
-            noiseFloor = noiseFloor * 0.8 + magnitude * 0.2
+            // Noise floor drops quickly to track actual noise
+            noiseFloor = noiseFloor * config.noiseRise + magnitude * (1.0 - config.noiseRise)
         } else if magnitude < noiseFloor * 2 {
-            noiseFloor *= noiseDecay
+            // When slightly above noise, slowly adapt upward
+            noiseFloor = noiseFloor * config.noiseDecay + magnitude * (1.0 - config.noiseDecay)
+        }
+        // Also slowly raise noise floor if we're seeing consistently higher values
+        // This helps track changing noise conditions
+        if magnitude > noiseFloor, magnitude < noiseFloor * config.onThreshold {
+            noiseFloor = noiseFloor * 0.999 + magnitude * 0.001
         }
         noiseFloor = max(noiseFloor, 0.0001)
     }
 }
 
-// MARK: - Morse Code Lookup
+// MARK: - MorseCode
 
 enum MorseCode {
+    enum Timing {
+        static let ditUnits: Double = 1.0
+        static let dahUnits: Double = 3.0
+
+        static func unitDuration(forWPM wpm: Int) -> TimeInterval {
+            // PARIS standard: 50 units per word
+            1.2 / Double(wpm)
+        }
+
+        static func wpm(fromUnitDuration unit: TimeInterval) -> Int {
+            max(5, min(60, Int(round(1.2 / unit))))
+        }
+    }
+
     static let decodeTable: [String: String] = [
         ".-": "A", "-...": "B", "-.-.": "C", "-..": "D", ".": "E",
         "..-.": "F", "--.": "G", "....": "H", "..": "I", ".---": "J",
@@ -291,23 +387,9 @@ enum MorseCode {
     static func decode(_ pattern: String) -> String? {
         decodeTable[pattern]
     }
-
-    enum Timing {
-        static let ditUnits: Double = 1.0
-        static let dahUnits: Double = 3.0
-
-        static func unitDuration(forWPM wpm: Int) -> TimeInterval {
-            // PARIS standard: 50 units per word
-            1.2 / Double(wpm)
-        }
-
-        static func wpm(fromUnitDuration unit: TimeInterval) -> Int {
-            max(5, min(60, Int(round(1.2 / unit))))
-        }
-    }
 }
 
-// MARK: - Morse Element
+// MARK: - MorseElement
 
 enum MorseElement: Equatable {
     case dit
@@ -315,6 +397,8 @@ enum MorseElement: Equatable {
     case elementGap
     case charGap
     case wordGap
+
+    // MARK: Internal
 
     var symbol: String {
         switch self {
@@ -327,7 +411,7 @@ enum MorseElement: Equatable {
     }
 }
 
-// MARK: - Decoded Output
+// MARK: - DecodedOutput
 
 enum DecodedOutput: Equatable {
     case character(String)
@@ -335,32 +419,18 @@ enum DecodedOutput: Equatable {
     case element(MorseElement)
 }
 
-// MARK: - Morse Decoder
+// MARK: - MorseDecoder
 
 class MorseDecoder {
-    private var estimatedWPM: Int
-    private var unitDuration: TimeInterval
-    private var currentPattern: String = ""
-    private var lastKeyDown: Bool = false
-    private var lastStateChange: TimeInterval = 0
-    private var recentDurations: [TimeInterval] = []
-    private var lastElementTime: TimeInterval = 0
-    private var manualWPMMode: Bool = false
-
-    private let minWPM: Int = 5
-    private let maxWPM: Int = 60
-    private let timingTolerance: Double = 0.5
-    private let minimumToneDuration: TimeInterval = 0.025
-    private let minimumGapDuration: TimeInterval = 0.020
-    private let minSamplesForAdaptation: Int = 5
-    private let maxDurationSamples: Int = 20
-    private let charTimeoutUnits: Double = 5.0
+    // MARK: Lifecycle
 
     init(initialWPM: Int = 20, adaptive: Bool = true) {
         estimatedWPM = initialWPM
         unitDuration = MorseCode.Timing.unitDuration(forWPM: initialWPM)
         manualWPMMode = !adaptive
     }
+
+    // MARK: Internal
 
     func processKeyEvent(isKeyDown: Bool, timestamp: TimeInterval) -> [DecodedOutput] {
         var outputs: [DecodedOutput] = []
@@ -387,7 +457,7 @@ class MorseDecoder {
 
             let elementName = element == .dit ? "DIT" : "DAH"
             print(
-                "  [TONE] \(elementName) \(String(format: "%.0f", duration * 1000))ms -> pattern: \(currentPattern)"
+                "  [TONE] \(elementName) \(String(format: "%.0f", duration * 1_000))ms -> pattern: \(currentPattern)"
             )
 
             updateWPMEstimate(duration: duration, element: element)
@@ -409,7 +479,9 @@ class MorseDecoder {
     }
 
     func checkTimeout(currentTime: TimeInterval) -> [DecodedOutput] {
-        guard !currentPattern.isEmpty else { return [] }
+        guard !currentPattern.isEmpty else {
+            return []
+        }
 
         let silenceDuration = currentTime - lastElementTime
         let timeoutDuration = unitDuration * charTimeoutUnits
@@ -421,7 +493,29 @@ class MorseDecoder {
         return []
     }
 
-    func getEstimatedWPM() -> Int { estimatedWPM }
+    func getEstimatedWPM() -> Int {
+        estimatedWPM
+    }
+
+    // MARK: Private
+
+    private var estimatedWPM: Int
+    private var unitDuration: TimeInterval
+    private var currentPattern: String = ""
+    private var lastKeyDown: Bool = false
+    private var lastStateChange: TimeInterval = 0
+    private var recentDurations: [TimeInterval] = []
+    private var lastElementTime: TimeInterval = 0
+    private var manualWPMMode: Bool = false
+
+    private let minWPM: Int = 5
+    private let maxWPM: Int = 60
+    private let timingTolerance: Double = 0.5
+    private let minimumToneDuration: TimeInterval = 0.025
+    private let minimumGapDuration: TimeInterval = 0.020
+    private let minSamplesForAdaptation: Int = 5
+    private let maxDurationSamples: Int = 20
+    private let charTimeoutUnits: Double = 5.0
 
     private func classifyToneDuration(_ duration: TimeInterval) -> MorseElement {
         let threshold = unitDuration * 2.0
@@ -449,19 +543,21 @@ class MorseDecoder {
         } else if duration < wordGapThreshold {
             outputs.append(.element(.charGap))
             outputs.append(contentsOf: flushCurrentCharacter())
-            print("  [GAP] char gap \(String(format: "%.0f", duration * 1000))ms")
+            print("  [GAP] char gap \(String(format: "%.0f", duration * 1_000))ms")
         } else {
             outputs.append(.element(.wordGap))
             outputs.append(contentsOf: flushCurrentCharacter())
             outputs.append(.wordSpace)
-            print("  [GAP] word gap \(String(format: "%.0f", duration * 1000))ms")
+            print("  [GAP] word gap \(String(format: "%.0f", duration * 1_000))ms")
         }
 
         return outputs
     }
 
     private func flushCurrentCharacter() -> [DecodedOutput] {
-        guard !currentPattern.isEmpty else { return [] }
+        guard !currentPattern.isEmpty else {
+            return []
+        }
 
         var outputs: [DecodedOutput] = []
 
@@ -478,8 +574,12 @@ class MorseDecoder {
     }
 
     private func updateWPMEstimate(duration: TimeInterval, element: MorseElement) {
-        guard !manualWPMMode else { return }
-        guard element == .dit || element == .dah else { return }
+        guard !manualWPMMode else {
+            return
+        }
+        guard element == .dit || element == .dah else {
+            return
+        }
 
         let estimatedUnit: TimeInterval =
             if element == .dit {
@@ -490,14 +590,18 @@ class MorseDecoder {
 
         let minUnit = MorseCode.Timing.unitDuration(forWPM: maxWPM)
         let maxUnit = MorseCode.Timing.unitDuration(forWPM: minWPM)
-        guard estimatedUnit >= minUnit, estimatedUnit <= maxUnit else { return }
+        guard estimatedUnit >= minUnit, estimatedUnit <= maxUnit else {
+            return
+        }
 
         recentDurations.append(estimatedUnit)
         if recentDurations.count > maxDurationSamples {
             recentDurations.removeFirst()
         }
 
-        guard recentDurations.count >= minSamplesForAdaptation else { return }
+        guard recentDurations.count >= minSamplesForAdaptation else {
+            return
+        }
 
         let sorted = recentDurations.sorted()
         let medianUnit = sorted[sorted.count / 2]
@@ -511,7 +615,10 @@ class MorseDecoder {
 
 // MARK: - Main Test Runner
 
-func runTest(wavPath: String, toneFrequency: Double, initialWPM: Int, adaptive: Bool) {
+func runTest(
+    wavPath: String, toneFrequency: Double, initialWPM: Int, adaptive: Bool,
+    config: ThresholdConfig, configName: String
+) {
     print("=".padding(toLength: 60, withPad: "=", startingAt: 0))
     print("CW Decoder Test")
     print("=".padding(toLength: 60, withPad: "=", startingAt: 0))
@@ -519,6 +626,11 @@ func runTest(wavPath: String, toneFrequency: Double, initialWPM: Int, adaptive: 
     print("Tone frequency: \(Int(toneFrequency)) Hz")
     print("Initial WPM: \(initialWPM)")
     print("Adaptive WPM: \(adaptive ? "enabled" : "disabled (fixed)")")
+    print("Threshold config: \(configName)")
+    print("  onThreshold: \(config.onThreshold), offThreshold: \(config.offThreshold)")
+    print(
+        "  confirmationBlocks: \(config.confirmationBlocks), calibrationBlocks: \(config.calibrationBlocks)"
+    )
     print("")
 
     // Load WAV file
@@ -547,16 +659,17 @@ func runTest(wavPath: String, toneFrequency: Double, initialWPM: Int, adaptive: 
         sampleRate: Double(wav.sampleRate),
         blockSize: blockSize
     )
-    var threshold = GoertzelThreshold()
+    var threshold = GoertzelThreshold(config: config)
     let decoder = MorseDecoder(initialWPM: initialWPM, adaptive: adaptive)
 
     let blockDuration = Double(blockSize) / Double(wav.sampleRate)
 
     // Apply Hamming window
     var hammingWindow = [Float](repeating: 0, count: blockSize)
-    for i in 0..<blockSize {
+    for i in 0 ..< blockSize {
         hammingWindow[i] = Float(
-            0.54 - 0.46 * cos(2.0 * Double.pi * Double(i) / Double(blockSize - 1)))
+            0.54 - 0.46 * cos(2.0 * Double.pi * Double(i) / Double(blockSize - 1))
+        )
     }
 
     // Process samples
@@ -569,7 +682,7 @@ func runTest(wavPath: String, toneFrequency: Double, initialWPM: Int, adaptive: 
     print("-".padding(toLength: 60, withPad: "-", startingAt: 0))
 
     while sampleIndex + blockSize <= wav.samples.count {
-        let block = Array(wav.samples[sampleIndex..<sampleIndex + blockSize])
+        let block = Array(wav.samples[sampleIndex ..< sampleIndex + blockSize])
 
         // Apply window
         var windowedBlock = [Float](repeating: 0, count: blockSize)
@@ -586,7 +699,7 @@ func runTest(wavPath: String, toneFrequency: Double, initialWPM: Int, adaptive: 
         ) {
             keyEvents.append(event)
             let state = event.isDown ? "KEY DOWN" : "KEY UP  "
-            let timeMs = String(format: "%.1f", event.timestamp * 1000)
+            let timeMs = String(format: "%.1f", event.timestamp * 1_000)
             let ratio = magnitude / max(threshold.currentNoiseFloor, 0.0001)
             print(
                 "[\(timeMs)ms] \(state) mag:\(String(format: "%.4f", magnitude)) ratio:\(String(format: "%.1f", ratio))"
@@ -594,10 +707,11 @@ func runTest(wavPath: String, toneFrequency: Double, initialWPM: Int, adaptive: 
 
             // Process through morse decoder
             let outputs = decoder.processKeyEvent(
-                isKeyDown: event.isDown, timestamp: event.timestamp)
+                isKeyDown: event.isDown, timestamp: event.timestamp
+            )
             for output in outputs {
                 switch output {
-                case .character(let c):
+                case let .character(c):
                     decodedText += c
                 case .wordSpace:
                     decodedText += " "
@@ -615,7 +729,7 @@ func runTest(wavPath: String, toneFrequency: Double, initialWPM: Int, adaptive: 
     let finalOutputs = decoder.checkTimeout(currentTime: blockStartTime + 1.0)
     for output in finalOutputs {
         switch output {
-        case .character(let c):
+        case let .character(c):
             decodedText += c
         case .wordSpace:
             decodedText += " "
@@ -641,7 +755,7 @@ func runTest(wavPath: String, toneFrequency: Double, initialWPM: Int, adaptive: 
 let args = CommandLine.arguments
 
 guard args.count >= 2 else {
-    print("Usage: swift test_cw_decoder.swift <wav_file> [tone_frequency] [wpm|adaptive]")
+    print("Usage: swift test_cw_decoder.swift <wav_file> [tone_frequency] [wpm|adaptive] [config]")
     print("")
     print("Arguments:")
     print("  wav_file       - Path to WAV file (16-bit PCM)")
@@ -649,11 +763,19 @@ guard args.count >= 2 else {
     print(
         "  wpm|adaptive   - WPM number for fixed timing, or 'adaptive' for auto-detection (default: adaptive)"
     )
+    print(
+        "  config         - Threshold config: 'default', 'noisy', or 'aggressive' (default: default)"
+    )
+    print("")
+    print("Threshold configs:")
+    print("  default    - Balanced settings for clean to light noise")
+    print("  noisy      - More aggressive noise rejection (for moderate noise)")
+    print("  aggressive - Maximum noise rejection (for heavy noise/QRM)")
     print("")
     print("Examples:")
-    print("  swift test_cw_decoder.swift test.wav 700 20        # Fixed 20 WPM")
-    print("  swift test_cw_decoder.swift test.wav 700 adaptive  # Adaptive WPM")
-    print("  swift test_cw_decoder.swift test.wav 700           # Adaptive WPM (default)")
+    print("  swift test_cw_decoder.swift test.wav 700 adaptive")
+    print("  swift test_cw_decoder.swift test.wav 700 adaptive noisy")
+    print("  swift test_cw_decoder.swift test.wav 700 20 aggressive")
     exit(1)
 }
 
@@ -674,4 +796,30 @@ if args.count > 3 {
     }
 }
 
-runTest(wavPath: wavPath, toneFrequency: toneFrequency, initialWPM: initialWPM, adaptive: adaptive)
+// Parse config argument
+var config = ThresholdConfig.default
+var configName = "default"
+
+if args.count > 4 {
+    let configArg = args[4].lowercased()
+    switch configArg {
+    case "noisy":
+        config = ThresholdConfig.noisy
+        configName = "noisy"
+    case "aggressive":
+        config = ThresholdConfig.aggressive
+        configName = "aggressive"
+    default:
+        config = ThresholdConfig.default
+        configName = "default"
+    }
+}
+
+runTest(
+    wavPath: wavPath,
+    toneFrequency: toneFrequency,
+    initialWPM: initialWPM,
+    adaptive: adaptive,
+    config: config,
+    configName: configName
+)

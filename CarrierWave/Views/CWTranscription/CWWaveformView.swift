@@ -96,25 +96,25 @@ struct CWLevelMeter: View {
 
             // Labels
             HStack {
-                Text("0")
+                Text("GAIN")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text("-40")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
-                Text("Low")
+                Text("-20")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
-                Text("Good")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                Text("Max")
+                Text("0 dB")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }
@@ -195,19 +195,25 @@ struct CWNoiseFloorIndicator: View {
 
             // Labels
             HStack {
-                Text("Quiet")
+                Text("SNR")
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+
+                Text("10:1")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
-                Text("Fair")
+                Text("3:1")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
 
                 Spacer()
 
-                Text("Noisy")
+                Text("1:1")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
             }

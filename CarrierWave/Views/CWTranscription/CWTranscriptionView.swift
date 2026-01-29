@@ -19,14 +19,7 @@ struct CWTranscriptionView: View {
                 statusBar
                     .padding(.horizontal)
                     .padding(.top, 8)
-
-                // Waveform visualization
-                CWWaveformView(
-                    samples: service.waveformSamples,
-                    isKeyDown: service.isKeyDown
-                )
-                .padding(.horizontal)
-                .padding(.top)
+                    .padding(.bottom, 12)
 
                 // Level meter
                 CWLevelMeter(
@@ -153,61 +146,47 @@ struct CWTranscriptionView: View {
     // MARK: - Settings Controls
 
     private var settingsControls: some View {
-        VStack(spacing: 8) {
-            // Backend selector
-            HStack {
-                Text("Decoder")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 60, alignment: .leading)
-
-                Picker("Backend", selection: $service.selectedBackend) {
-                    ForEach(CWDecoderBackend.allCases) { backend in
-                        Text(backend.rawValue).tag(backend)
-                    }
+        HStack(spacing: 12) {
+            // WPM display/button
+            Button {
+                // Cycle through common WPM values
+                let presets = [15, 20, 25, 30]
+                if let currentIndex = presets.firstIndex(of: service.estimatedWPM) {
+                    let nextIndex = (currentIndex + 1) % presets.count
+                    service.setWPM(presets[nextIndex])
+                } else {
+                    service.setWPM(20)
                 }
-                .pickerStyle(.segmented)
-                .disabled(!service.canChangeBackend)
-            }
-
-            // WPM control
-            HStack {
-                Text("WPM")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 60, alignment: .leading)
-
-                Slider(
-                    value: Binding(
-                        get: { Double(service.estimatedWPM) },
-                        set: { service.setWPM(Int($0)) }
-                    ),
-                    in: 5 ... 50,
-                    step: 1
-                )
-
+            } label: {
                 Text("\(service.estimatedWPM)")
-                    .font(.subheadline.monospaced())
-                    .frame(width: 30, alignment: .trailing)
+                    .font(.subheadline.weight(.semibold).monospaced())
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(Color(.systemGray4))
+                    .foregroundStyle(.primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
+            .buttonStyle(.plain)
 
-            // Tone frequency control
-            HStack {
-                Text("Tone")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 60, alignment: .leading)
+            Text("WPM")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
-                Slider(
-                    value: $service.toneFrequency,
-                    in: 400 ... 1_000,
-                    step: 10
-                )
+            Spacer()
 
-                Text("\(Int(service.toneFrequency))")
-                    .font(.subheadline.monospaced())
-                    .frame(width: 40, alignment: .trailing)
+            // Pre-amp toggle
+            Button {
+                service.preAmpEnabled.toggle()
+            } label: {
+                Text("PRE")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(service.preAmpEnabled ? Color.orange : Color(.systemGray4))
+                    .foregroundStyle(service.preAmpEnabled ? .white : .primary)
+                    .clipShape(RoundedRectangle(cornerRadius: 6))
             }
+            .buttonStyle(.plain)
         }
         .padding(12)
         .background(Color(.systemGray6))
@@ -217,27 +196,11 @@ struct CWTranscriptionView: View {
     // MARK: - Noise Floor Section
 
     private var noiseFloorSection: some View {
-        VStack(spacing: 4) {
-            HStack {
-                Text("Noise Floor")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-
-                Spacer()
-
-                if service.isListening, service.isNoiseTooHigh {
-                    Label("Move away from noise source", systemImage: "exclamationmark.triangle.fill")
-                        .font(.caption2)
-                        .foregroundStyle(.orange)
-                }
-            }
-
-            CWNoiseFloorIndicator(
-                noiseFloor: service.noiseFloor,
-                quality: service.noiseFloorQuality,
-                isListening: service.isListening
-            )
-        }
+        CWNoiseFloorIndicator(
+            noiseFloor: service.noiseFloor,
+            quality: service.noiseFloorQuality,
+            isListening: service.isListening
+        )
     }
 
     // MARK: - Transcript Area
@@ -310,39 +273,15 @@ struct CWTranscriptionView: View {
 
     @ViewBuilder
     private var settingsMenu: some View {
-        // Decoder backend selection
-        Section("Decoder Backend") {
-            ForEach(CWDecoderBackend.allCases) { backend in
-                Button {
-                    if service.canChangeBackend {
-                        service.selectedBackend = backend
-                    }
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading) {
-                            Text(backend.rawValue)
-                            Text(backend.shortDescription)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if service.selectedBackend == backend {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-                .disabled(!service.canChangeBackend)
-            }
-        }
-
         // WPM presets for quick access
-        Section("WPM Presets") {
+        Section("WPM") {
             ForEach([15, 20, 25, 30], id: \.self) { wpm in
                 Button {
                     service.setWPM(wpm)
                 } label: {
                     HStack {
                         Text("\(wpm) WPM")
+                        Spacer()
                         if service.estimatedWPM == wpm {
                             Image(systemName: "checkmark")
                         }
@@ -352,16 +291,32 @@ struct CWTranscriptionView: View {
         }
 
         // Tone presets for quick access
-        Section("Tone Presets") {
+        Section("Tone") {
             ForEach([600, 700, 800], id: \.self) { freq in
                 Button {
                     service.toneFrequency = Double(freq)
                 } label: {
                     HStack {
                         Text("\(freq) Hz")
+                        Spacer()
                         if Int(service.toneFrequency) == freq {
                             Image(systemName: "checkmark")
                         }
+                    }
+                }
+            }
+        }
+
+        // Signal options
+        Section("Signal") {
+            Button {
+                service.preAmpEnabled.toggle()
+            } label: {
+                HStack {
+                    Text("Pre-Amp (10x)")
+                    Spacer()
+                    if service.preAmpEnabled {
+                        Image(systemName: "checkmark")
                     }
                 }
             }

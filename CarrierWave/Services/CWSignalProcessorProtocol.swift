@@ -1,46 +1,34 @@
 import Foundation
 
-// MARK: - CWDecoderBackend
+// MARK: - CWSignalResult
 
-/// Available CW signal processing backends
-enum CWDecoderBackend: String, CaseIterable, Identifiable {
-    /// Bandpass filter with envelope follower (original implementation)
-    case bandpass = "Bandpass Filter"
+/// Result of processing an audio buffer through the CW signal pipeline
+struct CWSignalResult {
+    /// Key state changes detected in this buffer: (isKeyDown, timestamp)
+    let keyEvents: [(isDown: Bool, timestamp: TimeInterval)]
 
-    /// Goertzel algorithm for single-frequency detection
-    case goertzel = "Goertzel"
+    /// Peak amplitude of the filtered signal (0.0-1.0)
+    let peakAmplitude: Float
 
-    // MARK: Internal
+    /// Current key state at end of buffer
+    let isKeyDown: Bool
 
-    var id: String {
-        rawValue
-    }
+    /// Recent envelope samples for visualization
+    let envelopeSamples: [Float]
 
-    var description: String {
-        switch self {
-        case .bandpass:
-            "Uses a digital bandpass filter centered on the tone frequency, " +
-                "followed by envelope detection and adaptive thresholding."
-        case .goertzel:
-            "Uses the Goertzel algorithm for efficient single-frequency detection. " +
-                "More computationally efficient for detecting a single tone."
-        }
-    }
+    /// Whether still in calibration period
+    let isCalibrating: Bool
 
-    var shortDescription: String {
-        switch self {
-        case .bandpass:
-            "Filter + Envelope"
-        case .goertzel:
-            "Goertzel DFT"
-        }
-    }
+    /// Current noise floor level (0.0-1.0, normalized)
+    let noiseFloor: Float
+
+    /// Current signal-to-noise ratio (higher = cleaner signal)
+    let signalToNoiseRatio: Float
 }
 
 // MARK: - CWSignalProcessorProtocol
 
 /// Protocol defining the interface for CW signal processors
-/// Allows different signal processing backends to be used interchangeably
 protocol CWSignalProcessorProtocol: Actor {
     /// Current tone frequency being detected
     var currentToneFrequency: Double { get }
@@ -59,10 +47,6 @@ protocol CWSignalProcessorProtocol: Actor {
     /// Reset all processor state (call when starting new capture)
     func reset()
 }
-
-// MARK: - CWSignalProcessor + CWSignalProcessorProtocol
-
-extension CWSignalProcessor: CWSignalProcessorProtocol {}
 
 // MARK: - GoertzelSignalProcessor + CWSignalProcessorProtocol
 

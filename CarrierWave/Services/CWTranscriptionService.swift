@@ -103,8 +103,8 @@ final class CWTranscriptionService: ObservableObject {
     /// All callsigns detected in current session
     @Published private(set) var detectedCallsigns: [String] = []
 
-    /// Selected signal processing backend
-    @Published var selectedBackend: CWDecoderBackend = .bandpass
+    /// Pre-amplifier enabled (boosts weak signals)
+    @Published var preAmpEnabled: Bool = false
 
     /// Whether currently listening
     var isListening: Bool {
@@ -142,11 +142,6 @@ final class CWTranscriptionService: ObservableObject {
         }
     }
 
-    /// Check if backend can be changed (only when not listening)
-    var canChangeBackend: Bool {
-        state != .listening
-    }
-
     // MARK: - Public API
 
     /// Start listening and transcribing CW
@@ -164,19 +159,11 @@ final class CWTranscriptionService: ObservableObject {
 
             let sampleRate = 44_100.0 // Standard sample rate
 
-            // Create signal processor based on selected backend
-            switch selectedBackend {
-            case .bandpass:
-                signalProcessor = CWSignalProcessor(
-                    sampleRate: sampleRate,
-                    toneFrequency: toneFrequency
-                )
-            case .goertzel:
-                signalProcessor = GoertzelSignalProcessor(
-                    sampleRate: sampleRate,
-                    toneFrequency: toneFrequency
-                )
-            }
+            // Create Goertzel signal processor
+            signalProcessor = GoertzelSignalProcessor(
+                sampleRate: sampleRate,
+                toneFrequency: toneFrequency
+            )
 
             morseDecoder = MorseDecoder(initialWPM: estimatedWPM)
 
@@ -247,6 +234,9 @@ final class CWTranscriptionService: ObservableObject {
 
     // MARK: Private
 
+    /// Pre-amplifier gain multiplier when enabled
+    private let preAmpGain: Float = 10.0
+
     // MARK: - Private Properties
 
     private var audioCapture: CWAudioCapture?
@@ -262,6 +252,9 @@ final class CWTranscriptionService: ObservableObject {
     /// Characters per line before wrapping
     private let lineWrapLength = 40
 
+    /// Track the last audio timestamp for timeout checking
+    private var lastAudioTimestamp: TimeInterval = 0
+
     // MARK: - Private Methods
 
     private func processAudioStream(_ stream: AsyncStream<CWAudioCapture.AudioBuffer>) async {
@@ -274,7 +267,20 @@ final class CWTranscriptionService: ObservableObject {
             guard let processor = signalProcessor else {
                 continue
             }
-            let result = await processor.process(samples: buffer.samples, timestamp: buffer.timestamp)
+
+            // Apply pre-amp boost if enabled
+            let amplifiedSamples: [Float] = if preAmpEnabled {
+                buffer.samples.map { $0 * preAmpGain }
+            } else {
+                buffer.samples
+            }
+
+            let result = await processor.process(
+                samples: amplifiedSamples, timestamp: buffer.timestamp
+            )
+
+            // Track audio timestamp for timeout checking
+            lastAudioTimestamp = buffer.timestamp
 
             // Update UI state
             await MainActor.run {
@@ -291,7 +297,9 @@ final class CWTranscriptionService: ObservableObject {
                 continue
             }
             for event in result.keyEvents {
-                let outputs = await decoder.processKeyEvent(isKeyDown: event.isDown, timestamp: event.timestamp)
+                let outputs = await decoder.processKeyEvent(
+                    isKeyDown: event.isDown, timestamp: event.timestamp
+                )
                 await processDecoderOutputs(outputs)
             }
 
@@ -395,7 +403,10 @@ final class CWTranscriptionService: ObservableObject {
                 guard let decoder = morseDecoder else {
                     continue
                 }
-                let outputs = await decoder.checkTimeout(currentTime: Date().timeIntervalSinceReferenceDate)
+                // Use audio timestamp + elapsed time for consistent time reference
+                // Add 0.1 seconds for each check interval
+                let checkTime = lastAudioTimestamp + 0.1
+                let outputs = await decoder.checkTimeout(currentTime: checkTime)
                 await processDecoderOutputs(outputs)
             }
         }
