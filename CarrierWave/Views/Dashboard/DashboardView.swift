@@ -7,6 +7,7 @@ struct DashboardView: View {
     // MARK: Internal
 
     @Environment(\.modelContext) var modelContext
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @Query var qsos: [QSO]
     @Query var allPresence: [ServicePresence]
 
@@ -131,6 +132,16 @@ struct DashboardView: View {
 
     // MARK: Private
 
+    private var statsGridColumns: [GridItem] {
+        if horizontalSizeClass == .regular {
+            // iPad: 6 columns (all stats in one row)
+            Array(repeating: GridItem(.flexible()), count: 6)
+        } else {
+            // iPhone: 3 columns (2 rows)
+            Array(repeating: GridItem(.flexible()), count: 3)
+        }
+    }
+
     // MARK: - Toolbar
 
     private var toolbarButtons: some View {
@@ -177,7 +188,7 @@ struct DashboardView: View {
             }
 
             ActivityGrid(activityData: stats.activityByDate)
-                .frame(height: 115)
+                .frame(height: 130)
         }
         .padding()
         .background(Color(.systemGray6))
@@ -224,13 +235,7 @@ struct DashboardView: View {
     }
 
     private var statsGrid: some View {
-        LazyVGrid(
-            columns: [
-                GridItem(.flexible()),
-                GridItem(.flexible()),
-                GridItem(.flexible()),
-            ], spacing: 12
-        ) {
+        LazyVGrid(columns: statsGridColumns, spacing: 12) {
             Button {
                 selectedTab = .logs
             } label: {

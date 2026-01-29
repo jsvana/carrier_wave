@@ -20,6 +20,8 @@ struct LogsContainerView: View {
     let lotwClient: LoTWClient
     let tourState: TourState
 
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {

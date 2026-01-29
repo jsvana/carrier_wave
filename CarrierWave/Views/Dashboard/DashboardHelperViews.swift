@@ -165,16 +165,20 @@ struct ActivityGrid: View {
         GeometryReader { geometry in
             let spacing: CGFloat = 2
             let gridWidth = geometry.size.width
-            let cellSize = (gridWidth - CGFloat(columns - 1) * spacing) / CGFloat(columns)
+            // Target cell size of ~14pt, with minimum 26 weeks and maximum 52 weeks
+            let targetCellSize: CGFloat = 14
+            let calculatedColumns = Int((gridWidth + spacing) / (targetCellSize + spacing))
+            let columnCount = min(max(calculatedColumns, 26), 52)
+            let cellSize = (gridWidth - CGFloat(columnCount - 1) * spacing) / CGFloat(columnCount)
             let gridHeight = CGFloat(rows) * cellSize + CGFloat(rows - 1) * spacing
             let columnWidth = cellSize + spacing
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top, spacing: spacing) {
-                    ForEach(0 ..< columns, id: \.self) { column in
+                    ForEach(0 ..< columnCount, id: \.self) { column in
                         VStack(spacing: spacing) {
                             ForEach(0 ..< rows, id: \.self) { row in
-                                let date = dateFor(column: column, row: row)
+                                let date = dateFor(column: column, row: row, totalColumns: columnCount)
                                 let count = activityData[date] ?? 0
 
                                 RoundedRectangle(cornerRadius: 2)
@@ -221,7 +225,7 @@ struct ActivityGrid: View {
                 .frame(height: gridHeight)
 
                 ZStack(alignment: .topLeading) {
-                    ForEach(monthLabelPositions, id: \.column) { item in
+                    ForEach(monthLabelPositions(columnCount: columnCount), id: \.column) { item in
                         Text(item.label)
                             .font(.system(size: 10))
                             .foregroundStyle(.secondary)
@@ -233,14 +237,13 @@ struct ActivityGrid: View {
             }
         }
         .accessibilityElement(children: .contain)
-        .accessibilityLabel("Activity grid showing QSOs over the past \(columns) weeks")
+        .accessibilityLabel("Activity grid showing QSO history")
     }
 
     // MARK: Private
 
     @State private var selectedDate: Date?
 
-    private let columns = 26
     private let rows = 7
 
     private let calendar = Calendar.current
@@ -260,12 +263,12 @@ struct ActivityGrid: View {
         activityData.values.max() ?? 1
     }
 
-    private var monthLabelPositions: [(column: Int, label: String)] {
+    private func monthLabelPositions(columnCount: Int) -> [(column: Int, label: String)] {
         var labels: [(Int, String)] = []
         var lastMonth = -1
 
-        for column in 0 ..< columns {
-            let date = dateFor(column: column, row: 0)
+        for column in 0 ..< columnCount {
+            let date = dateFor(column: column, row: 0, totalColumns: columnCount)
             let month = calendar.component(.month, from: date)
 
             if month != lastMonth {
@@ -276,10 +279,10 @@ struct ActivityGrid: View {
         return labels
     }
 
-    private func dateFor(column: Int, row: Int) -> Date {
+    private func dateFor(column: Int, row: Int, totalColumns: Int) -> Date {
         let today = calendar.startOfDay(for: Date())
         let todayWeekday = calendar.component(.weekday, from: today)
-        let weeksBack = columns - 1 - column
+        let weeksBack = totalColumns - 1 - column
         let daysBack = weeksBack * 7 + (todayWeekday - 1 - row)
         return calendar.date(byAdding: .day, value: -daysBack, to: today) ?? today
     }

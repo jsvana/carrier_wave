@@ -9,15 +9,28 @@ struct ActivityView: View {
     let tourState: TourState
 
     @Environment(\.modelContext) var modelContext
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
 
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 24) {
-                    challengesSection
-                    activityFeedSection
+                if horizontalSizeClass == .regular {
+                    // iPad: Side-by-side layout
+                    HStack(alignment: .top, spacing: 24) {
+                        challengesSection
+                            .frame(minWidth: 300, idealWidth: 350, maxWidth: 400)
+                        activityFeedSection
+                            .frame(maxWidth: .infinity)
+                    }
+                    .padding()
+                } else {
+                    // iPhone: Vertical stack
+                    VStack(spacing: 24) {
+                        challengesSection
+                        activityFeedSection
+                    }
+                    .padding()
                 }
-                .padding()
             }
             .navigationTitle("Activity")
             .toolbar {
@@ -284,8 +297,12 @@ struct ActivityView: View {
         itemToShare = item
         showingShareSheet = true
     }
+}
 
-    private func refresh() async {
+// MARK: - ActivityView+Actions
+
+extension ActivityView {
+    func refresh() async {
         guard let syncService else {
             return
         }
@@ -310,7 +327,7 @@ struct ActivityView: View {
         }
     }
 
-    private func handleInviteNotification(_ notification: Notification) {
+    func handleInviteNotification(_ notification: Notification) {
         guard let userInfo = notification.userInfo,
               let source = userInfo["source"] as? String,
               let challengeId = userInfo["challengeId"] as? UUID
@@ -328,7 +345,7 @@ struct ActivityView: View {
         showingInviteSheet = true
     }
 
-    private func evaluateNewQSOs() async {
+    func evaluateNewQSOs() async {
         guard let syncService else {
             return
         }

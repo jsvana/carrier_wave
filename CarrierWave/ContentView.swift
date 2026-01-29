@@ -3,12 +3,34 @@ import SwiftUI
 
 // MARK: - AppTab
 
-enum AppTab: Hashable {
+enum AppTab: Hashable, CaseIterable {
     case dashboard
     case logs
     case map
     case activity
     case settings
+
+    // MARK: Internal
+
+    var title: String {
+        switch self {
+        case .dashboard: "Dashboard"
+        case .logs: "Logs"
+        case .map: "Map"
+        case .activity: "Activity"
+        case .settings: "Settings"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .dashboard: "square.grid.2x2"
+        case .logs: "list.bullet"
+        case .map: "map"
+        case .activity: "person.2"
+        case .settings: "gear"
+        }
+    }
 }
 
 // MARK: - SettingsDestination
@@ -29,77 +51,15 @@ struct ContentView: View {
 
     let tourState: TourState
 
+    @Environment(\.horizontalSizeClass) var horizontalSizeClass
+
     var body: some View {
-        TabView(selection: $selectedTab) {
-            if let syncService {
-                DashboardView(
-                    iCloudMonitor: iCloudMonitor,
-                    potaAuth: potaAuthService,
-                    syncService: syncService,
-                    selectedTab: $selectedTab,
-                    settingsDestination: $settingsDestination,
-                    tourState: tourState
-                )
-                .tabItem {
-                    Label("Dashboard", systemImage: "square.grid.2x2")
-                }
-                .tag(AppTab.dashboard)
+        Group {
+            if horizontalSizeClass == .regular {
+                iPadNavigation
             } else {
-                ProgressView()
-                    .tabItem {
-                        Label("Dashboard", systemImage: "square.grid.2x2")
-                    }
-                    .tag(AppTab.dashboard)
+                iPhoneNavigation
             }
-
-            LogsContainerView(
-                potaClient: potaClient,
-                potaAuth: potaAuthService,
-                lofiClient: lofiClient,
-                qrzClient: qrzClient,
-                hamrsClient: hamrsClient,
-                lotwClient: lotwClient,
-                tourState: tourState
-            )
-            .tabItem {
-                Label("Logs", systemImage: "list.bullet")
-            }
-            .tag(AppTab.logs)
-
-            NavigationStack {
-                QSOMapView()
-            }
-            .tabItem {
-                Label("Map", systemImage: "map")
-            }
-            .tag(AppTab.map)
-
-            ActivityView(tourState: tourState)
-                .tabItem {
-                    Label("Activity", systemImage: "person.2")
-                }
-                .tag(AppTab.activity)
-
-            Group {
-                if let syncService {
-                    SettingsMainView(
-                        potaAuth: potaAuthService,
-                        destination: $settingsDestination,
-                        tourState: tourState
-                    )
-                    .environmentObject(syncService)
-                } else {
-                    SettingsMainView(
-                        potaAuth: potaAuthService,
-                        destination: $settingsDestination,
-                        tourState: tourState
-                    )
-                }
-            }
-            .tabItem {
-                Label("Settings", systemImage: "gear")
-            }
-            .tag(AppTab.settings)
         }
         .onAppear {
             iCloudMonitor.startMonitoring()
@@ -154,6 +114,100 @@ struct ContentView: View {
     private let qrzClient = QRZClient()
     private let hamrsClient = HAMRSClient()
     private let lotwClient = LoTWClient()
+
+    // MARK: - iPad Navigation (Sidebar)
+
+    private var iPadNavigation: some View {
+        NavigationSplitView {
+            List {
+                ForEach(AppTab.allCases, id: \.self) { tab in
+                    Button {
+                        selectedTab = tab
+                    } label: {
+                        Label(tab.title, systemImage: tab.icon)
+                    }
+                    .listRowBackground(selectedTab == tab ? Color.accentColor.opacity(0.2) : nil)
+                }
+            }
+            .navigationTitle("Carrier Wave")
+        } detail: {
+            selectedTabContent
+        }
+    }
+
+    // MARK: - iPhone Navigation (TabView)
+
+    private var iPhoneNavigation: some View {
+        TabView(selection: $selectedTab) {
+            ForEach(AppTab.allCases, id: \.self) { tab in
+                selectedTabContent(for: tab)
+                    .tabItem {
+                        Label(tab.title, systemImage: tab.icon)
+                    }
+                    .tag(tab)
+            }
+        }
+    }
+
+    // MARK: - Tab Content
+
+    private var selectedTabContent: some View {
+        selectedTabContent(for: selectedTab)
+    }
+
+    @ViewBuilder
+    private func selectedTabContent(for tab: AppTab) -> some View {
+        switch tab {
+        case .dashboard:
+            if let syncService {
+                DashboardView(
+                    iCloudMonitor: iCloudMonitor,
+                    potaAuth: potaAuthService,
+                    syncService: syncService,
+                    selectedTab: $selectedTab,
+                    settingsDestination: $settingsDestination,
+                    tourState: tourState
+                )
+            } else {
+                ProgressView()
+            }
+
+        case .logs:
+            LogsContainerView(
+                potaClient: potaClient,
+                potaAuth: potaAuthService,
+                lofiClient: lofiClient,
+                qrzClient: qrzClient,
+                hamrsClient: hamrsClient,
+                lotwClient: lotwClient,
+                tourState: tourState
+            )
+
+        case .map:
+            NavigationStack {
+                QSOMapView()
+            }
+
+        case .activity:
+            ActivityView(tourState: tourState)
+
+        case .settings:
+            if let syncService {
+                SettingsMainView(
+                    potaAuth: potaAuthService,
+                    destination: $settingsDestination,
+                    tourState: tourState
+                )
+                .environmentObject(syncService)
+            } else {
+                SettingsMainView(
+                    potaAuth: potaAuthService,
+                    destination: $settingsDestination,
+                    tourState: tourState
+                )
+            }
+        }
+    }
 }
 
 #Preview {
