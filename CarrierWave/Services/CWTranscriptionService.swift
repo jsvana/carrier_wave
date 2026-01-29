@@ -103,6 +103,9 @@ final class CWTranscriptionService: ObservableObject {
     /// All callsigns detected in current session
     @Published private(set) var detectedCallsigns: [String] = []
 
+    /// Selected signal processing backend
+    @Published var selectedBackend: CWDecoderBackend = .bandpass
+
     /// Whether currently listening
     var isListening: Bool {
         state == .listening
@@ -130,13 +133,18 @@ final class CWTranscriptionService: ObservableObject {
         }
     }
 
-    /// Tone frequency for bandpass filter
+    /// Tone frequency for signal detection
     @Published var toneFrequency: Double = 600 {
         didSet {
             Task {
                 await signalProcessor?.setToneFrequency(toneFrequency)
             }
         }
+    }
+
+    /// Check if backend can be changed (only when not listening)
+    var canChangeBackend: Bool {
+        state != .listening
     }
 
     // MARK: - Public API
@@ -155,10 +163,21 @@ final class CWTranscriptionService: ObservableObject {
             }
 
             let sampleRate = 44_100.0 // Standard sample rate
-            signalProcessor = CWSignalProcessor(
-                sampleRate: sampleRate,
-                toneFrequency: toneFrequency
-            )
+
+            // Create signal processor based on selected backend
+            switch selectedBackend {
+            case .bandpass:
+                signalProcessor = CWSignalProcessor(
+                    sampleRate: sampleRate,
+                    toneFrequency: toneFrequency
+                )
+            case .goertzel:
+                signalProcessor = GoertzelSignalProcessor(
+                    sampleRate: sampleRate,
+                    toneFrequency: toneFrequency
+                )
+            }
+
             morseDecoder = MorseDecoder(initialWPM: estimatedWPM)
 
             // Start capture
@@ -231,7 +250,7 @@ final class CWTranscriptionService: ObservableObject {
     // MARK: - Private Properties
 
     private var audioCapture: CWAudioCapture?
-    private var signalProcessor: CWSignalProcessor?
+    private var signalProcessor: (any CWSignalProcessorProtocol)?
     private var morseDecoder: MorseDecoder?
 
     private var captureTask: Task<Void, Never>?

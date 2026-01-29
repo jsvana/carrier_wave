@@ -154,12 +154,28 @@ struct CWTranscriptionView: View {
 
     private var settingsControls: some View {
         VStack(spacing: 8) {
+            // Backend selector
+            HStack {
+                Text("Decoder")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .frame(width: 60, alignment: .leading)
+
+                Picker("Backend", selection: $service.selectedBackend) {
+                    ForEach(CWDecoderBackend.allCases) { backend in
+                        Text(backend.rawValue).tag(backend)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .disabled(!service.canChangeBackend)
+            }
+
             // WPM control
             HStack {
                 Text("WPM")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .frame(width: 50, alignment: .leading)
+                    .frame(width: 60, alignment: .leading)
 
                 Slider(
                     value: Binding(
@@ -180,7 +196,7 @@ struct CWTranscriptionView: View {
                 Text("Tone")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .frame(width: 50, alignment: .leading)
+                    .frame(width: 60, alignment: .leading)
 
                 Slider(
                     value: $service.toneFrequency,
@@ -294,6 +310,31 @@ struct CWTranscriptionView: View {
 
     @ViewBuilder
     private var settingsMenu: some View {
+        // Decoder backend selection
+        Section("Decoder Backend") {
+            ForEach(CWDecoderBackend.allCases) { backend in
+                Button {
+                    if service.canChangeBackend {
+                        service.selectedBackend = backend
+                    }
+                } label: {
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(backend.rawValue)
+                            Text(backend.shortDescription)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        if service.selectedBackend == backend {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+                .disabled(!service.canChangeBackend)
+            }
+        }
+
         // WPM presets for quick access
         Section("WPM Presets") {
             ForEach([15, 20, 25, 30], id: \.self) { wpm in

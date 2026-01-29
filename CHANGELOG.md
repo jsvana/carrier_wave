@@ -2,6 +2,15 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- **CW Decoder Backend Selection** - Choose between two signal processing algorithms
+  - Bandpass Filter: Original implementation using bandpass filter, envelope follower, and adaptive threshold
+  - Goertzel: Alternative algorithm using the Goertzel DFT for efficient single-frequency detection
+  - Backend selector in CW transcription view settings (segmented control)
+  - Backend selection also available in settings menu with descriptions
+
 ## [1.12.0] - 2026-01-28
 
 ### Added

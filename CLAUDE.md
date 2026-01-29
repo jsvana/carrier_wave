@@ -109,6 +109,8 @@
 | `CWError.swift` | CW transcription error types |
 | `CWAudioCapture.swift` | AVAudioEngine microphone capture for CW decoding |
 | `CWSignalProcessor.swift` | DSP pipeline: bandpass filter, envelope follower, threshold detection |
+| `CWSignalProcessorProtocol.swift` | Protocol for signal processor backends, CWDecoderBackend enum |
+| `GoertzelSignalProcessor.swift` | Goertzel algorithm-based CW signal processor backend |
 | `MorseCode.swift` | Morse code lookup table, timing constants, QSO abbreviations |
 | `MorseDecoder.swift` | Timing state machine for dit/dah classification, adaptive WPM |
 | `CWTranscriptionService.swift` | Coordinates audio capture, signal processing, and morse decoding |
