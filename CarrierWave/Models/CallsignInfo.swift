@@ -8,6 +8,8 @@ enum CallsignInfoSource: String, Codable {
     case poloNotes
     /// From QRZ XML callbook API
     case qrz
+    /// From HamDB.org API (free, US callsigns)
+    case hamdb
 }
 
 // MARK: - CallsignInfo

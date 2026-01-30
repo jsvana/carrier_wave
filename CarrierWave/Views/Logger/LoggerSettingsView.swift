@@ -14,6 +14,11 @@ struct LoggerSettingsView: View {
         }
         .navigationTitle("Logger Settings")
         .navigationBarTitleDisplayMode(.inline)
+        .alert("License Lookup", isPresented: $showLookupResult) {
+            Button("OK", role: .cancel) {}
+        } message: {
+            Text(lookupResultMessage)
+        }
     }
 
     // MARK: Private
@@ -26,20 +31,76 @@ struct LoggerSettingsView: View {
     @AppStorage("loggerShowActivityPanel") private var showActivityPanel = true
     @AppStorage("loggerShowLicenseWarnings") private var showLicenseWarnings = true
 
+    @State private var isLookingUp = false
+    @State private var showLookupResult = false
+    @State private var lookupResultMessage = ""
+
     private var licenseSection: some View {
         Section {
-            Picker("License Class", selection: $licenseClass) {
-                Text("Technician").tag("Technician")
-                Text("General").tag("General")
-                Text("Extra").tag("Extra")
+            HStack {
+                Picker("License Class", selection: $licenseClass) {
+                    Text("Technician").tag("Technician")
+                    Text("General").tag("General")
+                    Text("Extra").tag("Extra")
+                }
+                .pickerStyle(.segmented)
+
+                if isLookingUp {
+                    ProgressView()
+                        .padding(.leading, 8)
+                } else {
+                    Button {
+                        lookupLicenseClass()
+                    } label: {
+                        Image(systemName: "magnifyingglass")
+                    }
+                    .buttonStyle(.borderless)
+                    .disabled(defaultCallsign.isEmpty)
+                    .padding(.leading, 8)
+                }
             }
-            .pickerStyle(.segmented)
 
             Toggle("Show band privilege warnings", isOn: $showLicenseWarnings)
         } header: {
             Text("License Class")
         } footer: {
-            Text("Used to warn when operating outside your band privileges")
+            if defaultCallsign.isEmpty {
+                Text("Enter your callsign below to enable automatic license lookup")
+            } else {
+                Text("Tap the search icon to look up your license class from HamDB")
+            }
+        }
+    }
+
+    private func lookupLicenseClass() {
+        guard !defaultCallsign.isEmpty else { return }
+
+        isLookingUp = true
+
+        Task {
+            do {
+                let client = HamDBClient()
+                if let foundClass = try await client.lookupLicenseClass(callsign: defaultCallsign) {
+                    await MainActor.run {
+                        licenseClass = foundClass.rawValue
+                        lookupResultMessage = "License class set to \(foundClass.displayName)"
+                        showLookupResult = true
+                        isLookingUp = false
+                    }
+                } else {
+                    await MainActor.run {
+                        lookupResultMessage = "Callsign \(defaultCallsign.uppercased()) not found in HamDB"
+                        showLookupResult = true
+                        isLookingUp = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    lookupResultMessage = "Lookup failed: \(error.localizedDescription)"
+                    showLookupResult = true
+                    isLookingUp = false
+                }
+            }
         }
     }
 

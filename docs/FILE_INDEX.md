@@ -119,6 +119,7 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `POTAClient+Spot.swift` | POTA self-spotting extension |
 | `BandPlanService.swift` | Validates frequency/mode against license class privileges |
 | `FrequencyActivityService.swift` | Aggregates nearby frequency activity from RBN |
+| `HamDBClient.swift` | HamDB.org API client for US callsign license class lookup |
 
 ## Views - Logger (`CarrierWave/Views/Logger/`)
 | File | Purpose |

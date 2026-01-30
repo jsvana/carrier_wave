@@ -2,6 +2,14 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
+## [Unreleased]
+
+### Added
+- HamDB license class lookup in Logger Settings
+  - Automatically look up license class from HamDB.org by tapping search icon
+  - Works with US amateur radio callsigns (no authentication required)
+  - Supports Extra, General, Technician, Advanced (mapped to Extra), and Novice (mapped to Technician)
+
 ## [1.13.1] - 2026-01-29
 
 ### Fixed
