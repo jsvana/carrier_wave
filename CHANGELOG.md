@@ -2,6 +2,11 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
+## [1.13.1] - 2026-01-29
+
+### Fixed
+- LoFi sync debug logging now appears in in-app sync logs and bug reports (was only going to system console)
+
 ## [1.13.0] - 2026-01-29
 
 ### Added

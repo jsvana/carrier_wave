@@ -273,7 +273,8 @@ class SyncService: ObservableObject {
 
     /// Sync only with LoFi (download only)
     func syncLoFi() async throws -> Int {
-        NSLog("[LoFi] syncLoFi() called")
+        let debugLog = SyncDebugLog.shared
+        debugLog.info("Starting LoFi-only sync", service: .lofi)
         isSyncing = true
         defer {
             isSyncing = false
@@ -282,13 +283,12 @@ class SyncService: ObservableObject {
 
         // Download with timeout
         syncPhase = .downloading(service: .lofi)
-        NSLog("[LoFi] About to call fetchAllQsosSinceLastSync")
         let qsos = try await withTimeout(seconds: syncTimeoutSeconds, service: .lofi) {
             try await self.lofiClient.fetchAllQsosSinceLastSync()
         }
-        NSLog("[LoFi] fetchAllQsosSinceLastSync returned %d raw QSOs", qsos.count)
+        debugLog.info("Fetched \(qsos.count) raw QSOs", service: .lofi)
         let fetched = qsos.compactMap { FetchedQSO.fromLoFi($0.0, operation: $0.1) }
-        NSLog("[LoFi] After filtering: %d valid QSOs", fetched.count)
+        debugLog.info("After filtering: \(fetched.count) valid QSOs", service: .lofi)
 
         syncPhase = .processing
         let processResult = try processDownloadedQSOs(fetched)
