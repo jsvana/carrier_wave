@@ -4,6 +4,8 @@
 <dict>
 	<key>NSMicrophoneUsageDescription</key>
 	<string>Carrier Wave uses the microphone to decode CW (Morse code) audio from your radio.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Carrier Wave uses your location to determine your grid square for QSO logging.</string>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict/>
