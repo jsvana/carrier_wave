@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Schedule - LICW Student Portal</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <a href="index.html" class="logo">LICW Student Portal</a>
+      <span class="user-info">W6JSV · Jay</span>
+    </div>
+  </header>
+
+  <nav>
+    <div class="container">
+      <ul>
+        <li><a href="index.html" class="active">My Schedule</a></li>
+        <li><a href="progress.html">My Progress</a></li>
+        <li><a href="forums.html">Forums</a></li>
+        <li><a href="recordings.html">Recordings</a></li>
+        <li><a href="explore.html">Explore Classes</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="container">
+      <div class="page-header">
+        <h1>My Schedule</h1>
+        <p>Classes and forums based on your interests</p>
+      </div>
+
+      <div class="filters">
+        <button class="filter-btn active">All</button>
+        <button class="filter-btn">Classes</button>
+        <button class="filter-btn">Forums</button>
+      </div>
+
+      <!-- Today's Section -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Today · Wednesday, Jan 29</h2>
+        </div>
+
+        <div class="schedule-item">
+          <div class="schedule-time">
+            <div class="schedule-day">Today</div>
+            <div class="schedule-hour">2:00 PM</div>
+          </div>
+          <div class="schedule-details">
+            <div class="schedule-title">
+              Beginners Carousel 3
+              <span class="badge badge-beginner">Beginner</span>
+            </div>
+            <div class="schedule-meta">Zoom Room A · Instructor: N1SG</div>
+          </div>
+          <div class="schedule-actions">
+            <button class="btn btn-secondary btn-small">+ Calendar</button>
+            <a href="#" class="btn btn-primary btn-small">Join Zoom</a>
+          </div>
+        </div>
+
+        <div class="schedule-item">
+          <div class="schedule-time">
+            <div class="schedule-day">Today</div>
+            <div class="schedule-hour">7:00 PM</div>
+          </div>
+          <div class="schedule-details">
+            <div class="schedule-title">
+              Antenna Forum
+              <span class="badge badge-forum">Forum</span>
+            </div>
+            <div class="schedule-meta">Zoom Room A · Moderator: WA9CW</div>
+            <div class="schedule-topic">
+              <strong>This week:</strong> Magnetic Loop Antennas for Small Spaces
+            </div>
+          </div>
+          <div class="schedule-actions">
+            <button class="btn btn-secondary btn-small">+ Calendar</button>
+            <a href="#" class="btn btn-primary btn-small">Join Zoom</a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tomorrow -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Tomorrow · Thursday, Jan 30</h2>
+        </div>
+
+        <div class="schedule-item">
+          <div class="schedule-time">
+            <div class="schedule-day">Thu</div>
+            <div class="schedule-hour">11:00 AM</div>
+          </div>
+          <div class="schedule-details">
+            <div class="schedule-title">
+              Beginners Carousel 3
+              <span class="badge badge-beginner">Beginner</span>
+            </div>
+            <div class="schedule-meta">Zoom Room C · Instructor: VK5PL</div>
+          </div>
+          <div class="schedule-actions">
+            <button class="btn btn-secondary btn-small">+ Calendar</button>
+          </div>
+        </div>
+
+        <div class="schedule-item">
+          <div class="schedule-time">
+            <div class="schedule-day">Thu</div>
+            <div class="schedule-hour">8:00 PM</div>
+          </div>
+          <div class="schedule-details">
+            <div class="schedule-title">
+              Portable Operations Forum
+              <span class="badge badge-forum">Forum</span>
+            </div>
+            <div class="schedule-meta">Zoom Room B · Moderator: K8MPW</div>
+            <div class="schedule-topic">
+              <strong>This week:</strong> POTA Activation Planning & Tips
+            </div>
+          </div>
+          <div class="schedule-actions">
+            <button class="btn btn-secondary btn-small">+ Calendar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- This Weekend -->
+      <div class="card">
+        <div class="card-header">
+          <h2>This Weekend</h2>
+        </div>
+
+        <div class="schedule-item">
+          <div class="schedule-time">
+            <div class="schedule-day">Sat</div>
+            <div class="schedule-hour">10:00 AM</div>
+          </div>
+          <div class="schedule-details">
+            <div class="schedule-title">
+              Beginners Carousel 3
+              <span class="badge badge-beginner">Beginner</span>
+            </div>
+            <div class="schedule-meta">Zoom Room A · Instructor: WO6W</div>
+          </div>
+          <div class="schedule-actions">
+            <button class="btn btn-secondary btn-small">+ Calendar</button>
+          </div>
+        </div>
+
+        <div class="schedule-item">
+          <div class="schedule-time">
+            <div class="schedule-day">Sun</div>
+            <div class="schedule-hour">11:00 AM</div>
+          </div>
+          <div class="schedule-details">
+            <div class="schedule-title">
+              Boat Anchor Forum
+              <span class="badge badge-forum">Forum</span>
+            </div>
+            <div class="schedule-meta">Zoom Room C · Moderator: W0FN</div>
+            <div class="schedule-topic">
+              <strong>This week:</strong> Restoring Collins S-Line Receivers
+            </div>
+          </div>
+          <div class="schedule-actions">
+            <button class="btn btn-secondary btn-small">+ Calendar</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Upcoming suggestion -->
+      <div class="hint-box">
+        <div class="hint-icon">💡</div>
+        <div class="hint-text">
+          <strong>You might be interested:</strong> The <strong>3D Printing Forum</strong> meets Wednesdays at 8pm.
+          Many BC3 students attend. <a href="forums.html">View forums →</a>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</body>
+</html>

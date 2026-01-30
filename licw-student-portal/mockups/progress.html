@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Progress - LICW Student Portal</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <div class="container">
+      <a href="index.html" class="logo">LICW Student Portal</a>
+      <span class="user-info">W6JSV · Jay</span>
+    </div>
+  </header>
+
+  <nav>
+    <div class="container">
+      <ul>
+        <li><a href="index.html">My Schedule</a></li>
+        <li><a href="progress.html" class="active">My Progress</a></li>
+        <li><a href="forums.html">Forums</a></li>
+        <li><a href="recordings.html">Recordings</a></li>
+        <li><a href="explore.html">Explore Classes</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <main>
+    <div class="container">
+      <div class="page-header">
+        <h1>My Progress</h1>
+        <p>Your journey through the LICW curriculum</p>
+      </div>
+
+      <!-- Current Level -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Current Level: Beginners Carousel 3</h2>
+          <span class="badge badge-beginner">Beginner</span>
+        </div>
+
+        <div class="progress-section">
+          <h3>Characters Learned</h3>
+          <p>Based on lessons you've attended, you've covered these characters:</p>
+
+          <div class="progress-bar-container">
+            <div class="progress-bar" style="width: 69%"></div>
+          </div>
+          <div class="progress-stats">
+            <span>18 of 26 characters covered</span>
+            <span>8 remaining</span>
+          </div>
+
+          <div class="character-grid">
+            <div class="character learned">E</div>
+            <div class="character learned">T</div>
+            <div class="character learned">A</div>
+            <div class="character learned">N</div>
+            <div class="character learned">I</div>
+            <div class="character learned">M</div>
+            <div class="character learned">S</div>
+            <div class="character learned">O</div>
+            <div class="character learned">R</div>
+            <div class="character learned">D</div>
+            <div class="character learned">L</div>
+            <div class="character learned">C</div>
+            <div class="character learned">U</div>
+            <div class="character learned">K</div>
+            <div class="character learned">P</div>
+            <div class="character learned">W</div>
+            <div class="character learned">H</div>
+            <div class="character learned">G</div>
+            <div class="character missing">Q</div>
+            <div class="character missing">F</div>
+            <div class="character missing">Y</div>
+            <div class="character missing">B</div>
+            <div class="character missing">V</div>
+            <div class="character missing">J</div>
+            <div class="character missing">X</div>
+            <div class="character missing">Z</div>
+          </div>
+
+          <p style="margin-top: 16px; color: var(--gray-500); font-size: 15px;">
+            <strong>Tip:</strong> Missing characters are introduced in upcoming BC3 lessons.
+            Keep attending to complete your character set.
+          </p>
+        </div>
+      </div>
+
+      <!-- Attendance Stats -->
+      <div class="card">
+        <h2>Attendance in BC3</h2>
+        <div style="margin-top: 16px; display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 24px;">
+          <div>
+            <div style="font-size: 36px; font-weight: 700; color: var(--primary);">12</div>
+            <div style="color: var(--gray-500);">Sessions attended</div>
+          </div>
+          <div>
+            <div style="font-size: 36px; font-weight: 700; color: var(--gray-700);">4</div>
+            <div style="color: var(--gray-500);">Weeks active</div>
+          </div>
+          <div>
+            <div style="font-size: 36px; font-weight: 700; color: var(--success);">3</div>
+            <div style="color: var(--gray-500);">This week</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progression Hint -->
+      <div class="hint-box">
+        <div class="hint-icon">📈</div>
+        <div class="hint-text">
+          <strong>Getting close!</strong> Once you've covered all 26 characters and feel comfortable,
+          you may be ready for <strong>Intermediate 1</strong>. There's no rush—many students take
+          multiple rotations through BC3 before advancing.
+          <a href="explore.html">Learn about INT1 →</a>
+        </div>
+      </div>
+
+      <!-- History -->
+      <div class="card">
+        <h2>Your Curriculum Journey</h2>
+        <div style="margin-top: 20px;">
+          <div style="display: flex; gap: 16px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--gray-100);">
+            <span class="badge badge-beginner">BC1</span>
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">Beginners Carousel 1</div>
+              <div style="font-size: 14px; color: var(--gray-500);">Completed · Sept 2025</div>
+            </div>
+            <span style="color: var(--success); font-weight: 500;">✓ Complete</span>
+          </div>
+
+          <div style="display: flex; gap: 16px; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--gray-100);">
+            <span class="badge badge-beginner">BC2</span>
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">Beginners Carousel 2</div>
+              <div style="font-size: 14px; color: var(--gray-500);">Completed · Oct-Nov 2025</div>
+            </div>
+            <span style="color: var(--success); font-weight: 500;">✓ Complete</span>
+          </div>
+
+          <div style="display: flex; gap: 16px; align-items: center; padding: 16px 0;">
+            <span class="badge badge-beginner">BC3</span>
+            <div style="flex: 1;">
+              <div style="font-weight: 600;">Beginners Carousel 3</div>
+              <div style="font-size: 14px; color: var(--gray-500);">Started Dec 2025 · In progress</div>
+            </div>
+            <span style="color: var(--primary); font-weight: 500;">In Progress</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Forums Attended -->
+      <div class="card">
+        <h2>Forums You Attend</h2>
+        <p style="color: var(--gray-500); margin-bottom: 16px;">Based on your attendance history</p>
+        <div style="display: flex; flex-wrap: wrap; gap: 12px;">
+          <span class="badge badge-forum" style="font-size: 15px; padding: 8px 16px;">Antenna Forum</span>
+          <span class="badge badge-forum" style="font-size: 15px; padding: 8px 16px;">Portable Operations</span>
+          <span class="badge badge-forum" style="font-size: 15px; padding: 8px 16px;">3D Printing</span>
+        </div>
+      </div>
+
+    </div>
+  </main>
+</body>
+</html>
