@@ -147,12 +147,42 @@ actor CWAudioCapture {
         do {
             // Use .measurement mode to minimize iOS audio processing (AGC, noise suppression)
             // This is critical for CW decoding where we need the raw signal
+            // Note: .defaultToSpeaker is omitted to allow external USB inputs to be preferred
             try session.setCategory(
                 .playAndRecord,
                 mode: .measurement,
-                options: [.defaultToSpeaker, .allowBluetooth]
+                options: [.allowBluetooth, .allowBluetoothA2DP]
             )
             try session.setActive(true)
+
+            // Log all available inputs for debugging
+            if let inputs = session.availableInputs {
+                print("[CW] Available audio inputs:")
+                for input in inputs {
+                    print("[CW]   - \(input.portName) (type: \(input.portType.rawValue))")
+                    if let dataSources = input.dataSources {
+                        for source in dataSources {
+                            print("[CW]       data source: \(source.dataSourceName)")
+                        }
+                    }
+                }
+
+                // Prefer external input: USB audio, line in, headset mic, or any non-built-in
+                let externalInput =
+                    inputs.first(where: { $0.portType == .usbAudio })
+                        ?? inputs.first(where: { $0.portType == .lineIn })
+                        ?? inputs.first(where: { $0.portType == .headsetMic })
+                        ?? inputs.first(where: { $0.portType != .builtInMic })
+
+                if let external = externalInput {
+                    try session.setPreferredInput(external)
+                    print(
+                        "[CW] Selected external input: \(external.portName) (type: \(external.portType.rawValue))"
+                    )
+                } else {
+                    print("[CW] No external input found, using built-in mic")
+                }
+            }
         } catch {
             throw CWError.audioSessionSetupFailed(error)
         }
