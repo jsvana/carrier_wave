@@ -206,7 +206,7 @@ actor MorseDecoder {
     private let minimumGapDuration: TimeInterval = 0.020
 
     /// Minimum samples needed before adapting WPM
-    private let minSamplesForAdaptation: Int = 5
+    private let minSamplesForAdaptation: Int = 3
 
     /// Estimated unit duration in seconds
     private var unitDuration: TimeInterval
@@ -371,10 +371,21 @@ actor MorseDecoder {
         let sorted = recentDurations.sorted()
         let medianUnit = sorted[sorted.count / 2]
 
-        // Use moderate smoothing - 25% new value, 75% old
-        // This balances responsiveness with stability
-        let smoothingFactor = 0.25
+        // Detect speed jumps - if the new median differs significantly from current,
+        // use a higher smoothing factor to catch up faster
+        let speedRatio = medianUnit / unitDuration
+        let isSpeedJump = speedRatio < 0.75 || speedRatio > 1.33 // ~25% speed change
+
+        // Use higher smoothing (50%) for speed jumps, moderate (40%) otherwise
+        // This prioritizes responsiveness over stability
+        let smoothingFactor = isSpeedJump ? 0.50 : 0.40
         unitDuration = unitDuration * (1 - smoothingFactor) + medianUnit * smoothingFactor
+
+        if isSpeedJump {
+            print(
+                "[CW] Speed jump detected (ratio: \(String(format: "%.2f", speedRatio))), using aggressive smoothing"
+            )
+        }
 
         // Clamp to valid range
         unitDuration = max(minUnit, min(maxUnit, unitDuration))
