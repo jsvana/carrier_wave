@@ -227,36 +227,13 @@ struct OnboardingView: View {
                 .font(.title2)
                 .fontWeight(.semibold)
 
-            Text("Your callsign is pre-filled. Just enter your password for each service you use.")
+            Text("Connect the services you use to sync your QSOs.")
                 .font(.body)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
 
             VStack(spacing: 16) {
-                // QRZ
-                serviceConnectionCard(
-                    name: "QRZ Logbook",
-                    icon: "globe",
-                    isConnected: connectedServices.contains("qrz"),
-                    content: {
-                        VStack(spacing: 8) {
-                            HStack {
-                                Text("Callsign")
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                                Text(callsign.uppercased())
-                                    .foregroundStyle(.secondary)
-                                    .monospaced()
-                            }
-                            SecureField("API Key", text: $qrzApiKey)
-                                .textFieldStyle(.roundedBorder)
-                                .textContentType(.password)
-                        }
-                    },
-                    onConnect: connectQRZ
-                )
-
-                // LoTW
+                // LoTW - uses callsign as username
                 serviceConnectionCard(
                     name: "LoTW",
                     icon: "checkmark.seal",
@@ -279,7 +256,7 @@ struct OnboardingView: View {
                     onConnect: connectLoTW
                 )
 
-                // POTA
+                // POTA - uses email
                 serviceConnectionCard(
                     name: "POTA",
                     icon: "tree",
@@ -297,6 +274,24 @@ struct OnboardingView: View {
                         }
                     },
                     onConnect: connectPOTA
+                )
+
+                // QRZ - uses API key
+                serviceConnectionCard(
+                    name: "QRZ Logbook",
+                    icon: "globe",
+                    isConnected: connectedServices.contains("qrz"),
+                    content: {
+                        VStack(spacing: 8) {
+                            Text("Get your API key from QRZ Logbook settings")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                            SecureField("API Key", text: $qrzApiKey)
+                                .textFieldStyle(.roundedBorder)
+                                .textContentType(.password)
+                        }
+                    },
+                    onConnect: connectQRZ
                 )
             }
 
