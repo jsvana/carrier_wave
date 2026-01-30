@@ -37,6 +37,9 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `ActivityItem.swift` | Activity feed item model |
 | `CWConversation.swift` | CW conversation and message models for chat display |
 | `CallsignInfo.swift` | Callsign lookup result with name, note, emoji, source |
+| `LoggingSession.swift` | Logging session model with activation type, frequency, mode |
+| `LoggerCommand.swift` | Command enum for logger input (FREQ, MODE, SPOT, RBN, SOLAR, WEATHER) |
+| `BandPlan.swift` | US amateur radio band plan data with license class privileges |
 
 ## Services (`CarrierWave/Services/`)
 | File | Purpose |
@@ -108,6 +111,29 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `CWConversationTracker.swift` | Track CW conversation turns via frequency and prosign analysis |
 | `PoloNotesParser.swift` | Parse Ham2K Polo notes list files for callsign info |
 | `CallsignLookupService.swift` | Two-tier callsign lookup (Polo notes, then QRZ API) |
+| `MorseEditDistance.swift` | Levenshtein distance on morse patterns for word suggestions |
+| `CWSuggestionEngine.swift` | Word suggestion engine with dictionaries and settings |
+| `LoggingSessionManager.swift` | Session lifecycle management (start, end, log QSO, hide QSO) |
+| `RBNClient.swift` | Vail ReRBN API client for reverse beacon network spots |
+| `NOAAClient.swift` | NOAA API client for solar conditions and weather |
+| `POTAClient+Spot.swift` | POTA self-spotting extension |
+| `BandPlanService.swift` | Validates frequency/mode against license class privileges |
+| `FrequencyActivityService.swift` | Aggregates nearby frequency activity from RBN |
+
+## Views - Logger (`CarrierWave/Views/Logger/`)
+| File | Purpose |
+|------|---------|
+| `LoggerView.swift` | Main logger view with session header, callsign input, QSO form |
+| `LoggerCallsignCard.swift` | Callsign info display card for logger |
+| `SessionStartSheet.swift` | Session wizard for mode, frequency, activation type |
+| `LoggerSettingsView.swift` | Logger settings (license class, defaults, preferences) |
+| `RBNPanelView.swift` | RBN spots panel with mini-map |
+| `SolarPanelView.swift` | Solar conditions panel (K-index, SFI, propagation) |
+| `WeatherPanelView.swift` | Weather conditions panel from NOAA |
+| `FrequencyActivityView.swift` | Nearby frequency activity display with QRM assessment |
+| `LicenseWarningBanner.swift` | Band plan violation warning banner |
+| `LoggerToastView.swift` | Toast notification system for logger |
+| `LoggerKeyboardAccessory.swift` | Number row and command buttons above keyboard |
 
 ## Views - CW Transcription (`CarrierWave/Views/CWTranscription/`)
 | File | Purpose |

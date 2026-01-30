@@ -159,6 +159,16 @@ struct CWHighlightedText: View {
             Text(str)
                 .foregroundColor(.mint)
                 .fontWeight(.medium)
+
+        case let .suggestion(original, suggested, _):
+            // Show original with superscript suggestion hint
+            Text(original)
+                .foregroundColor(.primary)
+                .underline(color: .blue.opacity(0.4))
+                + Text("→\(suggested)")
+                .font(.caption2)
+                .foregroundColor(.blue)
+                .baselineOffset(6)
         }
     }
 

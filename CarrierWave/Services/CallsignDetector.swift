@@ -40,6 +40,7 @@ enum CWTextElement: Identifiable, Equatable {
     case grid(String) // Grid square (e.g., EM74)
     case power(String) // Power level (e.g., 100W)
     case name(String) // Operator name
+    case suggestion(original: String, suggested: String, category: SuggestionCategory)
 
     // MARK: Internal
 
@@ -59,6 +60,7 @@ enum CWTextElement: Identifiable, Equatable {
         case let .grid(str): "grid-\(str)"
         case let .power(str): "pwr-\(str)"
         case let .name(str): "name-\(str)"
+        case let .suggestion(orig, sugg, _): "sug-\(orig)-\(sugg)"
         }
     }
 }

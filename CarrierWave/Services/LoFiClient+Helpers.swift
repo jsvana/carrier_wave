@@ -1,3 +1,4 @@
+// swiftlint:disable function_body_length
 import Foundation
 
 // MARK: - LoFiClient Private Helpers
@@ -62,19 +63,71 @@ extension LoFiClient {
     }
 
     private func logResponseCounts(_ decoded: some Any) {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .short
+
         if let opsResponse = decoded as? LoFiOperationsResponse {
-            NSLog("[LoFi] ========== COUNTS ==========")
-            NSLog("[LoFi] Operations returned: %d", opsResponse.operations.count)
-            NSLog("[LoFi] Records left: %d", opsResponse.meta.operations.recordsLeft)
-            if let next = opsResponse.meta.operations.nextSyncedAtMillis {
-                NSLog("[LoFi] Next synced at millis: %d", next)
+            let meta = opsResponse.meta.operations
+            NSLog("[LoFi] ========== OPERATIONS RESPONSE ==========")
+            NSLog("[LoFi] Operations in page: %d", opsResponse.operations.count)
+            NSLog("[LoFi] Total records: %d", meta.totalRecords)
+            NSLog("[LoFi] Records left: %d", meta.recordsLeft)
+            NSLog("[LoFi] Limit: %d", meta.limit)
+
+            if let syncedUntil = meta.syncedUntilMillis {
+                let date = Date(timeIntervalSince1970: syncedUntil / 1_000.0)
+                NSLog(
+                    "[LoFi] Synced until: %@ (millis: %.0f)", formatter.string(from: date),
+                    syncedUntil
+                )
+            }
+            if let syncedSince = meta.syncedSinceMillis {
+                let date = Date(timeIntervalSince1970: syncedSince / 1_000.0)
+                NSLog(
+                    "[LoFi] Synced since: %@ (millis: %.0f)", formatter.string(from: date),
+                    syncedSince
+                )
+            }
+            if let next = meta.nextSyncedAtMillis {
+                let date = Date(timeIntervalSince1970: next / 1_000.0)
+                NSLog(
+                    "[LoFi] Next synced at: %@ (millis: %.0f)", formatter.string(from: date), next
+                )
+            }
+            if let otherClientsOnly = meta.otherClientsOnly {
+                NSLog("[LoFi] Other clients only: %@", otherClientsOnly ? "true" : "false")
             }
         } else if let qsosResponse = decoded as? LoFiQsosResponse {
-            NSLog("[LoFi] ========== COUNTS ==========")
-            NSLog("[LoFi] QSOs returned: %d", qsosResponse.qsos.count)
-            NSLog("[LoFi] Records left: %d", qsosResponse.meta.qsos.recordsLeft)
-            if let next = qsosResponse.meta.qsos.nextSyncedAtMillis {
-                NSLog("[LoFi] Next synced at millis: %d", next)
+            let meta = qsosResponse.meta.qsos
+            NSLog("[LoFi] ========== QSOS RESPONSE ==========")
+            NSLog("[LoFi] QSOs in page: %d", qsosResponse.qsos.count)
+            NSLog("[LoFi] Total records: %d", meta.totalRecords)
+            NSLog("[LoFi] Records left: %d", meta.recordsLeft)
+            NSLog("[LoFi] Limit: %d", meta.limit)
+
+            if let syncedUntil = meta.syncedUntilMillis {
+                let date = Date(timeIntervalSince1970: syncedUntil / 1_000.0)
+                NSLog(
+                    "[LoFi] Synced until: %@ (millis: %.0f)", formatter.string(from: date),
+                    syncedUntil
+                )
+            }
+            if let syncedSince = meta.syncedSinceMillis {
+                let date = Date(timeIntervalSince1970: syncedSince / 1_000.0)
+                NSLog(
+                    "[LoFi] Synced since: %@ (millis: %.0f)", formatter.string(from: date),
+                    syncedSince
+                )
+            }
+            if let next = meta.nextSyncedAtMillis {
+                let date = Date(timeIntervalSince1970: next / 1_000.0)
+                NSLog(
+                    "[LoFi] Next synced at: %@ (millis: %.0f)", formatter.string(from: date), next
+                )
+            }
+            if let otherClientsOnly = meta.otherClientsOnly {
+                NSLog("[LoFi] Other clients only: %@", otherClientsOnly ? "true" : "false")
             }
         }
     }

@@ -5,6 +5,7 @@ import SwiftUI
 
 enum AppTab: Hashable, CaseIterable {
     case dashboard
+    case logger
     case logs
     case cwDecoder
     case map
@@ -16,6 +17,7 @@ enum AppTab: Hashable, CaseIterable {
     var title: String {
         switch self {
         case .dashboard: "Dashboard"
+        case .logger: "Logger"
         case .logs: "Logs"
         case .cwDecoder: "CW"
         case .map: "Map"
@@ -27,6 +29,7 @@ enum AppTab: Hashable, CaseIterable {
     var icon: String {
         switch self {
         case .dashboard: "square.grid.2x2"
+        case .logger: "pencil.and.list.clipboard"
         case .logs: "list.bullet"
         case .cwDecoder: "waveform"
         case .map: "map"
@@ -192,6 +195,9 @@ struct ContentView: View {
             } else {
                 ProgressView()
             }
+
+        case .logger:
+            LoggerView()
 
         case .logs:
             LogsContainerView(

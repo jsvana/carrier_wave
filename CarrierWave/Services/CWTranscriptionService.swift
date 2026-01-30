@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Combine
 import Foundation
 import SwiftUI
@@ -8,12 +9,25 @@ import SwiftUI
 struct CWTranscriptEntry: Identifiable, Equatable {
     // MARK: Lifecycle
 
-    init(id: UUID = UUID(), timestamp: Date = Date(), text: String, isWordSpace: Bool = false) {
+    init(
+        id: UUID = UUID(),
+        timestamp: Date = Date(),
+        text: String,
+        isWordSpace: Bool = false,
+        suggestionEngine: CWSuggestionEngine? = nil
+    ) {
         self.id = id
         self.timestamp = timestamp
         self.text = text
-        elements = CallsignDetector.parseElements(from: text)
         self.isWordSpace = isWordSpace
+
+        // Parse elements, then apply suggestions if engine is provided
+        let baseElements = CallsignDetector.parseElements(from: text)
+        if let engine = suggestionEngine, engine.suggestionsEnabled {
+            elements = Self.applyWordSuggestions(to: baseElements, using: engine)
+        } else {
+            elements = baseElements
+        }
     }
 
     // MARK: Internal
@@ -23,6 +37,60 @@ struct CWTranscriptEntry: Identifiable, Equatable {
     let text: String
     let elements: [CWTextElement]
     let isWordSpace: Bool
+
+    // MARK: Private
+
+    /// Apply word suggestions to text elements
+    private static func applyWordSuggestions(
+        to elements: [CWTextElement],
+        using engine: CWSuggestionEngine
+    ) -> [CWTextElement] {
+        elements.flatMap { element -> [CWTextElement] in
+            guard case let .text(str) = element else {
+                return [element]
+            }
+
+            // Split text into words, check each for suggestions
+            let words = str.components(separatedBy: .whitespaces)
+            var result: [CWTextElement] = []
+
+            for (index, word) in words.enumerated() {
+                if word.isEmpty {
+                    continue
+                }
+
+                if let suggestion = engine.suggestCorrection(for: word) {
+                    result.append(
+                        .suggestion(
+                            original: suggestion.originalWord,
+                            suggested: suggestion.suggestedWord,
+                            category: suggestion.category
+                        )
+                    )
+                } else {
+                    // Merge adjacent plain text
+                    if case let .text(existing) = result.last {
+                        result.removeLast()
+                        result.append(.text(existing + " " + word))
+                    } else {
+                        result.append(.text(word))
+                    }
+                }
+
+                // Add space between words (except last)
+                if index < words.count - 1, !result.isEmpty {
+                    if case let .text(existing) = result.last {
+                        result.removeLast()
+                        result.append(.text(existing + " "))
+                    } else {
+                        result.append(.text(" "))
+                    }
+                }
+            }
+
+            return result
+        }
+    }
 }
 
 // MARK: - CWTranscriptionState
@@ -105,6 +173,9 @@ final class CWTranscriptionService: ObservableObject {
 
     /// Conversation tracker for chat-style display
     @Published private(set) var conversationTracker = CWConversationTracker()
+
+    /// Suggestion engine for word corrections
+    @Published var suggestionEngine = CWSuggestionEngine()
 
     /// Pre-amplifier enabled (boosts weak signals)
     @Published var preAmpEnabled: Bool = false
@@ -401,14 +472,15 @@ final class CWTranscriptionService: ObservableObject {
         let remainder: String
 
         if let lastSpace = currentLine.lastIndex(of: " ") {
-            text = String(currentLine[..<lastSpace])
+            // Include trailing space to preserve word boundary
+            text = String(currentLine[...lastSpace])
             remainder = String(currentLine[currentLine.index(after: lastSpace)...])
         } else {
             text = currentLine
             remainder = ""
         }
 
-        let entry = CWTranscriptEntry(text: text)
+        let entry = CWTranscriptEntry(text: text, suggestionEngine: suggestionEngine)
         transcript.append(entry)
         currentLine = remainder
 

@@ -1,3 +1,4 @@
+// swiftlint:disable file_length type_body_length function_body_length
 import Foundation
 
 // MARK: - LoFiError
@@ -141,6 +142,9 @@ final class LoFiClient {
 
         let registration = try JSONDecoder().decode(LoFiRegistrationResponse.self, from: data)
 
+        // Log account details including cutoff date
+        logRegistrationDetails(registration)
+
         // Save the token
         try keychain.save(registration.token, for: KeychainHelper.Keys.lofiAuthToken)
 
@@ -255,10 +259,22 @@ final class LoFiClient {
         let lastSyncMillis = getLastSyncMillis()
         let isFreshSync = lastSyncMillis == 0
 
-        NSLog(
-            "[LoFi] fetchAllQsosSinceLastSync: callsign=%@, lastSyncMillis=%lld, isFreshSync=%@",
-            getCallsign() ?? "unknown", lastSyncMillis, isFreshSync ? "true" : "false"
-        )
+        NSLog("[LoFi] ========== STARTING SYNC ==========")
+        NSLog("[LoFi] Callsign: %@", getCallsign() ?? "unknown")
+        NSLog("[LoFi] Last Sync Millis: %lld", lastSyncMillis)
+        if lastSyncMillis > 0 {
+            let lastSyncDate = Date(timeIntervalSince1970: Double(lastSyncMillis) / 1_000.0)
+            let formatter = ISO8601DateFormatter()
+            NSLog("[LoFi] Last Sync Date: %@", formatter.string(from: lastSyncDate))
+        }
+        NSLog("[LoFi] Is Fresh Sync: %@", isFreshSync ? "true" : "false")
+
+        // Re-register to get fresh account info (including cutoff date)
+        do {
+            _ = try await register()
+        } catch {
+            NSLog("[LoFi] Warning: Could not refresh registration: %@", error.localizedDescription)
+        }
 
         // Fetch all operations (both active and deleted)
         let operations = try await fetchAllOperations(isFreshSync: isFreshSync)
@@ -276,13 +292,24 @@ final class LoFiClient {
         }
 
         let allQsos = Array(qsosByUUID.values)
-        NSLog("[LoFi] Total unique QSOs fetched: %d", allQsos.count)
+
+        // Log comprehensive summary
+        logSyncSummary(operations: operations, qsos: allQsos)
+
         return allQsos
     }
 
     /// Fetch ALL QSOs from all operations (ignoring last sync timestamp, for force re-download)
     func fetchAllQsos() async throws -> [(LoFiQso, LoFiOperation)] {
-        NSLog("[LoFi] fetchAllQsos: fetching all QSOs (force re-download)")
+        NSLog("[LoFi] ========== FORCE RE-DOWNLOAD ==========")
+        NSLog("[LoFi] Fetching ALL QSOs (ignoring last sync timestamp)")
+
+        // Re-register to get fresh account info (including cutoff date)
+        do {
+            _ = try await register()
+        } catch {
+            NSLog("[LoFi] Warning: Could not refresh registration: %@", error.localizedDescription)
+        }
 
         // Fetch all operations (treat as fresh sync to get everything)
         let operations = try await fetchAllOperations(isFreshSync: true)
@@ -295,7 +322,10 @@ final class LoFiClient {
         )
 
         let allQsos = Array(qsosByUUID.values)
-        NSLog("[LoFi] fetchAllQsos: Total QSOs fetched: %d", allQsos.count)
+
+        // Log comprehensive summary
+        logSyncSummary(operations: operations, qsos: allQsos)
+
         return allQsos
     }
 
@@ -321,12 +351,103 @@ final class LoFiClient {
 
     // MARK: Private
 
+    private func logRegistrationDetails(_ registration: LoFiRegistrationResponse) {
+        NSLog("[LoFi] ========== REGISTRATION ==========")
+        NSLog("[LoFi] Account UUID: %@", registration.account.uuid)
+        NSLog("[LoFi] Account Call: %@", registration.account.call)
+        NSLog("[LoFi] Account Name: %@", registration.account.name ?? "nil")
+        NSLog("[LoFi] Account Email: %@", registration.account.email ?? "nil")
+
+        if let cutoffDate = registration.account.cutoffDate {
+            NSLog("[LoFi] ⚠️ CUTOFF DATE: %@", cutoffDate)
+        } else {
+            NSLog("[LoFi] Cutoff Date: nil (no restriction)")
+        }
+
+        if let cutoffMillis = registration.account.cutoffDateMillis {
+            let date = Date(timeIntervalSince1970: Double(cutoffMillis) / 1_000.0)
+            let formatter = ISO8601DateFormatter()
+            NSLog(
+                "[LoFi] ⚠️ CUTOFF DATE MILLIS: %lld (%@)", cutoffMillis, formatter.string(from: date)
+            )
+        } else {
+            NSLog("[LoFi] Cutoff Date Millis: nil (no restriction)")
+        }
+
+        NSLog("[LoFi] Sync Batch Size: %d", registration.meta.flags.suggestedSyncBatchSize)
+        NSLog("[LoFi] Sync Loop Delay: %d ms", registration.meta.flags.suggestedSyncLoopDelay)
+        NSLog("[LoFi] Sync Check Period: %d ms", registration.meta.flags.suggestedSyncCheckPeriod)
+    }
+
+    private func logSyncSummary(operations: [LoFiOperation], qsos: [(LoFiQso, LoFiOperation)]) {
+        NSLog("[LoFi] ========== SYNC SUMMARY ==========")
+        NSLog("[LoFi] Total Operations: %d", operations.count)
+
+        let expectedQsoCount = operations.reduce(0) { $0 + $1.qsoCount }
+        NSLog("[LoFi] Expected QSOs (from operation.qsoCount): %d", expectedQsoCount)
+        NSLog("[LoFi] Actual QSOs fetched: %d", qsos.count)
+
+        if qsos.count != expectedQsoCount {
+            NSLog(
+                "[LoFi] ⚠️ QSO COUNT MISMATCH: expected %d, got %d (diff: %d)",
+                expectedQsoCount, qsos.count, expectedQsoCount - qsos.count
+            )
+        }
+
+        // Log date range of fetched QSOs
+        if !qsos.isEmpty {
+            let timestamps = qsos.map(\.0.startAtMillis)
+            let minTimestamp = timestamps.min() ?? 0
+            let maxTimestamp = timestamps.max() ?? 0
+            let minDate = Date(timeIntervalSince1970: minTimestamp / 1_000.0)
+            let maxDate = Date(timeIntervalSince1970: maxTimestamp / 1_000.0)
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+
+            NSLog(
+                "[LoFi] QSO Date Range: %@ to %@", formatter.string(from: minDate),
+                formatter.string(from: maxDate)
+            )
+        }
+
+        // Log operations with QSO count mismatches
+        var mismatchCount = 0
+        for op in operations {
+            let opQsos = qsos.filter { $0.1.uuid == op.uuid }
+            if opQsos.count != op.qsoCount {
+                mismatchCount += 1
+                if mismatchCount <= 10 {
+                    NSLog(
+                        "[LoFi] ⚠️ Operation %@ (%@): expected %d QSOs, got %d",
+                        op.uuid, op.title ?? "untitled", op.qsoCount, opQsos.count
+                    )
+                }
+            }
+        }
+        if mismatchCount > 10 {
+            NSLog("[LoFi] ... and %d more operations with mismatches", mismatchCount - 10)
+        }
+        NSLog("[LoFi] ========== END SUMMARY ==========")
+    }
+
     private func fetchAllOperations(isFreshSync: Bool) async throws -> [LoFiOperation] {
         var operationsByUUID: [String: LoFiOperation] = [:]
 
+        NSLog("[LoFi] ========== FETCHING OPERATIONS ==========")
+        NSLog(
+            "[LoFi] isFreshSync: %@, otherClientsOnly: %@",
+            isFreshSync ? "true" : "false", isFreshSync ? "false" : "true"
+        )
+
         for deleted in [false, true] {
             var syncedSince: Int64 = 0
+            var pageCount = 0
+
+            NSLog("[LoFi] --- Fetching %@ operations ---", deleted ? "DELETED" : "ACTIVE")
+
             while true {
+                pageCount += 1
                 let response = try await fetchOperations(
                     syncedSinceMillis: syncedSince,
                     limit: 50,
@@ -334,14 +455,29 @@ final class LoFiClient {
                     deleted: deleted
                 )
 
+                NSLog(
+                    "[LoFi] Page %d: got %d operations, totalRecords=%d, recordsLeft=%d",
+                    pageCount, response.operations.count,
+                    response.meta.operations.totalRecords,
+                    response.meta.operations.recordsLeft
+                )
+
                 for operation in response.operations {
                     operationsByUUID[operation.uuid] = operation
                 }
 
                 if response.meta.operations.recordsLeft == 0 {
+                    NSLog(
+                        "[LoFi] No more records, finished fetching %@ operations",
+                        deleted ? "deleted" : "active"
+                    )
                     break
                 }
                 guard let next = response.meta.operations.nextSyncedAtMillis else {
+                    NSLog(
+                        "[LoFi] ⚠️ recordsLeft=%d but no nextSyncedAtMillis!",
+                        response.meta.operations.recordsLeft
+                    )
                     break
                 }
                 syncedSince = Int64(next)
@@ -349,10 +485,28 @@ final class LoFiClient {
         }
 
         let operations = Array(operationsByUUID.values)
-        NSLog(
-            "[LoFi] Total unique operations: %d, expected QSOs: %d",
-            operations.count, operations.reduce(0) { $0 + $1.qsoCount }
-        )
+        let expectedQsos = operations.reduce(0) { $0 + $1.qsoCount }
+
+        NSLog("[LoFi] ========== OPERATIONS SUMMARY ==========")
+        NSLog("[LoFi] Total unique operations: %d", operations.count)
+        NSLog("[LoFi] Expected total QSOs (sum of qsoCount): %d", expectedQsos)
+
+        // Log date range of operations
+        if !operations.isEmpty {
+            let minMillis = operations.compactMap(\.startAtMillisMin).min() ?? 0
+            let maxMillis = operations.compactMap(\.startAtMillisMax).max() ?? 0
+            if minMillis > 0, maxMillis > 0 {
+                let minDate = Date(timeIntervalSince1970: minMillis / 1_000.0)
+                let maxDate = Date(timeIntervalSince1970: maxMillis / 1_000.0)
+                let formatter = DateFormatter()
+                formatter.dateStyle = .medium
+                NSLog(
+                    "[LoFi] Operations date range: %@ to %@",
+                    formatter.string(from: minDate), formatter.string(from: maxDate)
+                )
+            }
+        }
+
         return operations
     }
 
@@ -390,7 +544,10 @@ final class LoFiClient {
 
         for deleted in [false, true] {
             var qsoSyncedSince = syncStart
+            var pageCount = 0
+
             while true {
+                pageCount += 1
                 let response = try await fetchOperationQsos(
                     operationUUID: operation.uuid,
                     syncedSinceMillis: qsoSyncedSince,
@@ -410,6 +567,10 @@ final class LoFiClient {
                     break
                 }
                 guard let next = response.meta.qsos.nextSyncedAtMillis else {
+                    NSLog(
+                        "[LoFi] ⚠️ Op %@: recordsLeft=%d but no nextSyncedAtMillis (deleted=%@)!",
+                        operation.uuid, response.meta.qsos.recordsLeft, deleted ? "true" : "false"
+                    )
                     break
                 }
                 qsoSyncedSince = Int64(next)
@@ -417,11 +578,37 @@ final class LoFiClient {
         }
 
         if qsos.count != operation.qsoCount {
+            // Log detailed mismatch info
+            let opTitle = operation.title ?? "untitled"
+            let potaRef = operation.potaRef?.reference ?? "none"
+
+            // Calculate operation date range
+            var dateInfo = "unknown dates"
+            if let minMillis = operation.startAtMillisMin,
+               let maxMillis = operation.startAtMillisMax
+            {
+                let minDate = Date(timeIntervalSince1970: minMillis / 1_000.0)
+                let maxDate = Date(timeIntervalSince1970: maxMillis / 1_000.0)
+                let formatter = DateFormatter()
+                formatter.dateFormat = "yyyy-MM-dd"
+                dateInfo =
+                    "\(formatter.string(from: minDate)) to \(formatter.string(from: maxDate))"
+            }
+
             NSLog(
-                "[LoFi] WARNING: Operation %@ QSO count mismatch - expected %d, got %d. "
-                    + "If you see 0 QSOs, download access may need to be enabled by Ham2K staff.",
-                operation.uuid, operation.qsoCount, qsos.count
+                "[LoFi] ⚠️ QSO MISMATCH: Op %@ (%@) POTA=%@ dates=%@ - expected %d, got %d (diff: %d)",
+                operation.uuid, opTitle, potaRef, dateInfo,
+                operation.qsoCount, qsos.count, operation.qsoCount - qsos.count
             )
+
+            // If we got 0 QSOs for an operation that should have some, log extra warning
+            if qsos.isEmpty, operation.qsoCount > 0 {
+                NSLog(
+                    "[LoFi] ⚠️⚠️ ZERO QSOs returned for operation with qsoCount=%d. "
+                        + "This may indicate a cutoff_date restriction on the server.",
+                    operation.qsoCount
+                )
+            }
         }
         return (qsos, maxSyncMillis)
     }

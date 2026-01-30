@@ -2,9 +2,48 @@
 
 All notable changes to Carrier Wave will be documented in this file.
 
-## [Unreleased]
+## [1.13.0] - 2026-01-29
 
 ### Added
+- **Under Construction Banner** - Dismissible warning for features still in development
+  - Shows on Logger and CW Decoder tabs
+  - Can be dismissed per-session or permanently hidden
+- **Keyboard Number Row** - Quick frequency entry in Logger
+  - Number row (0-9 and decimal) appears above keyboard when entering callsigns
+  - Keyboard dismiss button to hide keyboard
+- **Enhanced LoFi Sync Debugging** - Comprehensive logging for diagnosing sync issues
+  - Logs account cutoff_date from registration response (explains limited data access)
+  - Logs operation and QSO count mismatches with expected vs actual totals
+  - Logs date ranges of operations and QSOs fetched
+  - Logs pagination details (records_left, synced_until, synced_since)
+  - Logs per-operation QSO count mismatches with POTA reference and date info
+  - Warning when 0 QSOs returned for operations that should have data
+  - Bug reports now include LoFi-specific details (linked status, callsign, last sync timestamp)
+- **QSO Logger Tab** - Streamlined logging for activations and casual operating
+  - Session-based logging with configurable wizard (mode, frequency, activation type)
+  - Soft delete pattern - QSOs are hidden, never truly deleted (WAL durability)
+  - Command input: type frequency (14.060), MODE, SPOT, RBN, SOLAR, WEATHER in callsign field
+  - Callsign lookup integration (Polo notes + QRZ) with info card display
+  - RST fields with expandable "More" section for notes, their park, operator
+  - Recent QSOs list filtered by current session
+- **RBN Integration** - Real-time Reverse Beacon Network spots
+  - RBN panel showing your spots with signal strength and timing
+  - Mini-map view showing spotter locations
+  - Frequency activity monitoring (±2kHz) with QRM assessment
+- **Solar & Weather Conditions** - NOAA data integration
+  - Solar panel showing K-index, SFI, propagation forecast
+  - HF band outlook based on current conditions
+  - Weather panel from NOAA with outdoor/antenna/equipment advisories
+- **Band Plan Validation** - License class privilege checking
+  - Warning banner when operating outside license privileges
+  - Technician/General/Extra class support
+  - Mode validation (CW vs SSB segments)
+- **POTA Self-Spotting** - Post spots directly from the logger
+  - Integrates with existing POTA authentication
+  - One-command spotting during activations
+- **Toast Notifications** - Feedback for logger actions
+  - QSO logged, spot posted, command executed confirmations
+  - Friend spotted alerts when friends appear on RBN
 - **CW Adaptive Frequency Detection** - Automatically detects CW tone frequency within a configurable range
   - Filter bank of Goertzel filters scans 400-900 Hz (default) with 50 Hz spacing
   - Locks onto detected frequency after confirmation, stays locked during gaps between elements

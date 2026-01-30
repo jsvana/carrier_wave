@@ -22,6 +22,7 @@ struct CarrierWaveApp: App {
             Friendship.self,
             Club.self,
             ActivityItem.self,
+            LoggingSession.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,

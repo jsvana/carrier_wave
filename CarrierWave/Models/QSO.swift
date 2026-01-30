@@ -102,6 +102,12 @@ final class QSO {
     /// DXCC entity (from LoTW)
     var dxcc: Int?
 
+    /// Soft delete flag - QSOs are never truly deleted, only hidden
+    var isHidden: Bool = false
+
+    /// Logging session this QSO belongs to (optional - older QSOs won't have this)
+    var loggingSessionId: UUID?
+
     @Relationship(deleteRule: .cascade, inverse: \ServicePresence.qso)
     var servicePresence: [ServicePresence] = []
 
@@ -145,6 +151,11 @@ final class QSO {
     /// Check if this is likely a US station (for state counting)
     var isUSStation: Bool {
         dxccEntity?.number == 291 // United States DXCC number
+    }
+
+    /// Convenience property - QSO is visible (not hidden)
+    var isVisible: Bool {
+        !isHidden
     }
 
     /// Count of populated optional fields (for deduplication tiebreaker)

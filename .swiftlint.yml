@@ -13,6 +13,7 @@ excluded:
 disabled_rules:
   - trailing_comma # Allow trailing commas
   - opening_brace # Conflicts with SwiftFormat line wrapping
+  - blanket_disable_command # Allow file-level swiftlint:disable
 
 opt_in_rules:
   - array_init

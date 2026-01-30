@@ -57,9 +57,8 @@ generate_pure_cw() {
         char=$(echo "$char" | tr '[:lower:]' '[:upper:]')
 
         if [[ "$char" == " " ]]; then
-            # Word gap (minus the letter gap we just added)
-            local extra_gap=$(echo "scale=4; $word_gap - $letter_gap" | bc)
-            segments+=("silence:$extra_gap")
+            # Full word gap (7 dits) - letter gap is added before next letter, not after previous
+            segments+=("silence:$word_gap")
             first_element=true
             continue
         fi

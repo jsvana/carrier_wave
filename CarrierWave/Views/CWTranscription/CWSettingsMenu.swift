@@ -12,9 +12,19 @@ struct CWSettingsMenu: View {
         wpmSection
         frequencySection
         signalSection
+        suggestionsSection
     }
 
     // MARK: Private
+
+    private var sensitivityLabel: String {
+        switch service.suggestionEngine.maxEditDistance {
+        case 1: "Strict"
+        case 2: "Moderate"
+        case 3: "Aggressive"
+        default: "Moderate"
+        }
+    }
 
     // MARK: - WPM Section
 
@@ -131,6 +141,107 @@ struct CWSettingsMenu: View {
                     Spacer()
                     if service.preAmpEnabled {
                         Image(systemName: "checkmark")
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: - Suggestions Section
+
+    private var suggestionsSection: some View {
+        Section("Word Suggestions") {
+            // Master toggle
+            Button {
+                service.suggestionEngine.suggestionsEnabled.toggle()
+            } label: {
+                HStack {
+                    Text("Enable Suggestions")
+                    Spacer()
+                    if service.suggestionEngine.suggestionsEnabled {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            if service.suggestionEngine.suggestionsEnabled {
+                // Sensitivity picker
+                Menu {
+                    Button {
+                        service.suggestionEngine.maxEditDistance = 1
+                    } label: {
+                        HStack {
+                            Text("Strict")
+                            if service.suggestionEngine.maxEditDistance == 1 {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+
+                    Button {
+                        service.suggestionEngine.maxEditDistance = 2
+                    } label: {
+                        HStack {
+                            Text("Moderate")
+                            if service.suggestionEngine.maxEditDistance == 2 {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+
+                    Button {
+                        service.suggestionEngine.maxEditDistance = 3
+                    } label: {
+                        HStack {
+                            Text("Aggressive")
+                            if service.suggestionEngine.maxEditDistance == 3 {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                } label: {
+                    HStack {
+                        Text("Sensitivity")
+                        Spacer()
+                        Text(sensitivityLabel)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                // Category toggles
+                Button {
+                    service.suggestionEngine.suggestProsigns.toggle()
+                } label: {
+                    HStack {
+                        Text("Prosigns (CQ, DE, K...)")
+                        Spacer()
+                        if service.suggestionEngine.suggestProsigns {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+
+                Button {
+                    service.suggestionEngine.suggestAbbreviations.toggle()
+                } label: {
+                    HStack {
+                        Text("Abbreviations (73, TU...)")
+                        Spacer()
+                        if service.suggestionEngine.suggestAbbreviations {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+
+                Button {
+                    service.suggestionEngine.suggestNumbers.toggle()
+                } label: {
+                    HStack {
+                        Text("Numbers")
+                        Spacer()
+                        if service.suggestionEngine.suggestNumbers {
+                            Image(systemName: "checkmark")
+                        }
                     }
                 }
             }

@@ -50,6 +50,9 @@ final class BugReportService {
         let qrzConfigured: Bool
         let potaConfigured: Bool
         let lofiConfigured: Bool
+        let lofiLinked: Bool
+        let lofiCallsign: String?
+        let lofiLastSyncMillis: Int64
         let lotwConfigured: Bool
         let hamrsConfigured: Bool
         let iCloudStatus: String
@@ -93,6 +96,9 @@ final class BugReportService {
         let qrzConfigured = qrzClient?.hasApiKey() ?? false
         let potaConfigured = potaAuth?.isAuthenticated ?? false
         let lofiConfigured = lofiClient?.hasCredentials() ?? false
+        let lofiLinked = lofiClient?.isLinked ?? false
+        let lofiCallsign = lofiClient?.getCallsign()
+        let lofiLastSyncMillis = lofiClient?.getLastSyncMillis() ?? 0
         let lotwConfigured = lotwClient?.hasCredentials() ?? false
         let hamrsConfigured = hamrsClient?.hasApiKey() ?? false
         let iCloudStatus = iCloudMonitor?.statusDescription ?? "Unknown"
@@ -101,6 +107,9 @@ final class BugReportService {
             qrzConfigured: qrzConfigured,
             potaConfigured: potaConfigured,
             lofiConfigured: lofiConfigured,
+            lofiLinked: lofiLinked,
+            lofiCallsign: lofiCallsign,
+            lofiLastSyncMillis: lofiLastSyncMillis,
             lotwConfigured: lotwConfigured,
             hamrsConfigured: hamrsConfigured,
             iCloudStatus: iCloudStatus
@@ -170,6 +179,12 @@ final class BugReportService {
         HAMRS: \(context.serviceStatus.hamrsConfigured ? "Configured" : "Not configured")
         iCloud: \(context.serviceStatus.iCloudStatus)
 
+        LOFI DETAILS
+        ------------
+        Linked: \(context.serviceStatus.lofiLinked ? "Yes" : "No")
+        Callsign: \(context.serviceStatus.lofiCallsign ?? "Not set")
+        Last Sync: \(formatLoFiLastSync(context.serviceStatus.lofiLastSyncMillis))
+
         RECENT SYNC LOGS
         ----------------
         \(context.syncLogs)
@@ -194,6 +209,17 @@ final class BugReportService {
             }
         }
         return mapDeviceIdentifier(identifier)
+    }
+
+    private func formatLoFiLastSync(_ millis: Int64) -> String {
+        guard millis > 0 else {
+            return "Never synced (0)"
+        }
+        let date = Date(timeIntervalSince1970: Double(millis) / 1_000.0)
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .medium
+        return "\(formatter.string(from: date)) (millis: \(millis))"
     }
 
     private func mapDeviceIdentifier(_ identifier: String) -> String {

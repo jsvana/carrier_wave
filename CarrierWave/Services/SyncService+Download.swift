@@ -1,3 +1,4 @@
+// swiftlint:disable function_body_length
 import Foundation
 import SwiftData
 
@@ -120,11 +121,39 @@ extension SyncService {
         await MainActor.run { self.syncPhase = .downloading(service: .lofi) }
         let debugLog = SyncDebugLog.shared
         debugLog.info("Starting LoFi download", service: .lofi)
+
+        // Log LoFi configuration state
+        let lastSyncMillis = lofiClient.getLastSyncMillis()
+        if lastSyncMillis > 0 {
+            let lastSyncDate = Date(timeIntervalSince1970: Double(lastSyncMillis) / 1_000.0)
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            debugLog.info("Last sync: \(formatter.string(from: lastSyncDate))", service: .lofi)
+        } else {
+            debugLog.info("Last sync: Never (fresh sync)", service: .lofi)
+        }
+
         do {
             let qsos = try await withTimeout(seconds: timeout, service: .lofi) {
                 try await self.lofiClient.fetchAllQsosSinceLastSync()
             }
             debugLog.info("Downloaded \(qsos.count) raw QSOs from LoFi API", service: .lofi)
+
+            // Log date range of downloaded QSOs
+            if !qsos.isEmpty {
+                let timestamps = qsos.map(\.0.startAtMillis)
+                let minTimestamp = timestamps.min() ?? 0
+                let maxTimestamp = timestamps.max() ?? 0
+                let minDate = Date(timeIntervalSince1970: minTimestamp / 1_000.0)
+                let maxDate = Date(timeIntervalSince1970: maxTimestamp / 1_000.0)
+                let formatter = DateFormatter()
+                formatter.dateStyle = .medium
+                debugLog.info(
+                    "QSO date range: \(formatter.string(from: minDate)) to \(formatter.string(from: maxDate))",
+                    service: .lofi
+                )
+            }
 
             var skippedCount = 0
             var fetchedList: [FetchedQSO] = []
@@ -300,8 +329,37 @@ extension SyncService {
         let debugLog = SyncDebugLog.shared
         debugLog.info("Force re-downloading from LoFi", service: .lofi)
 
+        // Log current state before re-download
+        let lastSyncMillis = lofiClient.getLastSyncMillis()
+        if lastSyncMillis > 0 {
+            let lastSyncDate = Date(timeIntervalSince1970: Double(lastSyncMillis) / 1_000.0)
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            formatter.timeStyle = .short
+            debugLog.info(
+                "Previous last sync: \(formatter.string(from: lastSyncDate))", service: .lofi
+            )
+        }
+        debugLog.info("Ignoring last sync timestamp, fetching ALL QSOs", service: .lofi)
+
         // Fetch ALL QSOs, not just since last sync
         let qsos = try await lofiClient.fetchAllQsos()
+
+        // Log date range
+        if !qsos.isEmpty {
+            let timestamps = qsos.map(\.0.startAtMillis)
+            let minTimestamp = timestamps.min() ?? 0
+            let maxTimestamp = timestamps.max() ?? 0
+            let minDate = Date(timeIntervalSince1970: minTimestamp / 1_000.0)
+            let maxDate = Date(timeIntervalSince1970: maxTimestamp / 1_000.0)
+            let formatter = DateFormatter()
+            formatter.dateStyle = .medium
+            debugLog.info(
+                "QSO date range: \(formatter.string(from: minDate)) to \(formatter.string(from: maxDate))",
+                service: .lofi
+            )
+        }
+
         let fetched = qsos.compactMap { FetchedQSO.fromLoFi($0.0, operation: $0.1) }
 
         debugLog.info("Fetched \(fetched.count) QSOs from LoFi", service: .lofi)

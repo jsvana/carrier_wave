@@ -10,6 +10,7 @@ enum ImportSource: String, Codable {
     case pota
     case hamrs
     case lotw
+    case logger
 }
 
 // MARK: - ServiceType
