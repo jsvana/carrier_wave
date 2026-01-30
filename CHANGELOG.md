@@ -19,6 +19,12 @@ All notable changes to Carrier Wave will be documented in this file.
   - Automatically look up license class from HamDB.org by tapping search icon
   - Works with US amateur radio callsigns (no authentication required)
   - Supports Extra, General, Technician, Advanced (mapped to Extra), and Novice (mapped to Technician)
+- LoFi sync test script (`scripts/lofi-sync-test.swift`) for local testing
+
+### Fixed
+- LoFi sync pagination now fetches all operations (was stopping after first page of 50)
+  - Server returns `next_updated_at_millis` when using `synced_since_millis` pagination
+- LoFi QSOs with missing `startAtMillis` field no longer crash sync (field is now optional)
 
 ## [1.13.1] - 2026-01-29
 

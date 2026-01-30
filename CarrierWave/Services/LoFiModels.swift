@@ -301,7 +301,7 @@ struct LoFiQso: Decodable, @unchecked Sendable {
         createdAtMillis = try container.decodeIfPresent(Double.self, forKey: .createdAtMillis)
         updatedAtMillis = try container.decodeIfPresent(Double.self, forKey: .updatedAtMillis)
         syncedAtMillis = try container.decodeIfPresent(Double.self, forKey: .syncedAtMillis)
-        startAtMillis = try container.decode(Double.self, forKey: .startAtMillis)
+        startAtMillis = try container.decodeIfPresent(Double.self, forKey: .startAtMillis)
         their = try container.decodeIfPresent(LoFiTheirInfo.self, forKey: .their)
         our = try container.decodeIfPresent(LoFiOurInfo.self, forKey: .our)
         band = try container.decodeIfPresent(String.self, forKey: .band)
@@ -348,7 +348,7 @@ struct LoFiQso: Decodable, @unchecked Sendable {
     let createdAtMillis: Double?
     let updatedAtMillis: Double?
     let syncedAtMillis: Double?
-    let startAtMillis: Double
+    let startAtMillis: Double?
     let their: LoFiTheirInfo?
     let our: LoFiOurInfo?
     let band: String?
@@ -461,9 +461,9 @@ extension LoFiQso {
         freq.map { $0 / 1_000.0 }
     }
 
-    /// QSO timestamp as Date
-    var timestamp: Date {
-        Date(timeIntervalSince1970: startAtMillis / 1_000.0)
+    /// QSO timestamp as Date (returns nil if startAtMillis is missing)
+    var timestamp: Date? {
+        startAtMillis.map { Date(timeIntervalSince1970: $0 / 1_000.0) }
     }
 
     /// Get their POTA reference

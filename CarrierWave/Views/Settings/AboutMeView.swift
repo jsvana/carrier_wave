@@ -57,60 +57,6 @@ struct AboutMeView: View {
 
     private let profileService = UserProfileService.shared
 
-    private func profileSection(_ profile: UserProfile) -> some View {
-        Section {
-            HStack {
-                Text(profile.callsign)
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .monospaced()
-                Spacer()
-                if let licenseClass = profile.licenseClass {
-                    Text(licenseClass.displayName)
-                        .font(.caption)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.accentColor.opacity(0.2))
-                        .clipShape(Capsule())
-                }
-            }
-
-            if let name = profile.fullName {
-                HStack {
-                    Image(systemName: "person")
-                        .foregroundStyle(.secondary)
-                    Text(name)
-                }
-            }
-
-            if let location = profile.fullLocation {
-                HStack {
-                    Image(systemName: "location")
-                        .foregroundStyle(.secondary)
-                    Text(location)
-                }
-            }
-
-            if let grid = profile.grid {
-                HStack {
-                    Image(systemName: "square.grid.3x3")
-                        .foregroundStyle(.secondary)
-                    Text(grid)
-                }
-            }
-
-            if let expires = profile.licenseExpires {
-                HStack {
-                    Image(systemName: "calendar")
-                        .foregroundStyle(.secondary)
-                    Text("License expires: \(expires)")
-                }
-            }
-        } header: {
-            Text("Profile")
-        }
-    }
-
     private var editSection: some View {
         Section {
             TextField("First Name", text: $editedFirstName)
@@ -185,6 +131,60 @@ struct AboutMeView: View {
         }
     }
 
+    private func profileSection(_ profile: UserProfile) -> some View {
+        Section {
+            HStack {
+                Text(profile.callsign)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+                    .monospaced()
+                Spacer()
+                if let licenseClass = profile.licenseClass {
+                    Text(licenseClass.displayName)
+                        .font(.caption)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.accentColor.opacity(0.2))
+                        .clipShape(Capsule())
+                }
+            }
+
+            if let name = profile.fullName {
+                HStack {
+                    Image(systemName: "person")
+                        .foregroundStyle(.secondary)
+                    Text(name)
+                }
+            }
+
+            if let location = profile.fullLocation {
+                HStack {
+                    Image(systemName: "location")
+                        .foregroundStyle(.secondary)
+                    Text(location)
+                }
+            }
+
+            if let grid = profile.grid {
+                HStack {
+                    Image(systemName: "square.grid.3x3")
+                        .foregroundStyle(.secondary)
+                    Text(grid)
+                }
+            }
+
+            if let expires = profile.licenseExpires {
+                HStack {
+                    Image(systemName: "calendar")
+                        .foregroundStyle(.secondary)
+                    Text("License expires: \(expires)")
+                }
+            }
+        } header: {
+            Text("Profile")
+        }
+    }
+
     private func loadProfile() {
         profile = profileService.getProfile()
 
@@ -199,7 +199,9 @@ struct AboutMeView: View {
     }
 
     private func saveProfile() {
-        guard let existingProfile = profile else { return }
+        guard let existingProfile = profile else {
+            return
+        }
 
         let licenseClass = LicenseClass(rawValue: editedLicenseClass)
 
@@ -226,7 +228,9 @@ struct AboutMeView: View {
     }
 
     private func refreshProfile() async {
-        guard let existingProfile = profile else { return }
+        guard let existingProfile = profile else {
+            return
+        }
 
         isRefreshing = true
         defer { isRefreshing = false }

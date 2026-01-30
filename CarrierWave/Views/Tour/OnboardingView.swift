@@ -1,3 +1,4 @@
+// swiftlint:disable file_length type_body_length
 import SwiftUI
 
 // MARK: - OnboardingStep
@@ -78,7 +79,6 @@ struct OnboardingView: View {
 
     private let profileService = UserProfileService.shared
 
-    @ViewBuilder
     private var stepContent: some View {
         ScrollView {
             VStack(spacing: 24) {
@@ -168,52 +168,18 @@ struct OnboardingView: View {
                     .fontWeight(.bold)
                     .monospaced()
 
-                Text("We couldn't find your callsign in HamDB. This might be a non-US callsign or a new license.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                Text(
+                    "We couldn't find your callsign in HamDB. This might be a non-US callsign or a new license."
+                )
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
                 Text("You can still use the app and update your profile later in Settings.")
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
-        }
-    }
-
-    private func profileInfoGrid(_ profile: UserProfile) -> some View {
-        VStack(spacing: 12) {
-            if let location = profile.shortLocation {
-                profileInfoRow(icon: "location", label: "QTH", value: location)
-            }
-
-            if let grid = profile.grid {
-                profileInfoRow(icon: "square.grid.3x3", label: "Grid", value: grid)
-            }
-
-            if let licenseClass = profile.licenseClass {
-                profileInfoRow(icon: "graduationcap", label: "Class", value: licenseClass.displayName)
-            }
-
-            if let expires = profile.licenseExpires {
-                profileInfoRow(icon: "calendar", label: "Expires", value: expires)
-            }
-        }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-
-    private func profileInfoRow(icon: String, label: String, value: String) -> some View {
-        HStack {
-            Image(systemName: icon)
-                .foregroundStyle(.secondary)
-                .frame(width: 24)
-            Text(label)
-                .foregroundStyle(.secondary)
-            Spacer()
-            Text(value)
-                .fontWeight(.medium)
         }
     }
 
@@ -300,49 +266,6 @@ struct OnboardingView: View {
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
         }
-    }
-
-    private func serviceConnectionCard<Content: View>(
-        name: String,
-        icon: String,
-        isConnected: Bool,
-        @ViewBuilder content: () -> Content,
-        onConnect: @escaping () async -> Void
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            HStack {
-                Image(systemName: icon)
-                    .foregroundStyle(.accent)
-                Text(name)
-                    .fontWeight(.medium)
-                Spacer()
-                if isConnected {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundStyle(.green)
-                }
-            }
-
-            if !isConnected {
-                content()
-
-                Button {
-                    Task { await onConnect() }
-                } label: {
-                    if isConnectingService {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                    } else {
-                        Text("Connect")
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.bordered)
-                .disabled(isConnectingService)
-            }
-        }
-        .padding()
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private var completeStep: some View {
@@ -449,14 +372,99 @@ struct OnboardingView: View {
         }
     }
 
+    private func profileInfoGrid(_ profile: UserProfile) -> some View {
+        VStack(spacing: 12) {
+            if let location = profile.shortLocation {
+                profileInfoRow(icon: "location", label: "QTH", value: location)
+            }
+
+            if let grid = profile.grid {
+                profileInfoRow(icon: "square.grid.3x3", label: "Grid", value: grid)
+            }
+
+            if let licenseClass = profile.licenseClass {
+                profileInfoRow(
+                    icon: "graduationcap", label: "Class", value: licenseClass.displayName
+                )
+            }
+
+            if let expires = profile.licenseExpires {
+                profileInfoRow(icon: "calendar", label: "Expires", value: expires)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    private func profileInfoRow(icon: String, label: String, value: String) -> some View {
+        HStack {
+            Image(systemName: icon)
+                .foregroundStyle(.secondary)
+                .frame(width: 24)
+            Text(label)
+                .foregroundStyle(.secondary)
+            Spacer()
+            Text(value)
+                .fontWeight(.medium)
+        }
+    }
+
+    private func serviceConnectionCard(
+        name: String,
+        icon: String,
+        isConnected: Bool,
+        @ViewBuilder content: () -> some View,
+        onConnect: @escaping () async -> Void
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundStyle(.accent)
+                Text(name)
+                    .fontWeight(.medium)
+                Spacer()
+                if isConnected {
+                    Image(systemName: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+            }
+
+            if !isConnected {
+                content()
+
+                Button {
+                    Task { await onConnect() }
+                } label: {
+                    if isConnectingService {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                    } else {
+                        Text("Connect")
+                            .frame(maxWidth: .infinity)
+                    }
+                }
+                .buttonStyle(.bordered)
+                .disabled(isConnectingService)
+            }
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
     private func lookupCallsign() {
-        guard !callsign.isEmpty else { return }
+        guard !callsign.isEmpty else {
+            return
+        }
 
         isLookingUp = true
 
         Task {
             do {
-                let foundProfile = try await profileService.lookupAndCreateProfile(callsign: callsign)
+                let foundProfile = try await profileService.lookupAndCreateProfile(
+                    callsign: callsign
+                )
                 await MainActor.run {
                     profile = foundProfile
                     isLookingUp = false
@@ -494,7 +502,9 @@ struct OnboardingView: View {
     }
 
     private func connectQRZ() async {
-        guard !qrzApiKey.isEmpty else { return }
+        guard !qrzApiKey.isEmpty else {
+            return
+        }
 
         isConnectingService = true
         defer { isConnectingService = false }
@@ -520,7 +530,9 @@ struct OnboardingView: View {
     }
 
     private func connectLoTW() async {
-        guard !lotwPassword.isEmpty else { return }
+        guard !lotwPassword.isEmpty else {
+            return
+        }
 
         isConnectingService = true
         defer { isConnectingService = false }
@@ -528,7 +540,9 @@ struct OnboardingView: View {
         do {
             let client = LoTWClient()
             // Use callsign as username for LoTW
-            try await client.validateCredentials(username: callsign.uppercased(), password: lotwPassword)
+            try await client.validateCredentials(
+                username: callsign.uppercased(), password: lotwPassword
+            )
             try client.saveCredentials(username: callsign.uppercased(), password: lotwPassword)
 
             await MainActor.run {
@@ -543,13 +557,17 @@ struct OnboardingView: View {
     }
 
     private func connectPOTA() async {
-        guard !potaUsername.isEmpty, !potaPassword.isEmpty else { return }
+        guard !potaUsername.isEmpty, !potaPassword.isEmpty else {
+            return
+        }
 
         isConnectingService = true
         defer { isConnectingService = false }
 
         do {
-            _ = try await potaAuth.performHeadlessLogin(username: potaUsername, password: potaPassword)
+            _ = try await potaAuth.performHeadlessLogin(
+                username: potaUsername, password: potaPassword
+            )
             try potaAuth.saveCredentials(username: potaUsername, password: potaPassword)
 
             await MainActor.run {

@@ -72,38 +72,6 @@ struct LoggerSettingsView: View {
         }
     }
 
-    private func lookupLicenseClass() {
-        guard !defaultCallsign.isEmpty else { return }
-
-        isLookingUp = true
-
-        Task {
-            do {
-                let client = HamDBClient()
-                if let foundClass = try await client.lookupLicenseClass(callsign: defaultCallsign) {
-                    await MainActor.run {
-                        licenseClass = foundClass.rawValue
-                        lookupResultMessage = "License class set to \(foundClass.displayName)"
-                        showLookupResult = true
-                        isLookingUp = false
-                    }
-                } else {
-                    await MainActor.run {
-                        lookupResultMessage = "Callsign \(defaultCallsign.uppercased()) not found in HamDB"
-                        showLookupResult = true
-                        isLookingUp = false
-                    }
-                }
-            } catch {
-                await MainActor.run {
-                    lookupResultMessage = "Lookup failed: \(error.localizedDescription)"
-                    showLookupResult = true
-                    isLookingUp = false
-                }
-            }
-        }
-    }
-
     private var defaultsSection: some View {
         Section {
             HStack {
@@ -145,6 +113,40 @@ struct LoggerSettingsView: View {
             Text("Display")
         } footer: {
             Text("Show nearby activity on the frequency (from RBN, POTA, etc.)")
+        }
+    }
+
+    private func lookupLicenseClass() {
+        guard !defaultCallsign.isEmpty else {
+            return
+        }
+
+        isLookingUp = true
+
+        Task {
+            do {
+                let client = HamDBClient()
+                if let foundClass = try await client.lookupLicenseClass(callsign: defaultCallsign) {
+                    await MainActor.run {
+                        licenseClass = foundClass.rawValue
+                        lookupResultMessage = "License class set to \(foundClass.displayName)"
+                        showLookupResult = true
+                        isLookingUp = false
+                    }
+                } else {
+                    await MainActor.run {
+                        lookupResultMessage = "Callsign \(defaultCallsign.uppercased()) not found in HamDB"
+                        showLookupResult = true
+                        isLookingUp = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    lookupResultMessage = "Lookup failed: \(error.localizedDescription)"
+                    showLookupResult = true
+                    isLookingUp = false
+                }
+            }
         }
     }
 }

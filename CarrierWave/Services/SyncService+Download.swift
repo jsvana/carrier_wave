@@ -142,7 +142,7 @@ extension SyncService {
 
             // Log date range of downloaded QSOs
             if !qsos.isEmpty {
-                let timestamps = qsos.map(\.0.startAtMillis)
+                let timestamps = qsos.compactMap(\.0.startAtMillis)
                 let minTimestamp = timestamps.min() ?? 0
                 let maxTimestamp = timestamps.max() ?? 0
                 let minDate = Date(timeIntervalSince1970: minTimestamp / 1_000.0)
@@ -193,7 +193,7 @@ extension SyncService {
             let rawJSON = """
             {
               "uuid": "\(lofiQso.uuid)",
-              "startAtMillis": \(lofiQso.startAtMillis),
+              "startAtMillis": \(lofiQso.startAtMillis.map { String($0) } ?? "nil"),
               "band": "\(lofiQso.band ?? "nil")",
               "mode": "\(lofiQso.mode ?? "nil")",
               "freq": \(lofiQso.freq.map { String($0) } ?? "nil"),
@@ -347,7 +347,7 @@ extension SyncService {
 
         // Log date range
         if !qsos.isEmpty {
-            let timestamps = qsos.map(\.0.startAtMillis)
+            let timestamps = qsos.compactMap(\.0.startAtMillis)
             let minTimestamp = timestamps.min() ?? 0
             let maxTimestamp = timestamps.max() ?? 0
             let minDate = Date(timeIntervalSince1970: minTimestamp / 1_000.0)

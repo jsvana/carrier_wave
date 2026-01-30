@@ -84,23 +84,25 @@ enum HamDBError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidURL:
-            return "Invalid HamDB API URL"
+            "Invalid HamDB API URL"
         case .invalidResponse:
-            return "Invalid response from HamDB"
+            "Invalid response from HamDB"
         case let .httpError(statusCode):
-            return "HamDB returned HTTP \(statusCode)"
+            "HamDB returned HTTP \(statusCode)"
         case let .decodingError(error):
-            return "Failed to decode HamDB response: \(error.localizedDescription)"
+            "Failed to decode HamDB response: \(error.localizedDescription)"
         }
     }
 }
 
-// MARK: - HamDB API Response Models
+// MARK: - HamDBResponse
 
 /// Root response from HamDB API
 struct HamDBResponse: Codable {
     let hamdb: HamDBData
 }
+
+// MARK: - HamDBData
 
 /// Container for HamDB data
 struct HamDBData: Codable {
@@ -109,15 +111,17 @@ struct HamDBData: Codable {
     let messages: HamDBMessages?
 }
 
+// MARK: - HamDBMessages
+
 /// Status messages from HamDB
 struct HamDBMessages: Codable {
     let status: String?
 }
 
+// MARK: - HamDBLicense
+
 /// License information from HamDB
 struct HamDBLicense: Codable, Sendable {
-    // MARK: Internal
-
     /// The callsign
     let call: String?
 

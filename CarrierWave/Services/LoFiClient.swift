@@ -283,7 +283,9 @@ final class LoFiClient {
             logRegistrationToDebugLog(registration, debugLog: debugLog)
         } catch {
             NSLog("[LoFi] Warning: Could not refresh registration: %@", error.localizedDescription)
-            debugLog.warning("Could not refresh registration: \(error.localizedDescription)", service: .lofi)
+            debugLog.warning(
+                "Could not refresh registration: \(error.localizedDescription)", service: .lofi
+            )
         }
 
         // Fetch all operations (both active and deleted)
@@ -324,7 +326,9 @@ final class LoFiClient {
             logRegistrationToDebugLog(registration, debugLog: debugLog)
         } catch {
             NSLog("[LoFi] Warning: Could not refresh registration: %@", error.localizedDescription)
-            debugLog.warning("Could not refresh registration: \(error.localizedDescription)", service: .lofi)
+            debugLog.warning(
+                "Could not refresh registration: \(error.localizedDescription)", service: .lofi
+            )
         }
 
         // Fetch all operations (treat as fresh sync to get everything)
@@ -396,11 +400,15 @@ final class LoFiClient {
         NSLog("[LoFi] Sync Check Period: %d ms", registration.meta.flags.suggestedSyncCheckPeriod)
     }
 
-    private func logRegistrationToDebugLog(_ registration: LoFiRegistrationResponse, debugLog: SyncDebugLog) {
+    private func logRegistrationToDebugLog(
+        _ registration: LoFiRegistrationResponse, debugLog: SyncDebugLog
+    ) {
         debugLog.info("Account: \(registration.account.call)", service: .lofi)
 
         if let cutoffDate = registration.account.cutoffDate {
-            debugLog.warning("⚠️ CUTOFF DATE: \(cutoffDate) - older QSOs may not sync", service: .lofi)
+            debugLog.warning(
+                "⚠️ CUTOFF DATE: \(cutoffDate) - older QSOs may not sync", service: .lofi
+            )
         } else {
             debugLog.info("No cutoff date restriction", service: .lofi)
         }
@@ -442,7 +450,7 @@ final class LoFiClient {
 
         // Log date range of fetched QSOs
         if !qsos.isEmpty {
-            let timestamps = qsos.map(\.0.startAtMillis)
+            let timestamps = qsos.compactMap(\.0.startAtMillis)
             let minTimestamp = timestamps.min() ?? 0
             let maxTimestamp = timestamps.max() ?? 0
             let minDate = Date(timeIntervalSince1970: minTimestamp / 1_000.0)
@@ -476,7 +484,9 @@ final class LoFiClient {
             }
         }
         if mismatchCount > 0 {
-            debugLog.warning("\(mismatchCount) operations have QSO count mismatches", service: .lofi)
+            debugLog.warning(
+                "\(mismatchCount) operations have QSO count mismatches", service: .lofi
+            )
         }
         if mismatchCount > 10 {
             NSLog("[LoFi] ... and %d more operations with mismatches", mismatchCount - 10)
@@ -514,9 +524,13 @@ final class LoFiClient {
                 if response.meta.operations.recordsLeft == 0 {
                     break
                 }
-                guard let next = response.meta.operations.nextSyncedAtMillis else {
+                // Server returns next_updated_at_millis when using synced_since_millis pagination
+                guard
+                    let next = response.meta.operations.nextUpdatedAtMillis
+                    ?? response.meta.operations.nextSyncedAtMillis
+                else {
                     debugLog.warning(
-                        "recordsLeft=\(response.meta.operations.recordsLeft) but no nextSyncedAtMillis",
+                        "recordsLeft=\(response.meta.operations.recordsLeft) but no nextUpdatedAtMillis",
                         service: .lofi
                     )
                     break
@@ -525,13 +539,17 @@ final class LoFiClient {
             }
 
             let opType = deleted ? "deleted" : "active"
-            debugLog.info("Fetched \(totalFetched) \(opType) operations in \(pageCount) pages", service: .lofi)
+            debugLog.info(
+                "Fetched \(totalFetched) \(opType) operations in \(pageCount) pages", service: .lofi
+            )
         }
 
         let operations = Array(operationsByUUID.values)
         let expectedQsos = operations.reduce(0) { $0 + $1.qsoCount }
 
-        debugLog.info("Total operations: \(operations.count), expected QSOs: \(expectedQsos)", service: .lofi)
+        debugLog.info(
+            "Total operations: \(operations.count), expected QSOs: \(expectedQsos)", service: .lofi
+        )
 
         // Log date range of operations
         if !operations.isEmpty {
@@ -611,7 +629,11 @@ final class LoFiClient {
                 if response.meta.qsos.recordsLeft == 0 {
                     break
                 }
-                guard let next = response.meta.qsos.nextSyncedAtMillis else {
+                // Server returns next_updated_at_millis when using synced_since_millis pagination
+                guard
+                    let next = response.meta.qsos.nextUpdatedAtMillis
+                    ?? response.meta.qsos.nextSyncedAtMillis
+                else {
                     debugLog.warning(
                         "Op \(operation.uuid): recordsLeft=\(response.meta.qsos.recordsLeft) but no next page",
                         service: .lofi
@@ -636,7 +658,8 @@ final class LoFiClient {
                 let maxDate = Date(timeIntervalSince1970: maxMillis / 1_000.0)
                 let formatter = DateFormatter()
                 formatter.dateFormat = "yyyy-MM-dd"
-                dateInfo = "\(formatter.string(from: minDate)) to \(formatter.string(from: maxDate))"
+                dateInfo =
+                    "\(formatter.string(from: minDate)) to \(formatter.string(from: maxDate))"
             }
 
             // Only log to debugLog if significant (>0 missing QSOs)

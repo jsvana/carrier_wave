@@ -171,7 +171,8 @@ extension FetchedQSO {
     static func fromLoFi(_ lofi: LoFiQso, operation: LoFiOperation) -> FetchedQSO? {
         guard let callsign = lofi.theirCall,
               let band = lofi.band,
-              let mode = lofi.mode
+              let mode = lofi.mode,
+              let timestamp = lofi.timestamp
         else {
             return nil
         }
@@ -183,7 +184,7 @@ extension FetchedQSO {
             band: band,
             mode: mode,
             frequency: lofi.freqMHz,
-            timestamp: lofi.timestamp,
+            timestamp: timestamp,
             rstSent: lofi.rstSent,
             rstReceived: lofi.rstRcvd,
             myCallsign: lofi.ourCall ?? operation.stationCall,
