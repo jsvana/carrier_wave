@@ -152,5 +152,8 @@ extension KeychainHelper {
         /// Callsign Aliases
         static let currentCallsign = "user.current.callsign"
         static let previousCallsigns = "user.previous.callsigns" // JSON array
+
+        /// User Profile
+        static let userProfile = "user.profile" // JSON UserProfile
     }
 }

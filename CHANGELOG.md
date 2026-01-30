@@ -5,6 +5,16 @@ All notable changes to Carrier Wave will be documented in this file.
 ## [Unreleased]
 
 ### Added
+- **User Onboarding Flow** - Profile setup after intro tour
+  - Enter callsign and automatically fetch profile from HamDB.org
+  - Displays name, QTH, grid square, license class, and expiration date
+  - Pre-fills service credentials with callsign (username shown grayed out, just enter password)
+  - Connect QRZ, LoTW, and POTA during onboarding
+  - Profile stored securely and used throughout the app
+- **About Me** - New profile section in Settings
+  - View and edit your profile information
+  - Refresh profile data from HamDB
+  - Shows callsign, name, location, grid, and license class
 - HamDB license class lookup in Logger Settings
   - Automatically look up license class from HamDB.org by tapping search icon
   - Works with US amateur radio callsigns (no authentication required)

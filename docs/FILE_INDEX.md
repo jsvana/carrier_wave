@@ -40,6 +40,7 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `LoggingSession.swift` | Logging session model with activation type, frequency, mode |
 | `LoggerCommand.swift` | Command enum for logger input (FREQ, MODE, SPOT, RBN, SOLAR, WEATHER) |
 | `BandPlan.swift` | US amateur radio band plan data with license class privileges |
+| `UserProfile.swift` | User's amateur radio profile (callsign, name, QTH, grid, license) |
 
 ## Services (`CarrierWave/Services/`)
 | File | Purpose |
@@ -120,6 +121,7 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `BandPlanService.swift` | Validates frequency/mode against license class privileges |
 | `FrequencyActivityService.swift` | Aggregates nearby frequency activity from RBN |
 | `HamDBClient.swift` | HamDB.org API client for US callsign license class lookup |
+| `UserProfileService.swift` | Persists and retrieves user profile data |
 
 ## Views - Logger (`CarrierWave/Views/Logger/`)
 | File | Purpose |
@@ -208,11 +210,13 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `IntroTourStepViews.swift` | Individual step content views for intro tour |
 | `MiniTourContent.swift` | Content definitions for all mini-tours |
 | `MiniTourModifier.swift` | View modifier for easy mini-tour integration |
+| `OnboardingView.swift` | Post-tour onboarding flow (callsign lookup, profile setup, service connections) |
 
 ## Views - Settings (`CarrierWave/Views/Settings/`)
 | File | Purpose |
 |------|---------|
 | `SettingsView.swift` | Main settings navigation |
+| `AboutMeView.swift` | User profile display and editing |
 | `ServiceSettingsViews.swift` | QRZ/POTA/LoFi auth configuration |
 | `CloudSettingsViews.swift` | iCloud sync settings |
 | `HAMRSSettingsView.swift` | HAMRS connection settings |

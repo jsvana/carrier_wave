@@ -80,6 +80,8 @@ struct ContentView: View {
             }
             if tourState.shouldShowIntroTour() {
                 showIntroTour = true
+            } else if tourState.shouldShowOnboarding() {
+                showOnboarding = true
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: .didReceiveADIFFile)) { notification in
@@ -103,6 +105,15 @@ struct ContentView: View {
         .fullScreenCover(isPresented: $showIntroTour) {
             IntroTourView(tourState: tourState)
         }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            OnboardingView(tourState: tourState, potaAuth: potaAuthService)
+        }
+        .onChange(of: tourState.hasCompletedIntroTour) { _, completed in
+            // Show onboarding after intro tour completes
+            if completed, tourState.shouldShowOnboarding() {
+                showOnboarding = true
+            }
+        }
     }
 
     // MARK: Private
@@ -115,6 +126,7 @@ struct ContentView: View {
     @State private var syncService: SyncService?
     @State private var potaClient: POTAClient?
     @State private var showIntroTour = false
+    @State private var showOnboarding = false
 
     private let lofiClient = LoFiClient()
     private let qrzClient = QRZClient()

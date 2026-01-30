@@ -15,6 +15,7 @@ struct SettingsMainView: View {
     var body: some View {
         NavigationStack(path: $navigationPath) {
             List {
+                profileSection
                 SyncSourcesSection(
                     potaAuth: potaAuth,
                     lofiClient: lofiClient,
@@ -126,6 +127,8 @@ struct SettingsMainView: View {
     @State private var lotwIsConfigured = false
     @State private var lotwUsername: String?
 
+    @State private var userProfile: UserProfile?
+
     @Query(sort: \ChallengeSource.name) private var challengeSources: [ChallengeSource]
 
     private let lofiClient = LoFiClient()
@@ -134,6 +137,43 @@ struct SettingsMainView: View {
     private let lotwClient = LoTWClient()
 
     // MARK: - Sections
+
+    private var profileSection: some View {
+        Section {
+            NavigationLink {
+                AboutMeView()
+            } label: {
+                HStack {
+                    if let profile = userProfile {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(profile.callsign)
+                                .font(.headline)
+                                .monospaced()
+                            if let name = profile.fullName {
+                                Text(name)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        Spacer()
+                        if let licenseClass = profile.licenseClass {
+                            Text(licenseClass.abbreviation)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.accentColor.opacity(0.2))
+                                .clipShape(Capsule())
+                        }
+                    } else {
+                        Label("Set Up Profile", systemImage: "person.crop.circle.badge.plus")
+                    }
+                }
+            }
+        } header: {
+            Text("My Profile")
+        }
+    }
 
     private var deduplicationSection: some View {
         Section {
@@ -346,6 +386,8 @@ struct SettingsMainView: View {
                 lotwUsername = creds.username
             }
         }
+
+        userProfile = UserProfileService.shared.getProfile()
     }
 }
 

@@ -8,6 +8,7 @@ final class TourState {
 
     init() {
         hasCompletedIntroTour = UserDefaults.standard.bool(forKey: Keys.hasCompletedIntroTour)
+        hasCompletedOnboarding = UserDefaults.standard.bool(forKey: Keys.hasCompletedOnboarding)
         lastTourVersion = UserDefaults.standard.string(forKey: Keys.lastTourVersion) ?? ""
         seenMiniTours = Set(
             UserDefaults.standard.stringArray(forKey: Keys.seenMiniTours) ?? []
@@ -28,6 +29,10 @@ final class TourState {
         didSet { UserDefaults.standard.set(hasCompletedIntroTour, forKey: Keys.hasCompletedIntroTour) }
     }
 
+    private(set) var hasCompletedOnboarding: Bool {
+        didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
+    }
+
     private(set) var lastTourVersion: String {
         didSet { UserDefaults.standard.set(lastTourVersion, forKey: Keys.lastTourVersion) }
     }
@@ -40,9 +45,17 @@ final class TourState {
         !hasCompletedIntroTour
     }
 
+    func shouldShowOnboarding() -> Bool {
+        hasCompletedIntroTour && !hasCompletedOnboarding
+    }
+
     func completeIntroTour(version: String) {
         hasCompletedIntroTour = true
         lastTourVersion = version
+    }
+
+    func completeOnboarding() {
+        hasCompletedOnboarding = true
     }
 
     func shouldShowUpdatePrompt(currentVersion: String, majorVersions: [String]) -> Bool {
@@ -69,6 +82,7 @@ final class TourState {
 
     func resetForTesting() {
         hasCompletedIntroTour = false
+        hasCompletedOnboarding = false
         lastTourVersion = ""
         seenMiniTours = []
     }
@@ -77,6 +91,7 @@ final class TourState {
 
     private enum Keys {
         static let hasCompletedIntroTour = "tour.hasCompletedIntroTour"
+        static let hasCompletedOnboarding = "tour.hasCompletedOnboarding"
         static let lastTourVersion = "tour.lastTourVersion"
         static let seenMiniTours = "tour.seenMiniTours"
     }
