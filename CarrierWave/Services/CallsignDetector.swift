@@ -37,6 +37,9 @@ enum CWTextElement: Identifiable, Equatable {
     case callsign(String, role: CallsignRole)
     case prosign(String)
     case signalReport(String)
+    case grid(String) // Grid square (e.g., EM74)
+    case power(String) // Power level (e.g., 100W)
+    case name(String) // Operator name
 
     // MARK: Internal
 
@@ -53,6 +56,9 @@ enum CWTextElement: Identifiable, Equatable {
         case let .callsign(str, _): "call-\(str)"
         case let .prosign(str): "pro-\(str)"
         case let .signalReport(str): "rst-\(str)"
+        case let .grid(str): "grid-\(str)"
+        case let .power(str): "pwr-\(str)"
+        case let .name(str): "name-\(str)"
         }
     }
 }
@@ -115,7 +121,9 @@ enum CallsignDetector {
         }
 
         // Prioritize by context: DE identifier > CQ call > response > unknown
-        let priority: [DetectedCallsign.CallsignContext] = [.deIdentifier, .cqCall, .response, .unknown]
+        let priority: [DetectedCallsign.CallsignContext] = [
+            .deIdentifier, .cqCall, .response, .unknown,
+        ]
 
         for targetContext in priority {
             if let match = candidates.last(where: { $0.context == targetContext }) {
@@ -189,7 +197,21 @@ enum CallsignDetector {
     private static let signalReportPattern = #"\b[1-5][1-9][1-9]?\b"#
 
     /// Common prosigns to identify
-    private static let prosigns = Set(["CQ", "DE", "K", "KN", "BK", "SK", "AR", "BT", "AS", "R", "TU", "QSL"])
+    private static let prosigns = Set([
+        "CQ", "DE", "K", "KN", "BK", "SK", "AR", "BT", "AS", "R", "TU", "QSL",
+    ])
+
+    /// Keywords that precede a name in CW QSOs
+    private static let nameKeywords = Set(["NAME", "OP", "OPR"])
+
+    /// Keywords that precede a signal report
+    private static let rstKeywords = Set(["UR", "RST", "YR"])
+
+    /// Grid square pattern (e.g., EM74, FN31pr)
+    private static let gridPattern = #"\b[A-R]{2}[0-9]{2}([A-X]{2})?\b"#
+
+    /// Power pattern (e.g., 100W, 5W, 1KW)
+    private static let powerPattern = #"\b[0-9]+K?W\b"#
 
     /// Compiled regex for callsigns
     private static let callsignRegex = try? NSRegularExpression(
@@ -201,6 +223,18 @@ enum CallsignDetector {
     private static let rstRegex = try? NSRegularExpression(
         pattern: signalReportPattern,
         options: []
+    )
+
+    /// Compiled regex for grid squares
+    private static let gridRegex = try? NSRegularExpression(
+        pattern: gridPattern,
+        options: [.caseInsensitive]
+    )
+
+    /// Compiled regex for power
+    private static let powerRegex = try? NSRegularExpression(
+        pattern: powerPattern,
+        options: [.caseInsensitive]
     )
 
     // MARK: - Private Helpers
@@ -265,8 +299,12 @@ enum CallsignDetector {
         at range: Range<String.Index>
     ) -> CWTextElement.CallsignRole {
         // Check what comes before
-        let beforeStart = text.index(range.lowerBound, offsetBy: -4, limitedBy: text.startIndex) ?? text.startIndex
-        let beforeText = String(text[beforeStart ..< range.lowerBound]).trimmingCharacters(in: .whitespaces)
+        let beforeStart =
+            text.index(range.lowerBound, offsetBy: -4, limitedBy: text.startIndex)
+                ?? text.startIndex
+        let beforeText = String(text[beforeStart ..< range.lowerBound]).trimmingCharacters(
+            in: .whitespaces
+        )
 
         if beforeText.hasSuffix("DE") {
             return .callee
@@ -278,8 +316,11 @@ enum CallsignDetector {
 
         // Check what comes after
         if range.upperBound < text.endIndex {
-            let afterEnd = text.index(range.upperBound, offsetBy: 4, limitedBy: text.endIndex) ?? text.endIndex
-            let afterText = String(text[range.upperBound ..< afterEnd]).trimmingCharacters(in: .whitespaces)
+            let afterEnd =
+                text.index(range.upperBound, offsetBy: 4, limitedBy: text.endIndex) ?? text.endIndex
+            let afterText = String(text[range.upperBound ..< afterEnd]).trimmingCharacters(
+                in: .whitespaces
+            )
 
             if afterText.hasPrefix("DE") {
                 return .caller
@@ -289,33 +330,99 @@ enum CallsignDetector {
         return .unknown
     }
 
-    /// Parse non-callsign text into prosigns, RST, and plain text
+    /// Parse non-callsign text into prosigns, RST, grid, power, name, and plain text
     private static func parseNonCallsignText(_ text: String) -> [CWTextElement] {
         var elements: [CWTextElement] = []
         let words = text.components(separatedBy: .whitespaces)
+        var pendingNameKeyword = false
 
-        for word in words {
+        for (index, word) in words.enumerated() {
             let trimmed = word.trimmingCharacters(in: .whitespaces)
             guard !trimmed.isEmpty else {
                 continue
             }
 
-            if prosigns.contains(trimmed) {
-                elements.append(.prosign(trimmed))
-            } else if isSignalReport(trimmed) {
-                elements.append(.signalReport(trimmed))
-            } else {
-                // Add as plain text with space
-                if case let .text(existing) = elements.last {
-                    elements.removeLast()
-                    elements.append(.text(existing + " " + trimmed))
-                } else {
-                    elements.append(.text(trimmed))
-                }
+            if let element = classifyWord(
+                trimmed, index: index, words: words,
+                pendingNameKeyword: &pendingNameKeyword
+            ) {
+                appendElement(element, to: &elements)
             }
         }
 
         return elements
+    }
+
+    /// Classify a word into a CWTextElement type
+    private static func classifyWord(
+        _ word: String, index: Int, words: [String],
+        pendingNameKeyword: inout Bool
+    ) -> CWTextElement? {
+        // Handle name after keyword
+        if pendingNameKeyword {
+            pendingNameKeyword = false
+            if !isLikelyNonName(word) {
+                return .name(word)
+            }
+        }
+
+        // Check for name keyword
+        if nameKeywords.contains(word) {
+            pendingNameKeyword = true
+            return .text(word)
+        }
+
+        if prosigns.contains(word) {
+            return .prosign(word)
+        }
+        if rstKeywords.contains(word) {
+            return .text(word)
+        }
+        if isSignalReport(word) {
+            return .signalReport(word)
+        }
+        if isGridSquare(word) {
+            return .grid(word)
+        }
+        if isPowerLevel(word) {
+            return .power(word)
+        }
+
+        return .text(word)
+    }
+
+    /// Append element, merging adjacent text elements
+    private static func appendElement(_ element: CWTextElement, to elements: inout [CWTextElement]) {
+        if case let .text(newText) = element, case let .text(existing) = elements.last {
+            elements.removeLast()
+            elements.append(.text(existing + " " + newText))
+        } else {
+            elements.append(element)
+        }
+    }
+
+    /// Check if word is likely NOT a name (common QSO abbreviations)
+    private static func isLikelyNonName(_ word: String) -> Bool {
+        let nonNames = Set(["IS", "ES", "HR", "HW", "FB", "GM", "GA", "GE", "GN", "73", "88", "GL"])
+        return nonNames.contains(word) || isSignalReport(word) || prosigns.contains(word)
+    }
+
+    /// Check if text is a grid square (e.g., EM74, FN31pr)
+    private static func isGridSquare(_ text: String) -> Bool {
+        guard let regex = gridRegex else {
+            return false
+        }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.firstMatch(in: text.uppercased(), options: [], range: range) != nil
+    }
+
+    /// Check if text is a power level (e.g., 100W, 5W, 1KW)
+    private static func isPowerLevel(_ text: String) -> Bool {
+        guard let regex = powerRegex else {
+            return false
+        }
+        let range = NSRange(text.startIndex..., in: text)
+        return regex.firstMatch(in: text.uppercased(), options: [], range: range) != nil
     }
 
     /// Check if text is a signal report (RST format)

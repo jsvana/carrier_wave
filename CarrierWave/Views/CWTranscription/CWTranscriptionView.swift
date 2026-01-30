@@ -1,5 +1,13 @@
 import SwiftUI
 
+// MARK: - TranscriptViewMode
+
+/// Display mode for the transcript area
+enum TranscriptViewMode: String, CaseIterable {
+    case chat = "Chat"
+    case raw = "Raw"
+}
+
 // MARK: - CWTranscriptionView
 
 /// Main CW transcription view with audio visualization and decoded transcript.
@@ -84,6 +92,7 @@ struct CWTranscriptionView: View {
 
     @StateObject private var service = CWTranscriptionService()
     @Environment(\.dismiss) private var dismiss
+    @State private var viewMode: TranscriptViewMode = .chat
 
     private var statusColor: Color {
         switch service.state {
@@ -221,17 +230,37 @@ struct CWTranscriptionView: View {
 
     // MARK: - Transcript Area
 
-    @ViewBuilder
     private var transcriptArea: some View {
-        if service.transcript.isEmpty, service.currentLine.isEmpty {
-            CWEmptyTranscriptView(isListening: service.isListening)
-                .frame(minHeight: 200)
-        } else {
-            CWTranscriptView(
-                entries: service.transcript,
-                currentLine: service.currentLine
-            )
-            .frame(minHeight: 200)
+        VStack(spacing: 8) {
+            // View mode picker
+            Picker("View Mode", selection: $viewMode) {
+                ForEach(TranscriptViewMode.allCases, id: \.self) { mode in
+                    Text(mode.rawValue).tag(mode)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            // Conditional view based on mode
+            if service.transcript.isEmpty, service.currentLine.isEmpty, service.conversation.isEmpty {
+                CWEmptyTranscriptView(isListening: service.isListening)
+                    .frame(minHeight: 200)
+            } else {
+                switch viewMode {
+                case .chat:
+                    CWChatView(
+                        conversation: service.conversation,
+                        callsignLookup: nil // Will be connected to lookup service later
+                    )
+                    .frame(minHeight: 200)
+
+                case .raw:
+                    CWTranscriptView(
+                        entries: service.transcript,
+                        currentLine: service.currentLine
+                    )
+                    .frame(minHeight: 200)
+                }
+            }
         }
     }
 

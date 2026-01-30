@@ -103,6 +103,9 @@ final class CWTranscriptionService: ObservableObject {
     /// All callsigns detected in current session
     @Published private(set) var detectedCallsigns: [String] = []
 
+    /// Conversation tracker for chat-style display
+    @Published private(set) var conversationTracker = CWConversationTracker()
+
     /// Pre-amplifier enabled (boosts weak signals)
     @Published var preAmpEnabled: Bool = false
 
@@ -117,6 +120,11 @@ final class CWTranscriptionService: ObservableObject {
 
     /// Maximum frequency for adaptive detection (Hz)
     @Published var maxFrequency: Double = 900
+
+    /// The current conversation (convenience accessor)
+    var conversation: CWConversation {
+        conversationTracker.conversation
+    }
 
     /// Whether currently listening
     var isListening: Bool {
@@ -223,6 +231,7 @@ final class CWTranscriptionService: ObservableObject {
         currentLine = ""
         detectedCallsign = nil
         detectedCallsigns = []
+        conversationTracker.reset()
     }
 
     /// Copy transcript to clipboard
@@ -402,6 +411,9 @@ final class CWTranscriptionService: ObservableObject {
         let entry = CWTranscriptEntry(text: text)
         transcript.append(entry)
         currentLine = remainder
+
+        // Forward to conversation tracker with current frequency
+        conversationTracker.processEntry(entry, frequency: detectedFrequency)
 
         // Trim old entries
         if transcript.count > maxTranscriptEntries {

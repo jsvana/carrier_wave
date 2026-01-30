@@ -144,6 +144,21 @@ struct CWHighlightedText: View {
             Text(str)
                 .foregroundColor(.orange)
                 .fontWeight(.medium)
+
+        case let .grid(str):
+            Text(str)
+                .foregroundColor(.cyan)
+                .fontWeight(.medium)
+
+        case let .power(str):
+            Text(str)
+                .foregroundColor(.yellow)
+                .fontWeight(.medium)
+
+        case let .name(str):
+            Text(str)
+                .foregroundColor(.mint)
+                .fontWeight(.medium)
         }
     }
 

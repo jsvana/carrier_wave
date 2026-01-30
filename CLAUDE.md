@@ -48,6 +48,8 @@
 | `Friendship.swift` | Friend connection model with status tracking |
 | `Club.swift` | Club model with Polo notes list membership |
 | `ActivityItem.swift` | Activity feed item model |
+| `CWConversation.swift` | CW conversation and message models for chat display |
+| `CallsignInfo.swift` | Callsign lookup result with name, note, emoji, source |
 
 ### Services (`CarrierWave/Services/`)
 | File | Purpose |
@@ -116,6 +118,9 @@
 | `MorseDecoder.swift` | Timing state machine for dit/dah classification, adaptive WPM |
 | `CWTranscriptionService.swift` | Coordinates audio capture, signal processing, and morse decoding |
 | `CallsignDetector.swift` | Callsign regex detection, context analysis, text element parsing |
+| `CWConversationTracker.swift` | Track CW conversation turns via frequency and prosign analysis |
+| `PoloNotesParser.swift` | Parse Ham2K Polo notes list files for callsign info |
+| `CallsignLookupService.swift` | Two-tier callsign lookup (Polo notes, then QRZ API) |
 
 ### Views - CW Transcription (`CarrierWave/Views/CWTranscription/`)
 | File | Purpose |
@@ -125,6 +130,9 @@
 | `CWWaveformView.swift` | Real-time audio waveform visualization, includes CWLevelMeter |
 | `CWTranscriptView.swift` | Decoded text display with timestamps |
 | `CWDetectedCallsignBar.swift` | Detected callsign display with "Use" button, highlighted text |
+| `CWChatView.swift` | Chat-style conversation display with message bubbles |
+| `CWMessageBubble.swift` | Individual message bubble for chat view |
+| `CWCallsignInfoCard.swift` | Callsign info display card and chip components |
 
 ### Views - Dashboard (`CarrierWave/Views/Dashboard/`)
 | File | Purpose |

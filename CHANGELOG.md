@@ -11,6 +11,20 @@ All notable changes to Carrier Wave will be documented in this file.
   - Three range presets: Wide (400-900 Hz), Normal (500-800 Hz), Narrow (550-700 Hz)
   - Toggle between adaptive and fixed frequency modes in settings menu
   - Detected frequency displayed in UI with auto-detect indicator
+- **CW Chat Transcription** - View decoded CW as a conversation between stations
+  - Chat/Raw toggle to switch between conversation bubbles and raw transcript
+  - Turn detection using frequency changes and prosigns (DE, K, KN, BK)
+  - Messages grouped by speaker with callsign attribution
+  - Left/right aligned bubbles for other station vs. you
+- **Enhanced CW Highlighting** - More intelligent text pattern detection
+  - Grid squares highlighted (e.g., EM74)
+  - Power levels highlighted (e.g., 100W)
+  - Operator names highlighted after NAME/OP keywords
+  - Signal reports highlighted with "UR" prefix context
+- **Callsign Lookup** - Automatic callsign information from multiple sources
+  - Polo notes lists checked first (local, fast, offline)
+  - Name and emoji displayed in chat bubbles when available
+  - Two-tier lookup architecture ready for QRZ XML API
 
 ## [1.12.0] - 2026-01-28
 

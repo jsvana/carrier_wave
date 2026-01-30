@@ -159,6 +159,24 @@ struct ContentView: View {
     }
 
     @ViewBuilder
+    private var settingsTabContent: some View {
+        if let syncService {
+            SettingsMainView(
+                potaAuth: potaAuthService,
+                destination: $settingsDestination,
+                tourState: tourState
+            )
+            .environmentObject(syncService)
+        } else {
+            SettingsMainView(
+                potaAuth: potaAuthService,
+                destination: $settingsDestination,
+                tourState: tourState
+            )
+        }
+    }
+
+    @ViewBuilder
     private func selectedTabContent(for tab: AppTab) -> some View {
         switch tab {
         case .dashboard:
@@ -187,7 +205,12 @@ struct ContentView: View {
             )
 
         case .cwDecoder:
-            CWTranscriptionView()
+            CWTranscriptionView(
+                onLog: { callsign in
+                    UIPasteboard.general.string = callsign
+                    selectedTab = .logs
+                }
+            )
 
         case .map:
             NavigationStack {
@@ -198,20 +221,7 @@ struct ContentView: View {
             ActivityView(tourState: tourState)
 
         case .settings:
-            if let syncService {
-                SettingsMainView(
-                    potaAuth: potaAuthService,
-                    destination: $settingsDestination,
-                    tourState: tourState
-                )
-                .environmentObject(syncService)
-            } else {
-                SettingsMainView(
-                    potaAuth: potaAuthService,
-                    destination: $settingsDestination,
-                    tourState: tourState
-                )
-            }
+            settingsTabContent
         }
     }
 }
