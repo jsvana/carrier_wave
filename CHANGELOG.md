@@ -11,7 +11,10 @@ All notable changes to Carrier Wave will be documented in this file.
   - Drag to reorder tabs in the tab bar
   - Hidden tabs appear in the More menu
   - Map and Activity start hidden by default, accessible from More
-- **Feature Selection in Onboarding** - New step to enable/disable Logger and CW Decoder during initial setup
+
+### Removed
+- **Feature Selection in Onboarding** - Removed now-redundant step for enabling/disabling Logger and CW Decoder
+  - Tab visibility is now configured via Settings → Navigation → Tab Bar
 
 ### Changed
 - **Bare Mode Switching** - Enter mode name directly (CW, SSB, FT8, etc.) instead of requiring "MODE CW"
