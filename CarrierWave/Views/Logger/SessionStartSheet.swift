@@ -1,47 +1,5 @@
 import SwiftUI
 
-// MARK: - CallsignSuffix
-
-/// Standard amateur radio callsign suffixes
-enum CallsignSuffix: String, CaseIterable, Identifiable {
-    case none = "None"
-    case portable = "Portable"
-    case mobile = "Mobile"
-    case maritime = "Maritime Mobile"
-    case aeronautical = "Aeronautical Mobile"
-    case custom = "Custom"
-
-    // MARK: Internal
-
-    var id: String {
-        rawValue
-    }
-
-    /// The suffix code used in the callsign
-    var code: String {
-        switch self {
-        case .none: ""
-        case .portable: "P"
-        case .mobile: "M"
-        case .maritime: "MM"
-        case .aeronautical: "AM"
-        case .custom: ""
-        }
-    }
-
-    /// Description for display
-    var description: String {
-        switch self {
-        case .none: "No suffix"
-        case .portable: "/P – Portable station"
-        case .mobile: "/M – Land vehicle"
-        case .maritime: "/MM – Vessel"
-        case .aeronautical: "/AM – Aircraft"
-        case .custom: "Custom suffix"
-        }
-    }
-}
-
 // MARK: - SessionStartSheet
 
 /// Session setup wizard for starting a new logging session
@@ -83,6 +41,8 @@ struct SessionStartSheet: View {
     @AppStorage("loggerDefaultCallsign") private var defaultCallsign = ""
     @AppStorage("loggerDefaultMode") private var defaultMode = "CW"
     @AppStorage("loggerDefaultGrid") private var defaultGrid = ""
+    @AppStorage("loggerDefaultActivationType") private var defaultActivationType = "casual"
+    @AppStorage("loggerDefaultParkReference") private var defaultParkReference = ""
     @AppStorage("loggerSkipWizard") private var skipWizard = false
 
     @State private var selectedMode = "CW"
@@ -96,6 +56,9 @@ struct SessionStartSheet: View {
     @State private var callsignPrefix = ""
     @State private var selectedSuffix: CallsignSuffix = .none
     @State private var customSuffix = ""
+
+    /// UI state
+    @State private var showSavedConfirmation = false
 
     /// The full constructed callsign (prefix/base/suffix)
     private var fullCallsign: String {
@@ -161,6 +124,12 @@ struct SessionStartSheet: View {
                 myGrid = defaultGrid
             }
             selectedMode = defaultMode
+            if let savedActivationType = ActivationType(rawValue: defaultActivationType) {
+                activationType = savedActivationType
+            }
+            if !defaultParkReference.isEmpty {
+                parkReference = defaultParkReference
+            }
         }
     }
 
@@ -289,45 +258,11 @@ struct SessionStartSheet: View {
     }
 
     private var activationSection: some View {
-        Section("Activation Type") {
-            Picker("Type", selection: $activationType) {
-                ForEach(ActivationType.allCases, id: \.self) { type in
-                    Label(type.displayName, systemImage: type.icon)
-                        .tag(type)
-                }
-            }
-            .pickerStyle(.segmented)
-
-            if activationType == .pota {
-                HStack {
-                    Text("Park")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    TextField("K-1234", text: $parkReference)
-                        .textInputAutocapitalization(.characters)
-                        .multilineTextAlignment(.trailing)
-                        .font(.subheadline.monospaced())
-                }
-
-                if let parkName = lookupParkName(parkReference) {
-                    Text(parkName)
-                        .font(.caption)
-                        .foregroundStyle(.green)
-                }
-            }
-
-            if activationType == .sota {
-                HStack {
-                    Text("Summit")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    TextField("W4C/CM-001", text: $sotaReference)
-                        .textInputAutocapitalization(.characters)
-                        .multilineTextAlignment(.trailing)
-                        .font(.subheadline.monospaced())
-                }
-            }
-        }
+        ActivationSectionView(
+            activationType: $activationType,
+            parkReference: $parkReference,
+            sotaReference: $sotaReference
+        )
     }
 
     private var optionsSection: some View {
@@ -337,7 +272,16 @@ struct SessionStartSheet: View {
             Button {
                 saveDefaults()
             } label: {
-                Label("Save as Defaults", systemImage: "square.and.arrow.down")
+                HStack {
+                    Label("Save as Defaults", systemImage: "square.and.arrow.down")
+                    Spacer()
+                    if showSavedConfirmation {
+                        Label("Saved", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .labelStyle(.iconOnly)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
             }
         } header: {
             Text("Options")
@@ -365,13 +309,16 @@ struct SessionStartSheet: View {
         if !myGrid.isEmpty {
             defaultGrid = myGrid.uppercased()
         }
-    }
-
-    private func lookupParkName(_ reference: String) -> String? {
-        guard !reference.isEmpty else {
-            return nil
+        defaultActivationType = activationType.rawValue
+        if activationType == .pota {
+            defaultParkReference = parkReference.uppercased()
+        } else {
+            defaultParkReference = ""
         }
-        return POTAParksCache.shared.name(for: reference.uppercased())
+
+        withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) {
+            showSavedConfirmation = true
+        }
     }
 }
 
@@ -414,6 +361,57 @@ struct CallsignBreakdownView: View {
                     .padding(.vertical, 2)
                     .background(Color.green.opacity(0.2))
                     .clipShape(Capsule())
+            }
+        }
+    }
+}
+
+// MARK: - ActivationSectionView
+
+/// Extracted view for activation type selection
+struct ActivationSectionView: View {
+    @Binding var activationType: ActivationType
+    @Binding var parkReference: String
+    @Binding var sotaReference: String
+
+    var body: some View {
+        Section("Activation Type") {
+            Picker("Type", selection: $activationType) {
+                ForEach(ActivationType.allCases, id: \.self) { type in
+                    Label(type.displayName, systemImage: type.icon)
+                        .tag(type)
+                }
+            }
+            .pickerStyle(.segmented)
+
+            if activationType == .pota {
+                HStack {
+                    Text("Park")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    TextField("K-1234", text: $parkReference)
+                        .textInputAutocapitalization(.characters)
+                        .multilineTextAlignment(.trailing)
+                        .font(.subheadline.monospaced())
+                }
+
+                if let parkName = POTAParksCache.shared.name(for: parkReference.uppercased()) {
+                    Text(parkName)
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
+
+            if activationType == .sota {
+                HStack {
+                    Text("Summit")
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    TextField("W4C/CM-001", text: $sotaReference)
+                        .textInputAutocapitalization(.characters)
+                        .multilineTextAlignment(.trailing)
+                        .font(.subheadline.monospaced())
+                }
             }
         }
     }
