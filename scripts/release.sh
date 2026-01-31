@@ -81,33 +81,24 @@ echo -e "${GREEN}Pushed tag $TAG_NAME to origin${NC}"
 if [[ -n "${DISCORD_WEBHOOK_URL:-}" ]]; then
     echo -e "${YELLOW}Sending Discord notification...${NC}"
 
-    # Escape special characters for JSON (awk is portable across GNU/BSD)
-    ESCAPED_CHANGELOG=$(printf '%s' "$CHANGELOG_CONTENT" | awk '
-        {
-            gsub(/"/, "\\\"")       # Escape double quotes
-            gsub(/\\/, "\\\\")      # Escape backslashes
-            if (NR > 1) printf "\\n"
-            printf "%s", $0
-        }
-    ')
-
-    # Build Discord webhook payload
-    PAYLOAD=$(cat <<EOF
-{
-  "embeds": [{
-    "title": "Carrier Wave $TAG_NAME Released",
-    "color": 5814783,
-    "fields": [{
-      "name": "What's New",
-      "value": "$ESCAPED_CHANGELOG"
-    }],
-    "footer": {
-      "text": "Carrier Wave - Amateur Radio QSO Logger"
-    }
-  }]
-}
-EOF
-)
+    # Build Discord webhook payload using jq for proper JSON escaping
+    PAYLOAD=$(jq -n \
+        --arg title "Carrier Wave $TAG_NAME Released" \
+        --arg changelog "$CHANGELOG_CONTENT" \
+        '{
+            embeds: [{
+                title: $title,
+                color: 5814783,
+                fields: [{
+                    name: "What'\''s New",
+                    value: $changelog
+                }],
+                footer: {
+                    text: "Carrier Wave - Amateur Radio QSO Logger"
+                }
+            }]
+        }'
+    )
 
     # Send to Discord
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
