@@ -4,6 +4,8 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+## [1.15.1] - 2026-01-31
+
 ### Fixed
 - **Tab Switching Performance** - Reduced lag when switching between tabs
   - Added lazy loading for Dashboard, Map, and Activity tabs (content deferred until visible)
