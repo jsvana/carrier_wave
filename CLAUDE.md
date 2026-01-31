@@ -116,6 +116,8 @@ When releasing a new version, update **all three** locations:
 - Use imperative mood ("Add feature" not "Added feature")
 - Be specific but concise - one line per change
 - Group related changes under a single bullet with sub-items if needed
+- **One section per type:** Each version should have at most one `### Added`, one `### Changed`, one `### Fixed`, and one `### Removed` section. Merge entries into existing sections rather than creating duplicates.
+- **Section order:** Added → Changed → Fixed → Removed
 - When releasing, rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD`
 
 ## Issue and feature ideas

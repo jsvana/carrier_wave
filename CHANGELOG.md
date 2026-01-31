@@ -13,18 +13,6 @@ All notable changes to Carrier Wave will be documented in this file.
   - Drag to reorder tabs in the tab bar
   - Hidden tabs appear in the More menu
   - Map and Activity start hidden by default, accessible from More
-
-### Removed
-- **Feature Selection in Onboarding** - Removed now-redundant step for enabling/disabling Logger and CW Decoder
-  - Tab visibility is now configured via Settings → Navigation → Tab Bar
-
-### Changed
-- **Bare Mode Switching** - Enter mode name directly (CW, SSB, FT8, etc.) instead of requiring "MODE CW"
-- **QSY Spot Confirmation** - Frequency and mode changes during POTA activations now prompt to post a QSY spot instead of auto-posting
-- **Auto Mode Detection** - Changing frequency automatically switches to the appropriate mode for that segment (CW for CW/DATA segments, SSB for phone segments)
-  - New setting "Auto-switch mode for frequency" to enable/disable this behavior
-
-### Added
 - **NOTE Command** - Add timestamped notes to the session log
   - Type `NOTE <text>` in logger input (e.g., `NOTE Band is noisy`)
   - Notes appear in the Session Log interleaved with QSOs
@@ -43,6 +31,12 @@ All notable changes to Carrier Wave will be documented in this file.
   - Standard suffixes: /P (Portable), /M (Mobile), /MM (Maritime), /AM (Aeronautical)
   - Custom suffix option for regional indicators or other uses
   - Full callsign displayed prominently with color-coded breakdown
+
+### Changed
+- **Bare Mode Switching** - Enter mode name directly (CW, SSB, FT8, etc.) instead of requiring "MODE CW"
+- **QSY Spot Confirmation** - Frequency and mode changes during POTA activations now prompt to post a QSY spot instead of auto-posting
+- **Auto Mode Detection** - Changing frequency automatically switches to the appropriate mode for that segment (CW for CW/DATA segments, SSB for phone segments)
+  - New setting "Auto-switch mode for frequency" to enable/disable this behavior
 
 ### Fixed
 - **POTA Duplicate Blocking** - Same band/date duplicates are now blocked, not just warned
@@ -65,6 +59,10 @@ All notable changes to Carrier Wave will be documented in this file.
 - **QRZ Callbook Login Restored** - Re-added QRZ Callbook login in Settings → External Data
   - Uses proper username/password authentication (separate from Logbook API key)
   - Requires QRZ XML Logbook Data subscription for callsign lookups
+
+### Removed
+- **Feature Selection in Onboarding** - Removed now-redundant step for enabling/disabling Logger and CW Decoder
+  - Tab visibility is now configured via Settings → Navigation → Tab Bar
 
 ## [1.14.0] - 2026-01-30
 
