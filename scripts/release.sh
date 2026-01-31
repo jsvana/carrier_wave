@@ -81,8 +81,15 @@ echo -e "${GREEN}Pushed tag $TAG_NAME to origin${NC}"
 if [[ -n "${DISCORD_WEBHOOK_URL:-}" ]]; then
     echo -e "${YELLOW}Sending Discord notification...${NC}"
 
-    # Escape special characters for JSON
-    ESCAPED_CHANGELOG=$(echo "$CHANGELOG_CONTENT" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')
+    # Escape special characters for JSON (awk is portable across GNU/BSD)
+    ESCAPED_CHANGELOG=$(printf '%s' "$CHANGELOG_CONTENT" | awk '
+        {
+            gsub(/"/, "\\\"")       # Escape double quotes
+            gsub(/\\/, "\\\\")      # Escape backslashes
+            if (NR > 1) printf "\\n"
+            printf "%s", $0
+        }
+    ')
 
     # Build Discord webhook payload
     PAYLOAD=$(cat <<EOF
