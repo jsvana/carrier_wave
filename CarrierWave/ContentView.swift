@@ -26,7 +26,7 @@ enum AppTab: String, Hashable, CaseIterable, Codable {
 
     /// Default hidden tabs (not shown in tab bar initially)
     static var defaultHidden: Set<AppTab> {
-        [.map, .activity]
+        [.logger, .cwDecoder, .activity]
     }
 
     var title: String {

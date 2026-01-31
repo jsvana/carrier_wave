@@ -242,16 +242,8 @@ struct DashboardView: View {
                 StreakDetailView(stats: stats, tourState: tourState)
             } label: {
                 VStack(alignment: .leading, spacing: 12) {
-                    HStack {
-                        Text("Streaks")
-                            .font(.headline)
-                        Spacer()
-                        if stats.dailyStreak.isAtRisk || stats.potaActivationStreak.isAtRisk {
-                            Image(systemName: "exclamationmark.triangle.fill")
-                                .font(.caption)
-                                .foregroundStyle(.orange)
-                        }
-                    }
+                    Text("Streaks")
+                        .font(.headline)
 
                     VStack(spacing: 12) {
                         streakRow(title: "Daily", streak: stats.dailyStreak)
@@ -363,7 +355,6 @@ struct DashboardView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: 40, alignment: .leading)
             StreakStatBox(streak: streak)
-            StreakStatBox(streak: streak, showLongest: true)
         }
     }
 }
