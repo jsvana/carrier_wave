@@ -4,6 +4,8 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+## [1.15.3] - 2026-01-31
+
 ### Fixed
 - **Settings Crash on Launch** - Fixed crash when navigating to Settings before SyncService initialized
 - **QSO Statistics Performance** - Major performance improvements for users with 15k+ QSOs
