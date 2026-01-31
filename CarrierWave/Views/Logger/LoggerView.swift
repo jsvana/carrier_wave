@@ -146,15 +146,26 @@ struct LoggerView: View {
             } message: {
                 Text(LoggerCommand.helpText)
             }
-            .alert("Delete Session?", isPresented: $showDeleteConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Delete", role: .destructive) {
+            .confirmationDialog(
+                "End Session",
+                isPresented: $showEndSessionConfirmation,
+                titleVisibility: .visible
+            ) {
+                Button("End Session") {
+                    let hadQSOs = !displayQSOs.isEmpty
+                    sessionManager?.endSession()
+                    if hadQSOs {
+                        onSessionEnd?()
+                    }
+                }
+                Button("Delete Session", role: .destructive) {
                     sessionManager?.deleteCurrentSession()
                 }
+                Button("Cancel", role: .cancel) {}
             } message: {
                 Text(
-                    "This will delete the session and hide all \(displayQSOs.count) QSOs. "
-                        + "Hidden QSOs won't sync to external services. This cannot be undone."
+                    "End keeps your \(displayQSOs.count) QSOs for sync. "
+                        + "Delete hides them permanently."
                 )
             }
             .alert("Post QSY Spot?", isPresented: $showQSYSpotConfirmation) {
@@ -244,6 +255,9 @@ struct LoggerView: View {
     @State private var lookupError: CallsignLookupError?
     @State private var lookupTask: Task<Void, Never>?
 
+    /// Cached POTA duplicate status (computed on callsign change, not every render)
+    @State private var cachedPotaDuplicateStatus: POTACallsignStatus?
+
     // Command panels
     @State private var showRBNPanel = false
     @State private var showMapPanel = false
@@ -257,8 +271,8 @@ struct LoggerView: View {
     @State private var showTitleEditSheet = false
     @State private var editingTitle = ""
 
-    /// Session deletion
-    @State private var showDeleteConfirmation = false
+    /// Session end/delete confirmation
+    @State private var showEndSessionConfirmation = false
 
     // QSY spot confirmation
     @State private var showQSYSpotConfirmation = false
@@ -353,33 +367,9 @@ struct LoggerView: View {
     }
 
     /// Check if the current callsign input would be a duplicate in the current POTA session
+    /// Uses cached value computed in onCallsignChanged to avoid expensive filtering on every render
     private var potaDuplicateStatus: POTACallsignStatus? {
-        guard let session = sessionManager?.activeSession,
-              session.activationType == .pota,
-              !callsignInput.isEmpty,
-              callsignInput.count >= 3,
-              detectedCommand == nil
-        else {
-            return nil
-        }
-
-        let callsign = callsignInput.uppercased()
-        let currentBand = session.band ?? "Unknown"
-
-        // Find all QSOs with this callsign in the current session
-        let matchingQSOs = displayQSOs.filter { $0.callsign.uppercased() == callsign }
-
-        if matchingQSOs.isEmpty {
-            return .firstContact
-        }
-
-        let previousBands = Set(matchingQSOs.map(\.band))
-
-        if previousBands.contains(currentBand) {
-            return .duplicateBand(band: currentBand)
-        } else {
-            return .newBand(previousBands: Array(previousBands).sorted())
-        }
+        cachedPotaDuplicateStatus
     }
 
     /// Key for animating POTA status changes
@@ -929,22 +919,8 @@ struct LoggerView: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.green)
 
-                Menu {
-                    Button {
-                        let hadQSOs = !displayQSOs.isEmpty
-                        sessionManager?.endSession()
-                        if hadQSOs {
-                            onSessionEnd?()
-                        }
-                    } label: {
-                        Label("End Session", systemImage: "stop.fill")
-                    }
-
-                    Button(role: .destructive) {
-                        showDeleteConfirmation = true
-                    } label: {
-                        Label("Delete Session", systemImage: "trash")
-                    }
+                Button {
+                    showEndSessionConfirmation = true
                 } label: {
                     Text("END")
                         .font(.subheadline.weight(.semibold))
@@ -954,6 +930,7 @@ struct LoggerView: View {
                         .background(Color.red)
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
+                .buttonStyle(.plain)
             }
 
             HStack {
@@ -1010,6 +987,36 @@ struct LoggerView: View {
         }
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
+    }
+
+    /// Compute POTA duplicate status - called only when callsign changes
+    private func computePotaDuplicateStatus() -> POTACallsignStatus? {
+        guard let session = sessionManager?.activeSession,
+              session.activationType == .pota,
+              !callsignInput.isEmpty,
+              callsignInput.count >= 3,
+              detectedCommand == nil
+        else {
+            return nil
+        }
+
+        let callsign = callsignInput.uppercased()
+        let currentBand = session.band ?? "Unknown"
+
+        // Find all QSOs with this callsign in the current session
+        let matchingQSOs = displayQSOs.filter { $0.callsign.uppercased() == callsign }
+
+        if matchingQSOs.isEmpty {
+            return .firstContact
+        }
+
+        let previousBands = Set(matchingQSOs.map(\.band))
+
+        if previousBands.contains(currentBand) {
+            return .duplicateBand(band: currentBand)
+        } else {
+            return .newBand(previousBands: Array(previousBands).sorted())
+        }
     }
 
     private func handleInputSubmit() {
@@ -1202,6 +1209,9 @@ struct LoggerView: View {
     private func onCallsignChanged(_ callsign: String) {
         lookupTask?.cancel()
 
+        // Update cached POTA duplicate status (avoids expensive computation on every render)
+        cachedPotaDuplicateStatus = computePotaDuplicateStatus()
+
         let trimmed = callsign.trimmingCharacters(in: .whitespaces).uppercased()
 
         // Don't lookup if too short or looks like a command
@@ -1278,6 +1288,7 @@ struct LoggerView: View {
         callsignInput = ""
         lookupResult = nil
         lookupError = nil
+        cachedPotaDuplicateStatus = nil
         theirGrid = ""
         theirPark = ""
         notes = ""
@@ -1366,6 +1377,14 @@ struct LoggerQSORow: View {
 
     // MARK: Private
 
+    /// Shared UTC time formatter - created once, reused for all rows
+    private static let utcTimeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
     @Environment(\.modelContext) private var modelContext
 
     @State private var callsignInfo: CallsignInfo?
@@ -1429,16 +1448,9 @@ struct LoggerQSORow: View {
         }
     }
 
-    private var timeFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
-    }
-
     private var rowContent: some View {
         HStack(spacing: 12) {
-            Text(timeFormatter.string(from: qso.timestamp))
+            Text(Self.utcTimeFormatter.string(from: qso.timestamp))
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
                 .frame(width: 50, alignment: .leading)

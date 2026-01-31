@@ -60,6 +60,10 @@ struct DashboardView: View {
     @State var mismarkedPOTACount = 0
     @State var showingPOTARepairAlert = false
 
+    /// Cached statistics - updated when QSO count changes
+    @State var cachedStats: QSOStatistics?
+    @State var lastQSOCount: Int = 0
+
     let lofiClient = LoFiClient()
     let qrzClient = QRZClient()
     let hamrsClient = HAMRSClient()
@@ -71,9 +75,14 @@ struct DashboardView: View {
         ImportService(modelContext: modelContext)
     }
 
-    /// Statistics
+    /// Statistics (cached to avoid expensive recomputation on every render)
     var stats: QSOStatistics {
-        QSOStatistics(qsos: qsos)
+        // Return cached stats if QSO count hasn't changed
+        if let cached = cachedStats, qsos.count == lastQSOCount {
+            return cached
+        }
+        // Compute fresh stats - the cache update happens in .task
+        return QSOStatistics(qsos: qsos)
     }
 
     var body: some View {
@@ -101,6 +110,20 @@ struct DashboardView: View {
             .task {
                 await checkForUnconfiguredCallsigns()
                 await checkForMismarkedPOTAPresence()
+            }
+            .onChange(of: qsos.count) { _, newCount in
+                // Update cached stats when QSO count changes
+                if newCount != lastQSOCount {
+                    lastQSOCount = newCount
+                    cachedStats = QSOStatistics(qsos: qsos)
+                }
+            }
+            .task(id: qsos.count) {
+                // Initialize cache on first load or when count changes
+                if cachedStats == nil || qsos.count != lastQSOCount {
+                    lastQSOCount = qsos.count
+                    cachedStats = QSOStatistics(qsos: qsos)
+                }
             }
             .callsignAliasDetectionAlert(
                 unconfiguredCallsigns: $unconfiguredCallsigns,

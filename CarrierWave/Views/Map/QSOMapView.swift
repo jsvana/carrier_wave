@@ -10,7 +10,7 @@ struct QSOMapView: View {
     var body: some View {
         ZStack {
             Map(position: $cameraPosition) {
-                ForEach(annotations) { annotation in
+                ForEach(cachedAnnotations) { annotation in
                     Annotation(
                         annotation.displayTitle,
                         coordinate: annotation.coordinate,
@@ -33,7 +33,7 @@ struct QSOMapView: View {
                 }
 
                 if filterState.showPaths {
-                    ForEach(arcs) { arc in
+                    ForEach(cachedArcs) { arc in
                         MapPolyline(coordinates: arc.geodesicPath())
                             .stroke(.blue.opacity(0.5), lineWidth: 2.5)
                     }
@@ -55,7 +55,7 @@ struct QSOMapView: View {
                         MapStatsOverlay(
                             totalQSOs: allQSOs.count,
                             visibleQSOs: filteredQSOs.count,
-                            gridCount: annotations.count,
+                            gridCount: cachedAnnotations.count,
                             stateCount: uniqueStates,
                             dxccCount: uniqueDXCCEntities
                         )
@@ -107,6 +107,39 @@ struct QSOMapView: View {
             )
             .presentationDetents([.medium, .large])
         }
+        .task {
+            updateCachedMapData()
+        }
+        .onChange(of: allQSOs.count) { _, _ in
+            updateCachedMapData()
+        }
+        .onChange(of: filterState.selectedBand) { _, _ in
+            updateCachedMapData()
+        }
+        .onChange(of: filterState.selectedMode) { _, _ in
+            updateCachedMapData()
+        }
+        .onChange(of: filterState.selectedPark) { _, _ in
+            updateCachedMapData()
+        }
+        .onChange(of: filterState.startDate) { _, _ in
+            updateCachedMapData()
+        }
+        .onChange(of: filterState.endDate) { _, _ in
+            updateCachedMapData()
+        }
+        .onChange(of: filterState.confirmedOnly) { _, _ in
+            updateCachedMapData()
+        }
+        .onChange(of: filterState.showAllQSOs) { _, _ in
+            updateCachedMapData()
+        }
+        .onChange(of: filterState.showIndividualQSOs) { _, _ in
+            updateCachedMapData()
+        }
+        .onChange(of: filterState.showPaths) { _, _ in
+            updateCachedMapData()
+        }
     }
 
     // MARK: Private
@@ -124,6 +157,11 @@ struct QSOMapView: View {
     @State private var showingFilterSheet = false
     @State private var selectedAnnotation: QSOAnnotation?
     @State private var cameraPosition: MapCameraPosition = .automatic
+
+    // Cached computed values to avoid expensive recalculation on every render
+    @State private var cachedAnnotations: [QSOAnnotation] = []
+    @State private var cachedArcs: [QSOArc] = []
+    @State private var lastCacheKey: String = ""
 
     private var filteredQSOs: [QSO] {
         allQSOs.filter { qso in
@@ -294,5 +332,11 @@ struct QSOMapView: View {
             "70CM",
         ]
         return order.firstIndex(of: band.uppercased()) ?? 999
+    }
+
+    /// Update cached annotations and arcs when data or filters change
+    private func updateCachedMapData() {
+        cachedAnnotations = annotations
+        cachedArcs = arcs
     }
 }

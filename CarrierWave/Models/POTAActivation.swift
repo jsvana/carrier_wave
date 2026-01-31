@@ -119,7 +119,8 @@ struct POTAActivation: Identifiable {
 
         // Convert to POTAActivation structs
         return groups.map { key, qsos in
-            let parts = key.split(separator: "|")
+            // Use omittingEmptySubsequences: false to preserve empty callsign between pipes
+            let parts = key.split(separator: "|", omittingEmptySubsequences: false)
             let parkRef = String(parts[0])
             let callsign = String(parts[1])
             let dateStr = String(parts[2])

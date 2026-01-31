@@ -4,6 +4,15 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Tab Switching Performance** - Reduced lag when switching between tabs
+  - Added lazy loading for Dashboard, Map, and Activity tabs (content deferred until visible)
+  - Cached QSOStatistics in Dashboard to avoid recomputing on every render
+  - Cached map annotations and arcs to avoid expensive coordinate conversions on every render
+- **Logger Text Field Performance** - Fixed significant lag when typing callsigns
+  - Cached DateFormatter instead of creating new instance on every render
+  - Cached POTA duplicate status to avoid filtering all QSOs on every keystroke
+
 ## [1.15.0] - 2026-01-31
 
 ### Added

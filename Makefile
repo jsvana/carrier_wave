@@ -1,4 +1,4 @@
-.PHONY: build build-device test devices install launch deploy clean lint format format-check setup-hooks
+.PHONY: build build-device test devices install launch deploy clean lint format format-check setup-hooks release
 
 DEVICE_NAME := theseus
 BUNDLE_ID := com.jsvana.FullDuplex
@@ -67,3 +67,11 @@ setup-hooks:
 	@echo ""
 	@echo "To enable, add this to your bd pre-commit hook or run:"
 	@echo "  ./scripts/pre-commit.sh"
+
+# Release a new version (creates git tag and notifies Discord)
+# Usage: make release VERSION=1.15.0
+release:
+ifndef VERSION
+	$(error VERSION is required. Usage: make release VERSION=1.15.0)
+endif
+	./scripts/release.sh $(VERSION)

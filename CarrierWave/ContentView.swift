@@ -180,6 +180,36 @@ extension Notification.Name {
     static let tabConfigurationChanged = Notification.Name("tabConfigurationChanged")
 }
 
+// MARK: - LazyTabContent
+
+/// Defers content creation until the view appears, improving tab switch performance.
+/// Shows a brief loading indicator on first appearance.
+struct LazyTabContent<Content: View>: View {
+    // MARK: Internal
+
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        Group {
+            if hasAppeared {
+                content()
+            } else {
+                ProgressView()
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .onAppear {
+            if !hasAppeared {
+                hasAppeared = true
+            }
+        }
+    }
+
+    // MARK: Private
+
+    @State private var hasAppeared = false
+}
+
 // MARK: - ContentView
 
 struct ContentView: View {
@@ -325,14 +355,16 @@ struct ContentView: View {
     @ViewBuilder
     private var dashboardTabContent: some View {
         if let syncService {
-            DashboardView(
-                iCloudMonitor: iCloudMonitor,
-                potaAuth: potaAuthService,
-                syncService: syncService,
-                selectedTab: $selectedTab,
-                settingsDestination: $settingsDestination,
-                tourState: tourState
-            )
+            LazyTabContent {
+                DashboardView(
+                    iCloudMonitor: iCloudMonitor,
+                    potaAuth: potaAuthService,
+                    syncService: syncService,
+                    selectedTab: $selectedTab,
+                    settingsDestination: $settingsDestination,
+                    tourState: tourState
+                )
+            }
         } else {
             ProgressView()
         }
@@ -370,13 +402,17 @@ struct ContentView: View {
 
     private var mapTabContent: some View {
         NavigationStack {
-            QSOMapView()
+            LazyTabContent {
+                QSOMapView()
+            }
         }
     }
 
     private var activityTabContent: some View {
         NavigationStack {
-            ActivityView(tourState: tourState, isInNavigationContext: false)
+            LazyTabContent {
+                ActivityView(tourState: tourState, isInNavigationContext: false)
+            }
         }
     }
 
