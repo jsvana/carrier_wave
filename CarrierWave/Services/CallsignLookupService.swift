@@ -1,6 +1,107 @@
 import Foundation
 import SwiftData
 
+// MARK: - CallsignLookupError
+
+/// Errors that can occur during callsign lookup
+enum CallsignLookupError: LocalizedError, Equatable {
+    /// No QRZ API key configured
+    case noQRZApiKey
+    /// QRZ session authentication failed
+    case qrzAuthFailed
+    /// Network request failed
+    case networkError(String)
+    /// Callsign not found in any source
+    case notFound
+    /// No lookup sources configured (no Polo notes, no QRZ key)
+    case noSourcesConfigured
+
+    // MARK: Internal
+
+    var errorDescription: String? {
+        switch self {
+        case .noQRZApiKey:
+            "QRZ Callbook not configured"
+        case .qrzAuthFailed:
+            "QRZ authentication failed"
+        case let .networkError(message):
+            "Network error: \(message)"
+        case .notFound:
+            "Callsign not found"
+        case .noSourcesConfigured:
+            "No lookup sources configured"
+        }
+    }
+
+    var recoverySuggestion: String? {
+        switch self {
+        case .noQRZApiKey:
+            "Login to QRZ Callbook in Settings → Data"
+        case .qrzAuthFailed:
+            "Check your QRZ credentials in Settings → Data"
+        case .networkError:
+            "Check your internet connection"
+        case .notFound:
+            nil
+        case .noSourcesConfigured:
+            "Configure QRZ Callbook or Polo Notes in Settings"
+        }
+    }
+}
+
+// MARK: - CallsignLookupResult
+
+/// Result of a callsign lookup with detailed status
+struct CallsignLookupResult: Equatable {
+    /// The callsign info if found
+    let info: CallsignInfo?
+    /// Error if lookup failed (nil if found or still searching)
+    let error: CallsignLookupError?
+    /// Whether QRZ lookup was attempted
+    let qrzAttempted: Bool
+    /// Whether Polo notes were checked
+    let poloNotesChecked: Bool
+
+    /// Whether any info was found
+    var found: Bool {
+        info != nil
+    }
+
+    /// Create a successful result
+    static func success(_ info: CallsignInfo) -> CallsignLookupResult {
+        CallsignLookupResult(info: info, error: nil, qrzAttempted: false, poloNotesChecked: true)
+    }
+
+    /// Create a result from QRZ lookup
+    static func fromQRZ(_ info: CallsignInfo) -> CallsignLookupResult {
+        CallsignLookupResult(info: info, error: nil, qrzAttempted: true, poloNotesChecked: true)
+    }
+
+    /// Create a not found result
+    static func notFound(qrzAttempted: Bool, poloNotesChecked: Bool) -> CallsignLookupResult {
+        CallsignLookupResult(
+            info: nil,
+            error: .notFound,
+            qrzAttempted: qrzAttempted,
+            poloNotesChecked: poloNotesChecked
+        )
+    }
+
+    /// Create an error result
+    static func error(
+        _ error: CallsignLookupError,
+        qrzAttempted: Bool = false,
+        poloNotesChecked: Bool = false
+    ) -> CallsignLookupResult {
+        CallsignLookupResult(
+            info: nil,
+            error: error,
+            qrzAttempted: qrzAttempted,
+            poloNotesChecked: poloNotesChecked
+        )
+    }
+}
+
 // MARK: - CallsignLookupService
 
 /// Service for looking up callsign information from multiple sources.
@@ -33,43 +134,101 @@ actor CallsignLookupService {
     /// - Parameter callsign: The callsign to look up
     /// - Returns: CallsignInfo if found, nil otherwise
     func lookup(_ callsign: String) async -> CallsignInfo? {
+        let result = await lookupWithResult(callsign)
+        return result.info
+    }
+
+    /// Look up a callsign with detailed result information
+    /// - Parameter callsign: The callsign to look up
+    /// - Returns: CallsignLookupResult with info and/or error details
+    func lookupWithResult(_ callsign: String) async -> CallsignLookupResult {
         let normalizedCallsign = callsign.uppercased()
 
         // Check cache first
         if let cached = cache[normalizedCallsign], cached.age < maxCacheAge {
-            return cached
+            return .success(cached)
         }
 
         // Check pending lookups
-        if let pending = pendingLookups[normalizedCallsign] {
+        if let pending = pendingResultLookups[normalizedCallsign] {
             return await pending.value
         }
 
         // Start new lookup
-        let task = Task<CallsignInfo?, Never> {
+        let task = Task<CallsignLookupResult, Never> {
             // Debounce
             try? await Task.sleep(nanoseconds: UInt64(debounceDelay * 1_000_000_000))
 
             // Tier 1: Polo notes (local)
-            if let poloInfo = await lookupInPoloNotes(normalizedCallsign) {
-                updateCache(poloInfo)
-                return poloInfo
+            let poloInfo = await lookupInPoloNotes(normalizedCallsign)
+
+            // Tier 2: QRZ XML API (remote) - always try if credentials configured
+            let qrzResult = await lookupInQRZWithResult(normalizedCallsign)
+
+            // Merge results: Polo Notes emoji/note + QRZ name/grid/location
+            if let polo = poloInfo, let qrz = qrzResult.info {
+                let merged = CallsignInfo(
+                    callsign: normalizedCallsign,
+                    name: qrz.name,
+                    note: polo.note,
+                    emoji: polo.emoji,
+                    qth: qrz.qth,
+                    state: qrz.state,
+                    country: qrz.country,
+                    grid: qrz.grid,
+                    licenseClass: qrz.licenseClass,
+                    source: .qrz, // Primary source is QRZ for name/grid
+                    allEmojis: polo.allEmojis,
+                    matchingSources: polo.matchingSources
+                )
+                updateCache(merged)
+                return .fromQRZ(merged)
             }
 
-            // Tier 2: QRZ XML API (remote)
-            if let qrzInfo = await lookupInQRZ(normalizedCallsign) {
-                updateCache(qrzInfo)
-                return qrzInfo
+            // QRZ only (no Polo Notes match)
+            if let info = qrzResult.info {
+                updateCache(info)
+                return .fromQRZ(info)
             }
 
-            return nil
+            // Polo Notes only (QRZ not configured or lookup failed)
+            if let info = poloInfo {
+                updateCache(info)
+                return .success(info)
+            }
+
+            // Return error from QRZ attempt, or not found
+            if let error = qrzResult.error {
+                return .error(error, qrzAttempted: true, poloNotesChecked: true)
+            }
+
+            return .notFound(qrzAttempted: true, poloNotesChecked: true)
         }
 
-        pendingLookups[normalizedCallsign] = task
+        pendingResultLookups[normalizedCallsign] = task
         let result = await task.value
-        pendingLookups[normalizedCallsign] = nil
+        pendingResultLookups[normalizedCallsign] = nil
 
         return result
+    }
+
+    /// Check if QRZ Callbook credentials are configured
+    func hasQRZCallbookCredentials() -> Bool {
+        (try? KeychainHelper.shared.readString(for: KeychainHelper.Keys.qrzCallbookUsername)) != nil
+            && (try? KeychainHelper.shared.readString(
+                for: KeychainHelper.Keys.qrzCallbookPassword
+            )) != nil
+    }
+
+    /// Legacy: Check if QRZ API key is configured (for backward compatibility)
+    func hasQRZApiKey() -> Bool {
+        hasQRZCallbookCredentials()
+    }
+
+    /// Check if any Polo notes sources are configured
+    func hasPoloNotesSources() async -> Bool {
+        let sources = await fetchAllSourcesOnMainActor()
+        return !sources.isEmpty
     }
 
     /// Get cached info for a callsign (synchronous, no network)
@@ -95,11 +254,12 @@ actor CallsignLookupService {
 
     // MARK: - Types
 
-    /// Entry from a notes source with source title and optional emoji/note
+    /// Entry from a notes source with source title and optional emoji/note/name
     private struct NotesEntry {
         let title: String
         let emoji: String?
         let note: String?
+        let name: String?
     }
 
     /// A source with its title for tracking
@@ -116,8 +276,11 @@ actor CallsignLookupService {
     /// Order of cache entries for LRU eviction
     private var cacheOrder: [String] = []
 
-    /// Pending lookup tasks (for deduplication)
+    /// Pending lookup tasks (for deduplication) - legacy
     private var pendingLookups: [String: Task<CallsignInfo?, Never>] = [:]
+
+    /// Pending lookup tasks with results (for deduplication)
+    private var pendingResultLookups: [String: Task<CallsignLookupResult, Never>] = [:]
 
     /// Merged Polo notes from all clubs
     private var poloNotesCache: [String: CallsignInfo] = [:]
@@ -170,7 +333,12 @@ actor CallsignLookupService {
                 for (callsign, info) in entries {
                     var existing = entriesByCallsign[callsign] ?? []
                     existing.append(
-                        NotesEntry(title: sourceTitle, emoji: info.emoji, note: info.note)
+                        NotesEntry(
+                            title: sourceTitle,
+                            emoji: info.emoji,
+                            note: info.note,
+                            name: info.name
+                        )
                     )
                     entriesByCallsign[callsign] = existing
                 }
@@ -178,15 +346,20 @@ actor CallsignLookupService {
         }
 
         // Merge entries into CallsignInfo with all emojis and source titles
+        // Sort by source title for consistent ordering (requirement 5)
         var merged: [String: CallsignInfo] = [:]
         for (callsign, entries) in entriesByCallsign {
-            let allEmojis = entries.compactMap(\.emoji).filter { !$0.isEmpty }
-            let sourceTitles = entries.map(\.title)
-            let lastNote = entries.last?.note
+            let sortedEntries = entries.sorted { $0.title < $1.title }
+            let allEmojis = sortedEntries.compactMap(\.emoji).filter { !$0.isEmpty }
+            let sourceTitles = sortedEntries.map(\.title)
+            // Use first non-nil name and note from sorted entries
+            let name = sortedEntries.compactMap(\.name).first
+            let note = sortedEntries.compactMap(\.note).first
 
             merged[callsign] = CallsignInfo(
                 callsign: callsign,
-                note: lastNote,
+                name: name,
+                note: note,
                 emoji: allEmojis.first,
                 source: .poloNotes,
                 allEmojis: allEmojis.isEmpty ? nil : allEmojis,
@@ -274,31 +447,188 @@ extension CallsignLookupService {
     /// Look up a callsign in QRZ XML callbook
     /// Uses the logbook API key which also works for XML callbook lookups
     private func lookupInQRZ(_ callsign: String) async -> CallsignInfo? {
-        // Get API key from keychain
-        guard let apiKey = try? KeychainHelper.shared.readString(for: KeychainHelper.Keys.qrzApiKey)
+        let result = await lookupInQRZWithResult(callsign)
+        return result.info
+    }
+
+    /// Look up a callsign in QRZ with detailed result/error information
+    private func lookupInQRZWithResult(_ callsign: String) async -> CallsignLookupResult {
+        // Get Callbook credentials from keychain
+        guard
+            let username = try? KeychainHelper.shared.readString(
+                for: KeychainHelper.Keys.qrzCallbookUsername
+            ),
+            let password = try? KeychainHelper.shared.readString(
+                for: KeychainHelper.Keys.qrzCallbookPassword
+            )
         else {
-            return nil
+            return .error(.noQRZApiKey)
         }
 
-        // First, get a session key using the API key
-        guard let sessionKey = await getQRZSessionKey(apiKey: apiKey) else {
-            return nil
+        // First, get a session key using username/password
+        let sessionResult = await getQRZSessionKeyWithCredentials(
+            username: username, password: password
+        )
+        guard let sessionKey = sessionResult.sessionKey else {
+            return .error(sessionResult.error ?? .qrzAuthFailed, qrzAttempted: true)
         }
 
         // Then look up the callsign
-        return await performQRZLookup(callsign: callsign, sessionKey: sessionKey)
+        return await performQRZLookupWithResult(callsign: callsign, sessionKey: sessionKey)
     }
 
-    /// Get a QRZ session key using the API key
-    private func getQRZSessionKey(apiKey: String) async -> String? {
+    /// Result from QRZ session key request
+    private struct QRZSessionResult {
+        let sessionKey: String?
+        let error: CallsignLookupError?
+    }
+
+    /// Get a QRZ session key with error details using username/password credentials
+    private func getQRZSessionKeyWithCredentials(
+        username: String, password: String
+    ) async -> QRZSessionResult {
+        guard var urlComponents = URLComponents(string: Self.qrzXMLURL) else {
+            return QRZSessionResult(sessionKey: nil, error: .qrzAuthFailed)
+        }
+
+        // QRZ XML API uses username/password authentication
+        urlComponents.queryItems = [
+            URLQueryItem(name: "username", value: username),
+            URLQueryItem(name: "password", value: password),
+            URLQueryItem(name: "agent", value: "CarrierWave"),
+        ]
+
+        guard let url = urlComponents.url else {
+            return QRZSessionResult(sessionKey: nil, error: .qrzAuthFailed)
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.setValue("CarrierWave/1.0", forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 30
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200
+            else {
+                return QRZSessionResult(sessionKey: nil, error: .qrzAuthFailed)
+            }
+
+            guard let xmlString = String(data: data, encoding: .utf8) else {
+                return QRZSessionResult(sessionKey: nil, error: .qrzAuthFailed)
+            }
+
+            // Check for error in response
+            if let errorMsg = parseXMLValue(from: xmlString, tag: "Error") {
+                if errorMsg.lowercased().contains("invalid")
+                    || errorMsg.lowercased().contains("password")
+                    || errorMsg.lowercased().contains("username")
+                {
+                    return QRZSessionResult(sessionKey: nil, error: .qrzAuthFailed)
+                }
+                return QRZSessionResult(
+                    sessionKey: nil, error: .networkError(errorMsg)
+                )
+            }
+
+            // Parse session key from XML response
+            if let key = parseXMLValue(from: xmlString, tag: "Key") {
+                return QRZSessionResult(sessionKey: key, error: nil)
+            }
+
+            return QRZSessionResult(sessionKey: nil, error: .qrzAuthFailed)
+        } catch {
+            return QRZSessionResult(
+                sessionKey: nil,
+                error: .networkError(error.localizedDescription)
+            )
+        }
+    }
+
+    /// Perform the actual callsign lookup with detailed result
+    private func performQRZLookupWithResult(
+        callsign: String,
+        sessionKey: String
+    ) async -> CallsignLookupResult {
+        guard var urlComponents = URLComponents(string: Self.qrzXMLURL) else {
+            return .error(.networkError("Invalid URL"), qrzAttempted: true)
+        }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "s", value: sessionKey),
+            URLQueryItem(name: "callsign", value: callsign),
+        ]
+
+        guard let url = urlComponents.url else {
+            return .error(.networkError("Invalid URL"), qrzAttempted: true)
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.setValue("CarrierWave/1.0", forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 30
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200
+            else {
+                return .error(.networkError("HTTP error"), qrzAttempted: true)
+            }
+
+            guard let xmlString = String(data: data, encoding: .utf8) else {
+                return .error(.networkError("Invalid response"), qrzAttempted: true)
+            }
+
+            // Check for error
+            if let errorMsg = parseXMLValue(from: xmlString, tag: "Error") {
+                if errorMsg.lowercased().contains("not found") {
+                    return .notFound(qrzAttempted: true, poloNotesChecked: true)
+                }
+                return .error(.networkError(errorMsg), qrzAttempted: true)
+            }
+
+            // Parse callsign info from XML
+            let name = combineNames(
+                first: parseXMLValue(from: xmlString, tag: "fname"),
+                last: parseXMLValue(from: xmlString, tag: "name")
+            )
+            let grid = parseXMLValue(from: xmlString, tag: "grid")
+            let qth = parseXMLValue(from: xmlString, tag: "addr2") // City
+            let state = parseXMLValue(from: xmlString, tag: "state")
+            let country = parseXMLValue(from: xmlString, tag: "country")
+            let licenseClass = parseXMLValue(from: xmlString, tag: "class")
+
+            // Only return if we got at least some useful info
+            guard name != nil || grid != nil || qth != nil else {
+                return .notFound(qrzAttempted: true, poloNotesChecked: true)
+            }
+
+            let info = CallsignInfo(
+                callsign: callsign,
+                name: name,
+                qth: qth,
+                state: state,
+                country: country,
+                grid: grid,
+                licenseClass: licenseClass,
+                source: .qrz
+            )
+            return .fromQRZ(info)
+        } catch {
+            return .error(.networkError(error.localizedDescription), qrzAttempted: true)
+        }
+    }
+
+    /// Get a QRZ session key using username/password credentials
+    private func getQRZSessionKey(username: String, password: String) async -> String? {
         guard var urlComponents = URLComponents(string: Self.qrzXMLURL) else {
             return nil
         }
 
-        // QRZ XML API accepts logbook API key with "apikey:" prefix
+        // QRZ XML API uses username/password authentication
         urlComponents.queryItems = [
-            URLQueryItem(name: "username", value: apiKey),
-            URLQueryItem(name: "password", value: "apikey"),
+            URLQueryItem(name: "username", value: username),
+            URLQueryItem(name: "password", value: password),
         ]
 
         guard let url = urlComponents.url else {
@@ -308,7 +638,7 @@ extension CallsignLookupService {
         do {
             var request = URLRequest(url: url)
             request.setValue("CarrierWave/1.0", forHTTPHeaderField: "User-Agent")
-            request.timeoutInterval = 5
+            request.timeoutInterval = 30
 
             let (data, response) = try await URLSession.shared.data(for: request)
 
@@ -347,7 +677,7 @@ extension CallsignLookupService {
         do {
             var request = URLRequest(url: url)
             request.setValue("CarrierWave/1.0", forHTTPHeaderField: "User-Agent")
-            request.timeoutInterval = 5
+            request.timeoutInterval = 30
 
             let (data, response) = try await URLSession.shared.data(for: request)
 

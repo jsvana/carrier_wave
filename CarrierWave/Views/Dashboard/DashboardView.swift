@@ -9,7 +9,7 @@ struct DashboardView: View {
     @Environment(\.modelContext) var modelContext
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     @Environment(\.verticalSizeClass) var verticalSizeClass
-    @Query var qsos: [QSO]
+    @Query(filter: #Predicate<QSO> { !$0.isHidden }) var qsos: [QSO]
     @Query var allPresence: [ServicePresence]
 
     @ObservedObject var iCloudMonitor: ICloudMonitor
@@ -194,7 +194,6 @@ struct DashboardView: View {
             }
 
             ActivityGrid(activityData: stats.activityByDate)
-                .frame(height: 130)
         }
         .padding()
         .background(Color(.systemGray6))

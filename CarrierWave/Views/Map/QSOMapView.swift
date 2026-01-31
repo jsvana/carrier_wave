@@ -16,16 +16,19 @@ struct QSOMapView: View {
                         coordinate: annotation.coordinate,
                         anchor: .bottom
                     ) {
-                        QSOMarkerView(annotation: annotation, isSelected: selectedAnnotation?.id == annotation.id)
-                            .onTapGesture {
-                                withAnimation {
-                                    if selectedAnnotation?.id == annotation.id {
-                                        selectedAnnotation = nil
-                                    } else {
-                                        selectedAnnotation = annotation
-                                    }
+                        QSOMarkerView(
+                            annotation: annotation,
+                            isSelected: selectedAnnotation?.id == annotation.id
+                        )
+                        .onTapGesture {
+                            withAnimation {
+                                if selectedAnnotation?.id == annotation.id {
+                                    selectedAnnotation = nil
+                                } else {
+                                    selectedAnnotation = annotation
                                 }
                             }
+                        }
                     }
                 }
 
@@ -86,8 +89,11 @@ struct QSOMapView: View {
                 Button {
                     showingFilterSheet = true
                 } label: {
-                    Image(systemName: filterState.hasActiveFilters ? "line.3.horizontal.decrease.circle.fill"
-                        : "line.3.horizontal.decrease.circle")
+                    Image(
+                        systemName: filterState.hasActiveFilters
+                            ? "line.3.horizontal.decrease.circle.fill"
+                            : "line.3.horizontal.decrease.circle"
+                    )
                 }
             }
         }
@@ -108,7 +114,11 @@ struct QSOMapView: View {
     /// Modes that represent activation metadata, not actual QSOs
     private static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
 
-    @Query(sort: \QSO.timestamp, order: .reverse) private var allQSOs: [QSO]
+    @Query(
+        filter: #Predicate<QSO> { !$0.isHidden },
+        sort: \QSO.timestamp,
+        order: .reverse
+    ) private var allQSOs: [QSO]
 
     @State private var filterState = MapFilterState()
     @State private var showingFilterSheet = false
@@ -234,12 +244,14 @@ struct QSOMapView: View {
                 continue
             }
 
-            result.append(QSOArc(
-                id: qso.id.uuidString,
-                from: from,
-                to: to,
-                callsign: qso.callsign
-            ))
+            result.append(
+                QSOArc(
+                    id: qso.id.uuidString,
+                    from: from,
+                    to: to,
+                    callsign: qso.callsign
+                )
+            )
         }
 
         return result
@@ -277,7 +289,10 @@ struct QSOMapView: View {
     }
 
     private func bandSortOrder(_ band: String) -> Int {
-        let order = ["160M", "80M", "60M", "40M", "30M", "20M", "17M", "15M", "12M", "10M", "6M", "2M", "70CM"]
+        let order = [
+            "160M", "80M", "60M", "40M", "30M", "20M", "17M", "15M", "12M", "10M", "6M", "2M",
+            "70CM",
+        ]
         return order.firstIndex(of: band.uppercased()) ?? 999
     }
 }

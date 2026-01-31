@@ -33,7 +33,8 @@ final class QSO {
         qrzConfirmed: Bool = false,
         lotwConfirmedDate: Date? = nil,
         lotwConfirmed: Bool = false,
-        dxcc: Int? = nil
+        dxcc: Int? = nil,
+        theirLicenseClass: String? = nil
     ) {
         self.id = id
         self.callsign = callsign
@@ -63,6 +64,7 @@ final class QSO {
         self.lotwConfirmedDate = lotwConfirmedDate
         self.lotwConfirmed = lotwConfirmed
         self.dxcc = dxcc
+        self.theirLicenseClass = theirLicenseClass
     }
 
     // MARK: Internal
@@ -101,6 +103,9 @@ final class QSO {
 
     /// DXCC entity (from LoTW)
     var dxcc: Int?
+
+    /// Their license class (e.g., "Extra", "General") - from QRZ lookup at time of logging
+    var theirLicenseClass: String?
 
     /// Soft delete flag - QSOs are never truly deleted, only hidden
     var isHidden: Bool = false
@@ -207,6 +212,9 @@ final class QSO {
             score += 1
         }
         if sotaRef != nil {
+            score += 1
+        }
+        if theirLicenseClass != nil {
             score += 1
         }
         return score

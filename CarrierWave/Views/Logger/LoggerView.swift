@@ -55,22 +55,14 @@ struct LoggerView: View {
                                         )
                                 }
 
-                                // Only show full card when keyboard is not visible
-                                if let info = lookupResult, !callsignFieldFocused {
-                                    LoggerCallsignCard(info: info)
-                                        .transition(
-                                            .asymmetric(
-                                                insertion: .move(edge: .top).combined(
-                                                    with: .opacity
-                                                ),
-                                                removal: .opacity
-                                            )
-                                        )
-                                }
+                                // Show callsign info or error when keyboard is not visible
+                                callsignLookupDisplay
 
                                 qsoFormSection
 
-                                if showMoreFields {
+                                alwaysVisibleFieldsSection
+
+                                if showMoreFields, hasMoreFields {
                                     moreFieldsSection
                                         .transition(
                                             .asymmetric(
@@ -121,6 +113,7 @@ struct LoggerView: View {
                 }
             }
             .animation(quickLogMode ? nil : .easeInOut(duration: 0.2), value: lookupResult != nil)
+            .animation(quickLogMode ? nil : .easeInOut(duration: 0.2), value: lookupError)
             .animation(quickLogMode ? nil : .easeInOut(duration: 0.2), value: showMoreFields)
             .animation(
                 quickLogMode ? nil : .easeInOut(duration: 0.2), value: currentViolation?.message
@@ -153,14 +146,36 @@ struct LoggerView: View {
             } message: {
                 Text(LoggerCommand.helpText)
             }
+            .alert("Delete Session?", isPresented: $showDeleteConfirmation) {
+                Button("Cancel", role: .cancel) {}
+                Button("Delete", role: .destructive) {
+                    sessionManager?.deleteCurrentSession()
+                }
+            } message: {
+                Text(
+                    "This will delete the session and hide all \(displayQSOs.count) QSOs. "
+                        + "Hidden QSOs won't sync to external services. This cannot be undone."
+                )
+            }
+            .alert("Post QSY Spot?", isPresented: $showQSYSpotConfirmation) {
+                Button("No", role: .cancel) {}
+                Button("Yes") {
+                    Task {
+                        await sessionManager?.postQSYSpot()
+                    }
+                }
+            } message: {
+                if let freq = qsyNewFrequency {
+                    Text("Post a QSY spot to POTA at \(String(format: "%.3f", freq)) MHz?")
+                } else {
+                    Text("Post a QSY spot to POTA?")
+                }
+            }
             .toastContainer()
             .safeAreaInset(edge: .bottom) {
                 if callsignFieldFocused {
                     VStack(spacing: 0) {
-                        // Show compact callsign info when keyboard is visible
-                        if let info = lookupResult {
-                            CompactCallsignBar(info: info)
-                        }
+                        compactCallsignLookupDisplay
                         numberRowAccessory
                     }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -192,6 +207,13 @@ struct LoggerView: View {
     @AppStorage("userLicenseClass") private var licenseClassRaw: String = LicenseClass.extra
         .rawValue
     @AppStorage("loggerQuickLogMode") private var quickLogMode = false
+    @AppStorage("loggerAutoModeSwitch") private var autoModeSwitch = true
+
+    // Always visible field settings
+    @AppStorage("loggerShowNotes") private var showNotesAlways = false
+    @AppStorage("loggerShowTheirGrid") private var showTheirGridAlways = false
+    @AppStorage("loggerShowTheirPark") private var showTheirParkAlways = false
+    @AppStorage("loggerShowOperator") private var showOperatorAlways = false
 
     @Query(
         filter: #Predicate<QSO> { !$0.isHidden },
@@ -219,6 +241,7 @@ struct LoggerView: View {
 
     // Callsign lookup
     @State private var lookupResult: CallsignInfo?
+    @State private var lookupError: CallsignLookupError?
     @State private var lookupTask: Task<Void, Never>?
 
     // Command panels
@@ -233,6 +256,13 @@ struct LoggerView: View {
     // Session title editing
     @State private var showTitleEditSheet = false
     @State private var editingTitle = ""
+
+    /// Session deletion
+    @State private var showDeleteConfirmation = false
+
+    // QSY spot confirmation
+    @State private var showQSYSpotConfirmation = false
+    @State private var qsyNewFrequency: Double?
 
     /// License warning
     @State private var dismissedViolation: String?
@@ -274,6 +304,11 @@ struct LoggerView: View {
             return false
         }
 
+        // Block POTA duplicates on same band (requirement 6a)
+        if case .duplicateBand = potaDuplicateStatus {
+            return false
+        }
+
         return true
     }
 
@@ -296,9 +331,25 @@ struct LoggerView: View {
         isCWMode ? "599" : "59"
     }
 
+    /// Whether any fields are configured to always be visible
+    private var hasAlwaysVisibleFields: Bool {
+        showNotesAlways || showTheirGridAlways || showTheirParkAlways || showOperatorAlways
+    }
+
+    /// Whether there are any fields left to show in "More Fields"
+    private var hasMoreFields: Bool {
+        !showNotesAlways || !showTheirGridAlways || !showTheirParkAlways || !showOperatorAlways
+    }
+
     /// Detected command from input (if any)
     private var detectedCommand: LoggerCommand? {
         LoggerCommand.parse(callsignInput)
+    }
+
+    /// Whether to show the lookup error banner (when keyboard is not visible)
+    private var shouldShowLookupError: Bool {
+        lookupError != nil && lookupResult == nil && !callsignFieldFocused && !callsignInput.isEmpty
+            && callsignInput.count >= 3 && detectedCommand == nil
     }
 
     /// Check if the current callsign input would be a duplicate in the current POTA session
@@ -361,6 +412,50 @@ struct LoggerView: View {
         }
 
         return violation
+    }
+
+    // MARK: - QSO List
+
+    /// Combined session log entries (QSOs + notes)
+    private var sessionLogEntries: [SessionLogEntry] {
+        let notes = sessionManager?.parseSessionNotes() ?? []
+        return SessionLogEntry.combine(qsos: displayQSOs, notes: notes)
+    }
+
+    /// Callsign lookup display (card or error banner)
+    @ViewBuilder
+    private var callsignLookupDisplay: some View {
+        if let info = lookupResult, !callsignFieldFocused {
+            LoggerCallsignCard(info: info)
+                .transition(
+                    .asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .opacity
+                    )
+                )
+        } else if let error = lookupError, shouldShowLookupError {
+            CallsignLookupErrorBanner(error: error)
+                .transition(
+                    .asymmetric(
+                        insertion: .move(edge: .top).combined(with: .opacity),
+                        removal: .opacity
+                    )
+                )
+        }
+    }
+
+    /// Compact callsign lookup display for keyboard accessory area
+    @ViewBuilder
+    private var compactCallsignLookupDisplay: some View {
+        if let info = lookupResult {
+            CompactCallsignBar(info: info)
+        } else if let error = lookupError,
+                  !callsignInput.isEmpty,
+                  callsignInput.count >= 3,
+                  detectedCommand == nil
+        {
+            CompactLookupErrorBar(error: error)
+        }
     }
 
     // MARK: - Number Row Accessory
@@ -526,6 +621,7 @@ struct LoggerView: View {
                     Button {
                         callsignInput = ""
                         lookupResult = nil
+                        lookupError = nil
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .foregroundStyle(.secondary)
@@ -591,79 +687,141 @@ struct LoggerView: View {
                     .clipShape(RoundedRectangle(cornerRadius: 8))
             }
 
-            Button {
-                withAnimation {
-                    showMoreFields.toggle()
+            // Only show "More" button if there are fields not marked as always visible
+            if hasMoreFields {
+                Button {
+                    withAnimation {
+                        showMoreFields.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: showMoreFields ? "chevron.up" : "chevron.down")
+                        Text(showMoreFields ? "Less" : "More")
+                    }
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .background(Color(.secondarySystemGroupedBackground))
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: showMoreFields ? "chevron.up" : "chevron.down")
-                    Text(showMoreFields ? "Less" : "More")
-                }
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .padding(.vertical, 10)
-                .padding(.horizontal, 12)
-                .background(Color(.secondarySystemGroupedBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 8))
             }
+        }
+    }
+
+    /// Fields configured to always be visible (shown below RST)
+    @ViewBuilder
+    private var alwaysVisibleFieldsSection: some View {
+        if hasAlwaysVisibleFields {
+            VStack(spacing: 12) {
+                // Grid and Park in a row if both visible
+                if showTheirGridAlways || showTheirParkAlways {
+                    HStack(spacing: 12) {
+                        if showTheirGridAlways {
+                            theirGridField
+                        }
+                        if showTheirParkAlways {
+                            theirParkField
+                        }
+                    }
+                }
+
+                if showOperatorAlways {
+                    operatorField
+                }
+
+                if showNotesAlways {
+                    notesField
+                }
+            }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
     }
 
     private var moreFieldsSection: some View {
         VStack(spacing: 12) {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Their Grid")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("FN31", text: $theirGrid)
-                        .font(.subheadline.monospaced())
-                        .textInputAutocapitalization(.characters)
-                        .padding(10)
-                        .background(Color(.tertiarySystemGroupedBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                }
-
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("Their Park")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                    TextField("K-1234", text: $theirPark)
-                        .font(.subheadline.monospaced())
-                        .textInputAutocapitalization(.characters)
-                        .padding(10)
-                        .background(Color(.tertiarySystemGroupedBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+            // Grid and Park in a row (only if not always visible)
+            if !showTheirGridAlways || !showTheirParkAlways {
+                HStack(spacing: 12) {
+                    if !showTheirGridAlways {
+                        theirGridField
+                    }
+                    if !showTheirParkAlways {
+                        theirParkField
+                    }
                 }
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Operator")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("Operator name", text: $operatorName)
-                    .font(.subheadline)
-                    .padding(10)
-                    .background(Color(.tertiarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            if !showOperatorAlways {
+                operatorField
             }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Notes")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                TextField("Notes...", text: $notes, axis: .vertical)
-                    .font(.subheadline)
-                    .lineLimit(2 ... 4)
-                    .padding(10)
-                    .background(Color(.tertiarySystemGroupedBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
+            if !showNotesAlways {
+                notesField
             }
         }
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    // MARK: - Reusable Field Views
+
+    private var theirGridField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Their Grid")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("FN31", text: $theirGrid)
+                .font(.subheadline.monospaced())
+                .textInputAutocapitalization(.characters)
+                .padding(10)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    private var theirParkField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Their Park")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("K-1234", text: $theirPark)
+                .font(.subheadline.monospaced())
+                .textInputAutocapitalization(.characters)
+                .padding(10)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    private var operatorField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Operator")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("Operator name", text: $operatorName)
+                .font(.subheadline)
+                .padding(10)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+    }
+
+    private var notesField: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text("Notes")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+            TextField("Notes...", text: $notes, axis: .vertical)
+                .font(.subheadline)
+                .lineLimit(2 ... 4)
+                .padding(10)
+                .background(Color(.tertiarySystemGroupedBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
     }
 
     // MARK: - Log Button
@@ -702,36 +860,40 @@ struct LoggerView: View {
         }
     }
 
-    // MARK: - QSO List
-
     @ViewBuilder
     private var qsoListSection: some View {
         // Only show QSO list when there's an active session
         if sessionManager?.hasActiveSession == true {
             VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Text("Session QSOs")
+                    Text("Session Log")
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.secondary)
                     Spacer()
-                    Text("\(displayQSOs.count)")
+                    Text("\(displayQSOs.count) QSOs")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                 }
 
-                if displayQSOs.isEmpty {
-                    Text("No QSOs yet")
+                if sessionLogEntries.isEmpty {
+                    Text("No entries yet")
                         .font(.subheadline)
                         .foregroundStyle(.tertiary)
                         .frame(maxWidth: .infinity, alignment: .center)
                         .padding(.vertical, 20)
                 } else {
-                    ForEach(displayQSOs.prefix(10)) { qso in
-                        LoggerQSORow(
-                            qso: qso,
-                            sessionQSOs: displayQSOs,
-                            isPOTASession: sessionManager?.activeSession?.activationType == .pota
-                        )
+                    ForEach(sessionLogEntries.prefix(15)) { entry in
+                        switch entry {
+                        case let .qso(qso):
+                            LoggerQSORow(
+                                qso: qso,
+                                sessionQSOs: displayQSOs,
+                                isPOTASession: sessionManager?.activeSession?.activationType
+                                    == .pota
+                            )
+                        case let .note(note):
+                            LoggerNoteRow(note: note)
+                        }
                     }
                 }
             }
@@ -767,11 +929,21 @@ struct LoggerView: View {
                     .font(.subheadline.weight(.medium))
                     .foregroundStyle(.green)
 
-                Button {
-                    let hadQSOs = !displayQSOs.isEmpty
-                    sessionManager?.endSession()
-                    if hadQSOs {
-                        onSessionEnd?()
+                Menu {
+                    Button {
+                        let hadQSOs = !displayQSOs.isEmpty
+                        sessionManager?.endSession()
+                        if hadQSOs {
+                            onSessionEnd?()
+                        }
+                    } label: {
+                        Label("End Session", systemImage: "stop.fill")
+                    }
+
+                    Button(role: .destructive) {
+                        showDeleteConfirmation = true
+                    } label: {
+                        Label("Delete Session", systemImage: "trash")
                     }
                 } label: {
                     Text("END")
@@ -857,12 +1029,28 @@ struct LoggerView: View {
     private func executeCommand(_ command: LoggerCommand) {
         switch command {
         case let .frequency(freq):
-            sessionManager?.updateFrequency(freq)
+            let result = sessionManager?.updateFrequency(freq)
             ToastManager.shared.commandExecuted("FREQ", result: String(format: "%.3f MHz", freq))
 
+            // Auto-switch mode based on frequency segment (if enabled)
+            if autoModeSwitch, let suggestedMode = result?.suggestedMode {
+                _ = sessionManager?.updateMode(suggestedMode)
+                ToastManager.shared.commandExecuted("MODE", result: "\(suggestedMode) (auto)")
+            }
+
+            // Prompt for QSY spot
+            if result?.shouldPromptForSpot == true {
+                qsyNewFrequency = freq
+                showQSYSpotConfirmation = true
+            }
+
         case let .mode(newMode):
-            sessionManager?.updateMode(newMode)
+            let shouldPromptForSpot = sessionManager?.updateMode(newMode) ?? false
             ToastManager.shared.commandExecuted("MODE", result: newMode)
+            if shouldPromptForSpot {
+                qsyNewFrequency = sessionManager?.activeSession?.frequency
+                showQSYSpotConfirmation = true
+            }
 
         case let .spot(comment):
             Task {
@@ -900,7 +1088,7 @@ struct LoggerView: View {
 
                 if !sessionQSOs.isEmpty, qsosWithGrid.isEmpty {
                     ToastManager.shared.warning(
-                        "No QSOs have grids - add QRZ Callbook in Settings → External Data"
+                        "No QSOs have grids - add QRZ Callbook in Settings → Data"
                     )
                 } else if sessionQSOs.count > qsosWithGrid.count {
                     let missing = sessionQSOs.count - qsosWithGrid.count
@@ -917,6 +1105,10 @@ struct LoggerView: View {
 
         case .help:
             showHelpAlert = true
+
+        case let .note(text):
+            sessionManager?.appendNote(text)
+            ToastManager.shared.commandExecuted("NOTE", result: "Added to session log")
         }
     }
 
@@ -959,6 +1151,52 @@ struct LoggerView: View {
         }
     }
 
+    /// Extract the primary callsign from a potentially prefixed/suffixed callsign
+    /// e.g., "I/W6JSV/P" -> "W6JSV", "VE3/W6JSV" -> "W6JSV", "W6JSV/M" -> "W6JSV"
+    private func extractPrimaryCallsign(_ callsign: String) -> String {
+        let parts = callsign.split(separator: "/").map(String.init)
+
+        guard parts.count > 1 else {
+            return callsign
+        }
+
+        // Common suffixes that indicate the primary is before them
+        let knownSuffixes = Set(["P", "M", "MM", "AM", "QRP", "R", "A", "B"])
+
+        // For 2 parts: check if second part is a known suffix or very short (1-2 chars)
+        // If so, first part is primary. Otherwise, longer part is likely primary.
+        if parts.count == 2 {
+            let first = parts[0]
+            let second = parts[1]
+
+            // If second is a known suffix, first is primary
+            if knownSuffixes.contains(second.uppercased()) {
+                return first
+            }
+
+            // If second is very short (1-2 chars), it's likely a suffix
+            if second.count <= 2 {
+                return first
+            }
+
+            // If first is very short (1-2 chars), it's likely a country prefix
+            if first.count <= 2 {
+                return second
+            }
+
+            // Otherwise, return the longer one (more likely to be the full callsign)
+            return first.count >= second.count ? first : second
+        }
+
+        // For 3 parts (prefix/call/suffix): middle is primary
+        if parts.count == 3 {
+            return parts[1]
+        }
+
+        // Fallback: return the longest part
+        return parts.max(by: { $0.count < $1.count }) ?? callsign
+    }
+
     private func onCallsignChanged(_ callsign: String) {
         lookupTask?.cancel()
 
@@ -969,6 +1207,17 @@ struct LoggerView: View {
               LoggerCommand.parse(trimmed) == nil
         else {
             lookupResult = nil
+            lookupError = nil
+            return
+        }
+
+        // Extract the primary callsign for lookup (strip prefix/suffix)
+        let primaryCallsign = extractPrimaryCallsign(trimmed)
+
+        // Don't lookup if primary is too short
+        guard primaryCallsign.count >= 3 else {
+            lookupResult = nil
+            lookupError = nil
             return
         }
 
@@ -981,13 +1230,15 @@ struct LoggerView: View {
             }
 
             let service = CallsignLookupService(modelContext: modelContext)
-            if let info = await service.lookup(trimmed) {
-                await MainActor.run {
-                    lookupResult = info
-                }
-            } else {
-                await MainActor.run {
-                    lookupResult = nil
+            let result = await service.lookupWithResult(primaryCallsign)
+
+            await MainActor.run {
+                lookupResult = result.info
+                // Only show actionable errors (not "not found" which is normal)
+                if result.error == .notFound {
+                    lookupError = nil
+                } else {
+                    lookupError = result.error
                 }
             }
         }
@@ -1017,12 +1268,14 @@ struct LoggerView: View {
             operatorName: operatorName.isEmpty ? nil : operatorName,
             state: lookupResult?.state,
             country: lookupResult?.country,
-            qth: lookupResult?.qth
+            qth: lookupResult?.qth,
+            theirLicenseClass: lookupResult?.licenseClass
         )
 
         // Reset form
         callsignInput = ""
         lookupResult = nil
+        lookupError = nil
         theirGrid = ""
         theirPark = ""
         notes = ""
@@ -1052,6 +1305,34 @@ enum POTACallsignStatus {
     case newBand(previousBands: [String])
     /// Duplicate on the same band (not valid for POTA)
     case duplicateBand(band: String)
+}
+
+// MARK: - LoggerNoteRow
+
+/// A row displaying a session note
+struct LoggerNoteRow: View {
+    let note: SessionNoteEntry
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Text(note.displayTime)
+                .font(.caption.monospaced())
+                .foregroundStyle(.secondary)
+                .frame(width: 50, alignment: .leading)
+
+            Image(systemName: "note.text")
+                .font(.caption)
+                .foregroundStyle(.purple)
+
+            Text(note.text)
+                .font(.subheadline)
+                .foregroundStyle(.primary)
+                .lineLimit(2)
+
+            Spacer()
+        }
+        .padding(.vertical, 6)
+    }
 }
 
 // MARK: - LoggerQSORow

@@ -98,7 +98,7 @@ struct POTAActivationsContentView: View {
     @Environment(\.modelContext) private var modelContext
     @AppStorage("debugMode") private var debugMode = false
     @AppStorage("bypassPOTAMaintenance") private var bypassMaintenance = false
-    @Query(filter: #Predicate<QSO> { $0.parkReference != nil })
+    @Query(filter: #Predicate<QSO> { $0.parkReference != nil && !$0.isHidden })
     private var allParkQSOs: [QSO]
 
     @State private var jobs: [POTAJob] = []

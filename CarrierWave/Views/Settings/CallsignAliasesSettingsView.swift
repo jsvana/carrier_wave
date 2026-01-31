@@ -36,7 +36,7 @@ struct CallsignAliasesSettingsView: View {
     // MARK: Private
 
     @Environment(\.modelContext) private var modelContext
-    @Query private var allQSOs: [QSO]
+    @Query(filter: #Predicate<QSO> { !$0.isHidden }) private var allQSOs: [QSO]
 
     @State private var currentCallsign = ""
     @State private var previousCallsigns: [String] = []

@@ -290,7 +290,7 @@ struct GoalListView: View {
 struct QualifyingQSOsView: View {
     let participation: ChallengeParticipation
 
-    @Query var allQSOs: [QSO]
+    @Query(filter: #Predicate<QSO> { !$0.isHidden }) var allQSOs: [QSO]
 
     var qualifyingQSOs: [QSO] {
         let ids = Set(participation.progress.qualifyingQSOIds)

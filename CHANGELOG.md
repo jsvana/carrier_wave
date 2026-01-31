@@ -4,6 +4,62 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Tab Bar Configuration** - Customize which tabs appear and their order
+  - Settings → Navigation → Tab Bar
+  - Enable/disable Logger, CW Decoder, and other tabs
+  - Drag to reorder tabs
+  - Shows which tabs will appear in "More" menu when too many enabled
+- **Feature Selection in Onboarding** - New step to enable/disable Logger and CW Decoder during initial setup
+
+### Changed
+- **Bare Mode Switching** - Enter mode name directly (CW, SSB, FT8, etc.) instead of requiring "MODE CW"
+- **QSY Spot Confirmation** - Frequency and mode changes during POTA activations now prompt to post a QSY spot instead of auto-posting
+- **Auto Mode Detection** - Changing frequency automatically switches to the appropriate mode for that segment (CW for CW/DATA segments, SSB for phone segments)
+  - New setting "Auto-switch mode for frequency" to enable/disable this behavior
+
+### Added
+- **NOTE Command** - Add timestamped notes to the session log
+  - Type `NOTE <text>` in logger input (e.g., `NOTE Band is noisy`)
+  - Notes appear in the Session Log interleaved with QSOs
+  - Notes are stored with UTC timestamp
+- **Configurable Always-Visible Fields** - Toggle which QSO fields stay visible
+  - Settings → Logger → Always visible fields
+  - Options: Notes, Their Grid, Their Park, Operator
+  - Configured fields appear without tapping "More"
+  - Preferences persist across sessions
+- **Delete Session** - Remove unwanted sessions before sync
+  - Long-press or tap END button to access menu
+  - "Delete Session" hides all QSOs and removes the session
+  - Hidden QSOs won't sync to external services
+- **Callsign Prefix/Suffix Support** - Construct callsigns for portable operations
+  - Add country prefix when operating abroad (e.g., I/W6JSV)
+  - Standard suffixes: /P (Portable), /M (Mobile), /MM (Maritime), /AM (Aeronautical)
+  - Custom suffix option for regional indicators or other uses
+  - Full callsign displayed prominently with color-coded breakdown
+
+### Fixed
+- **POTA Duplicate Blocking** - Same band/date duplicates are now blocked, not just warned
+  - Log button is disabled when entering a duplicate callsign on the same band
+  - Duplicate warning banner still shows to explain why logging is blocked
+- **Hidden QSOs Excluded from All Views** - Hidden QSOs no longer appear in:
+  - Dashboard statistics (total QSOs, QSLs, entities, grids, bands, parks, streaks)
+  - Map view
+  - POTA Activations view
+  - Challenge progress
+  - Callsign alias detection
+- **License Class Persisted** - QSOs now save the contacted station's license class from QRZ lookup
+- **Callsign Notes Ordering** - Emojis and source names from Polo notes now display in consistent alphabetical order by source title
+- **Activity Grid Clipping on iPad** - Calendar activity view no longer cut off in landscape with navigation menu hidden
+- **Callsign Lookup Error Feedback** - Logger now shows why callsign lookups fail
+  - Displays actionable error when QRZ API key is missing
+  - Shows authentication errors with recovery suggestions
+  - Network errors displayed with helpful messages
+  - Previously failed silently with no indication
+- **QRZ Callbook Login Restored** - Re-added QRZ Callbook login in Settings → External Data
+  - Uses proper username/password authentication (separate from Logbook API key)
+  - Requires QRZ XML Logbook Data subscription for callsign lookups
+
 ## [1.14.0] - 2026-01-30
 
 ### Added

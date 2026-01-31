@@ -237,6 +237,13 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `SettingsSections.swift` | Sync Sources section with service navigation links |
 | `CallsignNotesSettingsView.swift` | Manage callsign notes file sources (URL + title) |
 
+## Documentation (`docs/features/`)
+| File | Purpose |
+|------|---------|
+| `logger-requirements.md` | Logger requirements and compliance checklist |
+| `sync.md` | QRZ, POTA, LoFi sync integration |
+| `statistics.md` | Dashboard stats and drilldown views |
+
 ## Views - Map (`CarrierWave/Views/Map/`)
 | File | Purpose |
 |------|---------|

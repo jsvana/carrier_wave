@@ -20,6 +20,14 @@ final class LoggingSessionManager {
 
     // MARK: Internal
 
+    /// Result of a frequency update
+    struct FrequencyUpdateResult {
+        /// Whether a QSY spot prompt should be shown
+        let shouldPromptForSpot: Bool
+        /// Suggested mode for the new frequency (nil if no change needed)
+        let suggestedMode: String?
+    }
+
     /// Currently active session
     private(set) var activeSession: LoggingSession?
 
@@ -158,37 +166,113 @@ final class LoggingSessionManager {
     }
 
     /// Update operating frequency
-    /// For POTA sessions, this also posts a QSY spot if the frequency changed
-    func updateFrequency(_ frequency: Double) {
+    /// Returns info about whether to prompt for spot and suggested mode
+    func updateFrequency(_ frequency: Double) -> FrequencyUpdateResult {
         guard let session = activeSession else {
-            return
+            return FrequencyUpdateResult(shouldPromptForSpot: false, suggestedMode: nil)
         }
 
         let oldFrequency = session.frequency
         session.updateFrequency(frequency)
         try? modelContext.save()
 
-        // Post QSY spot for POTA sessions when frequency actually changed
-        if session.activationType == .pota,
-           oldFrequency != nil,
-           oldFrequency != frequency
-        {
-            Task {
-                await postSpot(comment: "QSY", showToast: true)
-            }
+        // Check if this is a QSY that could be spotted
+        let shouldPromptForSpot =
+            session.activationType == .pota
+                && oldFrequency != nil
+                && oldFrequency != frequency
+
+        // Check if mode should change based on frequency
+        let suggestedMode = BandPlanService.suggestedMode(for: frequency)
+        let currentMode = session.mode.uppercased()
+
+        // Only suggest if different from current mode
+        let modeToSuggest: String? = if let suggested = suggestedMode, suggested != currentMode {
+            suggested
+        } else {
+            nil
         }
+
+        return FrequencyUpdateResult(
+            shouldPromptForSpot: shouldPromptForSpot,
+            suggestedMode: modeToSuggest
+        )
+    }
+
+    /// Post a QSY spot (called from LoggerView after user confirmation)
+    func postQSYSpot() async {
+        await postSpot(comment: "QSY", showToast: true)
     }
 
     /// Update operating mode
-    func updateMode(_ mode: String) {
-        activeSession?.updateMode(mode)
+    /// Returns true if a QSY spot prompt should be shown (POTA session with mode change)
+    @discardableResult
+    func updateMode(_ mode: String) -> Bool {
+        guard let session = activeSession else {
+            return false
+        }
+
+        let oldMode = session.mode
+        session.updateMode(mode)
         try? modelContext.save()
+
+        // Return whether this is a QSY that could be spotted
+        return session.activationType == .pota
+            && oldMode != mode
     }
 
     /// Update session title
     func updateTitle(_ title: String?) {
         activeSession?.customTitle = title
         try? modelContext.save()
+    }
+
+    /// Append a note to the session log
+    /// Notes are stored with ISO8601 timestamps for sorting: [ISO8601|HH:mm] text
+    func appendNote(_ text: String) {
+        guard let session = activeSession else {
+            return
+        }
+
+        let timestamp = Date()
+
+        // ISO8601 for sorting, HH:mm for display
+        let isoFormatter = ISO8601DateFormatter()
+        let isoString = isoFormatter.string(from: timestamp)
+
+        let displayFormatter = DateFormatter()
+        displayFormatter.dateFormat = "HH:mm"
+        displayFormatter.timeZone = TimeZone(identifier: "UTC")
+        let displayTime = displayFormatter.string(from: timestamp)
+
+        // Format: [ISO8601|HH:mm] text
+        let noteEntry = "[\(isoString)|\(displayTime)] \(text)"
+
+        if let existingNotes = session.notes, !existingNotes.isEmpty {
+            session.notes = existingNotes + "\n" + noteEntry
+        } else {
+            session.notes = noteEntry
+        }
+
+        try? modelContext.save()
+    }
+
+    /// Parse session notes into individual entries with timestamps
+    func parseSessionNotes() -> [SessionNoteEntry] {
+        guard let session = activeSession, let notes = session.notes, !notes.isEmpty else {
+            return []
+        }
+
+        var entries: [SessionNoteEntry] = []
+        let lines = notes.components(separatedBy: "\n")
+
+        for line in lines {
+            if let entry = SessionNoteEntry.parse(line) {
+                entries.append(entry)
+            }
+        }
+
+        return entries
     }
 
     /// Log a new QSO
@@ -203,7 +287,8 @@ final class LoggingSessionManager {
         operatorName: String? = nil,
         state: String? = nil,
         country: String? = nil,
-        qth: String? = nil
+        qth: String? = nil,
+        theirLicenseClass: String? = nil
     ) -> QSO? {
         guard let session = activeSession else {
             return nil
@@ -235,7 +320,8 @@ final class LoggingSessionManager {
             name: name,
             qth: qth,
             state: state,
-            country: country
+            country: country,
+            theirLicenseClass: theirLicenseClass
         )
 
         // Set the logging session ID
@@ -261,6 +347,46 @@ final class LoggingSessionManager {
     /// Unhide a previously hidden QSO
     func unhideQSO(_ qso: QSO) {
         qso.isHidden = false
+        try? modelContext.save()
+    }
+
+    /// Delete the current session and all its QSOs
+    /// This removes the session and hides all associated QSOs so they won't sync
+    func deleteCurrentSession() {
+        guard let session = activeSession else {
+            return
+        }
+
+        // Hide all QSOs in this session
+        let sessionId = session.id
+        let predicate = #Predicate<QSO> { qso in
+            qso.loggingSessionId == sessionId
+        }
+
+        let descriptor = FetchDescriptor<QSO>(predicate: predicate)
+
+        do {
+            let qsos = try modelContext.fetch(descriptor)
+            for qso in qsos {
+                qso.isHidden = true
+            }
+        } catch {
+            // Continue with session deletion even if QSO hiding fails
+        }
+
+        // Delete the session itself
+        modelContext.delete(session)
+        activeSession = nil
+        clearActiveSessionId()
+
+        // Stop timers and services
+        stopAutoSpotTimer()
+        spotCommentsService.stopPolling()
+        spotCommentsService.clear()
+
+        // Re-enable screen timeout
+        UIApplication.shared.isIdleTimerDisabled = false
+
         try? modelContext.save()
     }
 
@@ -484,5 +610,108 @@ final class LoggingSessionManager {
         if UserDefaults.standard.bool(forKey: "lofi.deviceLinked") {
             qso.markNeedsUpload(to: .lofi, context: modelContext)
         }
+    }
+}
+
+// MARK: - SessionNoteEntry
+
+/// A parsed note entry from session notes
+struct SessionNoteEntry: Identifiable {
+    let id = UUID()
+    let timestamp: Date
+    let displayTime: String
+    let text: String
+
+    /// Parse a note line in format "[ISO8601|HH:mm] text" or legacy "[HH:mm] text"
+    static func parse(_ line: String) -> SessionNoteEntry? {
+        // Try new format first: [ISO8601|HH:mm] text
+        if let bracketEnd = line.firstIndex(of: "]"),
+           line.first == "["
+        {
+            let bracketContent = String(line[line.index(after: line.startIndex) ..< bracketEnd])
+            let text = String(line[line.index(after: bracketEnd)...]).trimmingCharacters(
+                in: .whitespaces
+            )
+
+            // Check for new format with pipe separator
+            if let pipeIndex = bracketContent.firstIndex(of: "|") {
+                let isoString = String(bracketContent[..<pipeIndex])
+                let displayTime = String(bracketContent[bracketContent.index(after: pipeIndex)...])
+
+                let isoFormatter = ISO8601DateFormatter()
+                if let timestamp = isoFormatter.date(from: isoString) {
+                    return SessionNoteEntry(
+                        timestamp: timestamp,
+                        displayTime: displayTime,
+                        text: text
+                    )
+                }
+            }
+
+            // Legacy format: [HH:mm] text - use today's date with that time
+            let displayTime = bracketContent
+            let formatter = DateFormatter()
+            formatter.dateFormat = "HH:mm"
+            formatter.timeZone = TimeZone(identifier: "UTC")
+
+            // For legacy notes, we can't determine the exact date, so use a very old date
+            // This will sort them before any new-format notes from today
+            if let timeComponents = formatter.date(from: displayTime) {
+                let calendar = Calendar.current
+                // Use the time components with a base date of 1970
+                var components = calendar.dateComponents([.hour, .minute], from: timeComponents)
+                components.year = 1_970
+                components.month = 1
+                components.day = 1
+                if let legacyDate = calendar.date(from: components) {
+                    return SessionNoteEntry(
+                        timestamp: legacyDate,
+                        displayTime: displayTime,
+                        text: text
+                    )
+                }
+            }
+        }
+
+        return nil
+    }
+}
+
+// MARK: - SessionLogEntry
+
+/// A unified entry in the session log (either a QSO or a note)
+enum SessionLogEntry: Identifiable {
+    case qso(QSO)
+    case note(SessionNoteEntry)
+
+    // MARK: Internal
+
+    var id: String {
+        switch self {
+        case let .qso(qso):
+            "qso-\(qso.id)"
+        case let .note(note):
+            "note-\(note.id)"
+        }
+    }
+
+    var timestamp: Date {
+        switch self {
+        case let .qso(qso):
+            qso.timestamp
+        case let .note(note):
+            note.timestamp
+        }
+    }
+
+    /// Combine QSOs and notes into a sorted list
+    static func combine(qsos: [QSO], notes: [SessionNoteEntry]) -> [SessionLogEntry] {
+        var entries: [SessionLogEntry] = []
+
+        entries.append(contentsOf: qsos.map { .qso($0) })
+        entries.append(contentsOf: notes.map { .note($0) })
+
+        // Sort by timestamp, most recent first
+        return entries.sorted { $0.timestamp > $1.timestamp }
     }
 }
