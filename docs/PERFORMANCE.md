@@ -1,0 +1,333 @@
+# Performance Guidelines
+
+> **Goal**: Keep the app responsive at 60fps. View bodies should complete in <16ms.
+
+## General Principles
+
+### SwiftUI View Bodies
+
+View bodies run on the main thread. Keep them fast.
+
+**DO:**
+```swift
+var body: some View {
+    Text(viewModel.cachedDisplayString)  // Read pre-computed value
+}
+```
+
+**DON'T:**
+```swift
+var body: some View {
+    Text(formatDate(date))  // Creates formatter every render
+    Text("\(items.filter { $0.isActive }.count)")  // Filters on every render
+}
+```
+
+### Formatter Caching
+
+DateFormatter and NumberFormatter are expensive to create (~1-2ms each). Create once, reuse.
+
+**DO:**
+```swift
+// In a shared location or view model
+private static let dateFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateStyle = .short
+    return f
+}()
+
+var formattedDate: String {
+    Self.dateFormatter.string(from: date)
+}
+```
+
+**DON'T:**
+```swift
+var body: some View {
+    let formatter = DateFormatter()  // Created every render!
+    formatter.dateStyle = .short
+    Text(formatter.string(from: date))
+}
+```
+
+### Observable Dependencies
+
+Each view should depend only on the data it needs. Whole-collection dependencies cause unnecessary updates.
+
+**DO:**
+```swift
+// Per-item view model
+@Observable
+class QSORowViewModel {
+    let qso: QSO
+    var isFavorite: Bool = false
+}
+
+// View depends only on its own view model
+struct QSORow: View {
+    let viewModel: QSORowViewModel
+    
+    var body: some View {
+        // Only updates when THIS qso's data changes
+    }
+}
+```
+
+**DON'T:**
+```swift
+struct QSORow: View {
+    @Environment(DataStore.self) var store
+    let qsoID: UUID
+    
+    var body: some View {
+        // Accesses store.allQSOs - updates when ANY qso changes
+        if let qso = store.allQSOs.first(where: { $0.id == qsoID }) {
+            // ...
+        }
+    }
+}
+```
+
+### Collection Operations
+
+**DO:**
+```swift
+// Reserve capacity when size is known
+var results: [QSO] = []
+results.reserveCapacity(input.count)
+
+// Use lazy for short-circuit operations
+let firstMatch = items.lazy.filter { $0.isValid }.first
+```
+
+**DON'T:**
+```swift
+// Multiple reallocations
+var results: [QSO] = []
+for item in input {
+    results.append(transform(item))  // Reallocates ~14 times for 10k items
+}
+```
+
+### Async/Actor Operations
+
+**DO:**
+```swift
+// Batch actor calls
+await syncService.uploadBatch(qsos)  // Single actor hop
+
+// Keep synchronous operations synchronous
+func computeTotal() -> Int {  // No async needed
+    items.reduce(0, +)
+}
+```
+
+**DON'T:**
+```swift
+// Individual actor calls in a loop
+for qso in qsos {
+    await syncService.upload(qso)  // N actor hops!
+}
+```
+
+---
+
+## Critical Views
+
+These views have specific performance requirements due to complexity or frequent updates.
+
+### Logger View
+
+The logger view handles real-time input and must remain responsive during rapid typing.
+
+**Requirements:**
+- Text field updates must not trigger full view rebuilds
+- Frequency/band changes should update only affected UI elements
+- QSO submission should not block the UI
+
+**Patterns to follow:**
+```swift
+// Isolate text input state
+@State private var callsignInput: String = ""  // Local to text field
+
+// Debounce lookups
+.onChange(of: callsignInput) { _, newValue in
+    lookupTask?.cancel()
+    lookupTask = Task {
+        try await Task.sleep(for: .milliseconds(300))
+        await performLookup(newValue)
+    }
+}
+
+// Pre-compute display values
+// Cache band/mode display strings in view model, not in body
+```
+
+**Avoid:**
+- SwiftData queries in the view body
+- Callsign lookups on every keystroke (debounce)
+- Recomputing frequency↔band mappings on each render
+
+### Map View
+
+Map views with many annotations are expensive. The QSO map may display hundreds of pins.
+
+**Requirements:**
+- Limit visible annotations to viewport + buffer
+- Cluster pins at low zoom levels
+- Defer annotation updates during pan/zoom gestures
+
+**Patterns to follow:**
+```swift
+// Cluster annotations
+Map {
+    ForEach(visibleClusters) { cluster in
+        if cluster.count > 1 {
+            ClusterAnnotation(cluster)
+        } else {
+            QSOAnnotation(cluster.qsos[0])
+        }
+    }
+}
+
+// Update visible set only when region change settles
+.onMapCameraChange(frequency: .onEnd) { context in
+    updateVisibleQSOs(for: context.region)
+}
+
+// Use lightweight annotation views
+struct QSOAnnotation: View {
+    let qso: QSO
+    var body: some View {
+        // Simple circle, not complex view hierarchy
+        Circle()
+            .fill(colorForBand(qso.band))
+            .frame(width: 12, height: 12)
+    }
+}
+```
+
+**Avoid:**
+- Rendering all QSOs regardless of viewport
+- Complex annotation views with multiple subviews
+- Updating annotations during active gestures
+- Fetching QSO details for each annotation in the body
+
+### Tab Transitions
+
+Tab changes should feel instant. Heavy views should defer loading.
+
+**Requirements:**
+- Tab switch should complete in <100ms
+- Defer expensive data loading until tab is visible
+- Preserve scroll position when returning to tabs
+
+**Patterns to follow:**
+```swift
+// Lazy initialization
+struct DashboardView: View {
+    @State private var hasAppeared = false
+    
+    var body: some View {
+        Group {
+            if hasAppeared {
+                DashboardContent()
+            } else {
+                ProgressView()
+            }
+        }
+        .onAppear {
+            if !hasAppeared {
+                hasAppeared = true
+            }
+        }
+    }
+}
+
+// Use task for async loading
+.task {
+    await loadDashboardData()
+}
+
+// Preserve state with @SceneStorage or view model
+@SceneStorage("logsScrollPosition") private var scrollPosition: String?
+```
+
+**Avoid:**
+- Synchronous data fetching in `onAppear`
+- Rebuilding entire view hierarchies on tab switch
+- Blocking the main thread during tab transitions
+- Loading all data upfront in the tab view itself
+
+---
+
+## Code Review Checklist
+
+When reviewing code for performance, verify:
+
+### View Bodies
+- [ ] No formatter creation in body
+- [ ] No filtering/sorting/mapping collections in body
+- [ ] No SwiftData queries in body
+- [ ] Computed properties are cached in view model where appropriate
+
+### Observable/State
+- [ ] Views depend only on data they display
+- [ ] No whole-collection dependencies for list items
+- [ ] `@State` used for view-local ephemeral state
+- [ ] `@Environment` values don't change frequently
+
+### Lists and Collections
+- [ ] `reserveCapacity` called when size is known
+- [ ] Lazy loading for large datasets
+- [ ] List rows are lightweight
+
+### Async Operations
+- [ ] Actor calls are batched where possible
+- [ ] Synchronous functions don't use `async` unnecessarily
+- [ ] Long operations show loading state, don't block UI
+
+### Critical Views (Logger, Map, Tabs)
+- [ ] Logger: Input is debounced, lookups don't block typing
+- [ ] Map: Annotations limited to viewport, clustering enabled
+- [ ] Tabs: Heavy content deferred until visible
+
+---
+
+## Measuring Performance
+
+When investigating slowdowns:
+
+1. **Profile with Instruments** (SwiftUI template)
+   - Look at "Long View Body Updates" lane
+   - Check for orange/red bars indicating slow updates
+
+2. **Check for unnecessary updates**
+   - Add `let _ = Self._printChanges()` temporarily to view body
+   - Look for updates when data hasn't changed
+
+3. **Time critical operations**
+   ```swift
+   let start = CFAbsoluteTimeGetCurrent()
+   // operation
+   let elapsed = CFAbsoluteTimeGetCurrent() - start
+   print("Operation took \(elapsed * 1000)ms")
+   ```
+
+4. **Watch for symptoms**
+   - Dropped frames during scrolling
+   - Delayed response to taps
+   - Stuttering animations
+   - Slow tab switches
+
+---
+
+## Memory Considerations
+
+Performance includes memory efficiency:
+
+- **Closures**: Use `[weak self]` to prevent retain cycles
+- **Timers**: Invalidate in `deinit` or when view disappears
+- **Observers**: Remove NotificationCenter observers
+- **Images**: Use appropriate resolution, don't load full-size for thumbnails
+- **SwiftData**: Fetch only needed properties with `#Predicate`

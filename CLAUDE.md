@@ -37,6 +37,7 @@ Carrier Wave is a SwiftUI/SwiftData iOS app for amateur radio QSO (contact) logg
 | Setup | Development environment, build commands | [docs/SETUP.md](docs/SETUP.md) |
 | Sync System | QRZ, POTA, LoFi integration | [docs/features/sync.md](docs/features/sync.md) |
 | Statistics | Dashboard stats and drilldown views | [docs/features/statistics.md](docs/features/statistics.md) |
+| Performance | View body rules, critical views, review checklist | [docs/PERFORMANCE.md](docs/PERFORMANCE.md) |
 
 ## Code Standards
 
@@ -45,6 +46,7 @@ Carrier Wave is a SwiftUI/SwiftData iOS app for amateur radio QSO (contact) logg
 - Use `@MainActor` for view-bound services
 - Store credentials in Keychain, never in SwiftData
 - Tests use in-memory SwiftData containers
+- **Follow [Performance Guidelines](docs/PERFORMANCE.md)** — especially for Logger, Map, and tab transitions
 
 ## Linting & Formatting
 
@@ -72,7 +74,11 @@ See [docs/SETUP.md](docs/SETUP.md) for device builds and additional commands.
 
 ## Version Updates
 
-When releasing a new version, update **all three** locations:
+When releasing a new version, follow these steps:
+
+### 1. Update version in code
+
+Update **all three** locations:
 
 1. **Xcode project** (`CarrierWave.xcodeproj/project.pbxproj`):
    - `MARKETING_VERSION` - The user-facing version (e.g., "1.2.0")
@@ -84,6 +90,27 @@ When releasing a new version, update **all three** locations:
 3. **Changelog** (`CHANGELOG.md`):
    - Rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD` with the new version and current date
    - Add a new empty `[Unreleased]` section at the top for future changes
+
+### 2. Commit and release
+
+After committing the version bump:
+
+```bash
+make release VERSION=X.Y.Z
+```
+
+This will:
+- Create an annotated git tag `vX.Y.Z` with the changelog as the tag message
+- Push the tag to GitHub
+- Send a release notification to Discord (if `DISCORD_WEBHOOK_URL` is configured)
+
+### Discord notifications
+
+To enable Discord release notifications, set the `DISCORD_WEBHOOK_URL` environment variable or add it to a `.env` file in the project root:
+
+```bash
+DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/...
+```
 
 ## Changelog
 
