@@ -4,6 +4,13 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+## [1.15.2] - 2026-01-31
+
+### Fixed
+- **Save as Defaults Button** - Now shows visual checkmark confirmation when tapped
+- **Skip Wizard Setting** - "Skip wizard next time" now works correctly, auto-starting sessions with saved defaults
+- **Save Defaults Completeness** - Activation type and park reference are now saved as defaults
+
 ## [1.15.1] - 2026-01-31
 
 ### Fixed
