@@ -44,6 +44,23 @@ struct LogsListContentView: View {
         .searchable(text: $searchText, prompt: "Search callsigns or parks")
         .onAppear {
             loadServiceConfiguration()
+            updateAvailableFilters()
+            updateFilteredQSOs()
+        }
+        .onChange(of: searchText) { _, _ in
+            updateFilteredQSOs()
+        }
+        .onChange(of: selectedBand) { _, _ in
+            updateFilteredQSOs()
+        }
+        .onChange(of: selectedMode) { _, _ in
+            updateFilteredQSOs()
+        }
+        .onChange(of: qsos.count) { _, _ in
+            if qsos.count != lastQSOCount {
+                updateAvailableFilters()
+                updateFilteredQSOs()
+            }
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
@@ -91,25 +108,22 @@ struct LogsListContentView: View {
     @State private var selectedMode: String?
     @State private var serviceConfig = ServiceConfiguration()
 
+    // Cached filter results to avoid recomputation on every render
+    @State private var cachedFilteredQSOs: [QSO] = []
+    @State private var cachedAvailableBands: [String] = []
+    @State private var cachedAvailableModes: [String] = []
+    @State private var lastQSOCount: Int = 0
+
     private var filteredQSOs: [QSO] {
-        qsos.filter { qso in
-            let matchesSearch =
-                searchText.isEmpty || qso.callsign.localizedCaseInsensitiveContains(searchText)
-                    || (qso.parkReference?.localizedCaseInsensitiveContains(searchText) ?? false)
-
-            let matchesBand = selectedBand == nil || qso.band == selectedBand
-            let matchesMode = selectedMode == nil || qso.mode == selectedMode
-
-            return matchesSearch && matchesBand && matchesMode
-        }
+        cachedFilteredQSOs
     }
 
     private var availableBands: [String] {
-        Array(Set(qsos.map(\.band))).sorted()
+        cachedAvailableBands
     }
 
     private var availableModes: [String] {
-        Array(Set(qsos.map(\.mode))).sorted()
+        cachedAvailableModes
     }
 
     private func deleteQSOs(at offsets: IndexSet) {
@@ -127,6 +141,25 @@ struct LogsListContentView: View {
             hamrs: hamrsClient.isConfigured,
             lotw: lotwClient.isConfigured
         )
+    }
+
+    private func updateFilteredQSOs() {
+        cachedFilteredQSOs = qsos.filter { qso in
+            let matchesSearch =
+                searchText.isEmpty || qso.callsign.localizedCaseInsensitiveContains(searchText)
+                    || (qso.parkReference?.localizedCaseInsensitiveContains(searchText) ?? false)
+
+            let matchesBand = selectedBand == nil || qso.band == selectedBand
+            let matchesMode = selectedMode == nil || qso.mode == selectedMode
+
+            return matchesSearch && matchesBand && matchesMode
+        }
+    }
+
+    private func updateAvailableFilters() {
+        cachedAvailableBands = Array(Set(qsos.map(\.band))).sorted()
+        cachedAvailableModes = Array(Set(qsos.map(\.mode))).sorted()
+        lastQSOCount = qsos.count
     }
 }
 

@@ -3,108 +3,156 @@ import SwiftUI
 
 // MARK: - QSOStatistics
 
-struct QSOStatistics {
+/// Statistics computed from QSO data with internal caching for performance.
+/// Uses a class to enable lazy cached properties that are computed once on first access.
+final class QSOStatistics {
+    // MARK: Lifecycle
+
+    init(qsos: [QSO]) {
+        self.qsos = qsos
+    }
+
     // MARK: Internal
 
     let qsos: [QSO]
+
+    // Streak cache storage (set by extension)
+    var cachedDailyStreak: StreakInfo?
+    var cachedPotaActivationStreak: StreakInfo?
+    var cachedModeStreaks: [StreakInfo]?
+    var cachedBandStreaks: [StreakInfo]?
 
     var totalQSOs: Int {
         realQSOs.count
     }
 
     var uniqueEntities: Int {
-        Set(realQSOs.compactMap { $0.dxccEntity?.number }).count
+        if let cached = _uniqueEntities {
+            return cached
+        }
+        let result = Set(realQSOs.compactMap { $0.dxccEntity?.number }).count
+        _uniqueEntities = result
+        return result
     }
 
     var uniqueGrids: Int {
-        Set(realQSOs.compactMap(\.theirGrid).filter { !$0.isEmpty }).count
+        if let cached = _uniqueGrids {
+            return cached
+        }
+        let result = Set(realQSOs.compactMap(\.theirGrid).filter { !$0.isEmpty }).count
+        _uniqueGrids = result
+        return result
     }
 
     var uniqueBands: Int {
-        Set(realQSOs.map { $0.band.lowercased() }).count
+        if let cached = _uniqueBands {
+            return cached
+        }
+        let result = Set(realQSOs.map { $0.band.lowercased() }).count
+        _uniqueBands = result
+        return result
     }
 
     var confirmedQSLs: Int {
-        realQSOs.filter(\.lotwConfirmed).count
+        if let cached = _confirmedQSLs {
+            return cached
+        }
+        let result = realQSOs.filter(\.lotwConfirmed).count
+        _confirmedQSLs = result
+        return result
     }
 
     var uniqueParks: Int {
-        Set(realQSOs.compactMap(\.parkReference).filter { !$0.isEmpty }).count
+        if let cached = _uniqueParks {
+            return cached
+        }
+        let result = Set(realQSOs.compactMap(\.parkReference).filter { !$0.isEmpty }).count
+        _uniqueParks = result
+        return result
     }
 
     /// Activations with 10+ QSOs (valid POTA activations)
     /// Each activation is a unique park+UTC date combination
     var successfulActivations: Int {
-        // Filter to QSOs with park references (realQSOs already excludes metadata)
-        let parksOnly = realQSOs.filter {
-            $0.parkReference != nil && !$0.parkReference!.isEmpty
-        }
-        // Group by park + UTC date (each UTC day at a park is a separate activation)
-        let grouped = Dictionary(grouping: parksOnly) { qso in
-            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
-        }
-        return grouped.values.filter { $0.count >= 10 }.count
+        activationGroups.values.filter { $0.count >= 10 }.count
     }
 
     /// Activations with <10 QSOs (activation attempts)
     /// Each activation is a unique park+UTC date combination
     var attemptedActivations: Int {
-        // Filter to QSOs with park references (realQSOs already excludes metadata)
-        let parksOnly = realQSOs.filter {
-            $0.parkReference != nil && !$0.parkReference!.isEmpty
-        }
-        // Group by park + UTC date (each UTC day at a park is a separate activation)
-        let grouped = Dictionary(grouping: parksOnly) { qso in
-            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
-        }
-        return grouped.values.filter { $0.count < 10 }.count
+        activationGroups.values.filter { $0.count < 10 }.count
     }
 
     var activityByDate: [Date: Int] {
+        if let cached = _activityByDate {
+            return cached
+        }
         var activity: [Date: Int] = [:]
         for qso in realQSOs {
             let date = qso.dateOnly
             activity[date, default: 0] += 1
         }
+        _activityByDate = activity
         return activity
     }
 
-    // MARK: - Streak Calculations
+    // MARK: - Internal Accessors for Extensions
+
+    /// Internal accessor for cached realQSOs (for use by extensions)
+    var cachedRealQSOs: [QSO] {
+        realQSOs
+    }
+
+    /// Internal accessor for cached activation groups (for use by extensions)
+    var cachedActivationGroups: [String: [QSO]] {
+        activationGroups
+    }
+
+    // MARK: - Category Items
 
     func items(for category: StatCategoryType) -> [StatCategoryItem] {
-        switch category {
-        case .qsls:
-            groupedByQSL()
-        case .entities:
-            groupedByEntity()
-        case .grids:
-            groupedByGrid()
-        case .bands:
-            groupedByBand()
-        case .parks:
-            groupedByPark()
-        case .frequencies:
-            groupedByFrequency()
-        case .bestFriends:
-            groupedByPartner()
-        case .bestHunters:
-            groupedByHunter()
+        // Check cache first
+        if let cached = _categoryItemsCache[category] {
+            return cached
         }
+
+        let result: [StatCategoryItem] =
+            switch category {
+            case .qsls:
+                groupedByQSL()
+            case .entities:
+                groupedByEntity()
+            case .grids:
+                groupedByGrid()
+            case .bands:
+                groupedByBand()
+            case .parks:
+                groupedByPark()
+            case .frequencies:
+                groupedByFrequency()
+            case .bestFriends:
+                groupedByPartner()
+            case .bestHunters:
+                groupedByHunter()
+            }
+
+        _categoryItemsCache[category] = result
+        return result
     }
 
     /// Top frequencies used, grouped to nearest 100kHz
     func topFrequencies(limit: Int = 5) -> [StatCategoryItem] {
-        Array(groupedByFrequency().sorted { $0.count > $1.count }.prefix(limit))
+        Array(items(for: .frequencies).sorted { $0.count > $1.count }.prefix(limit))
     }
 
     /// Top QSO partners (most frequent callsigns contacted)
     func topFriends(limit: Int = 5) -> [StatCategoryItem] {
-        Array(groupedByPartner().sorted { $0.count > $1.count }.prefix(limit))
+        Array(items(for: .bestFriends).sorted { $0.count > $1.count }.prefix(limit))
     }
 
     /// Top hunters (most frequent callers during POTA activations)
     func topHunters(limit: Int = 5) -> [StatCategoryItem] {
-        Array(groupedByHunter().sorted { $0.count > $1.count }.prefix(limit))
+        Array(items(for: .bestHunters).sorted { $0.count > $1.count }.prefix(limit))
     }
 
     // MARK: Private
@@ -113,9 +161,53 @@ struct QSOStatistics {
     /// These should never be counted as QSOs for any statistics
     private static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
 
+    /// Static DateFormatter for park grouping (avoid creating on each call)
+    private static let parkDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .none
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
+    // Cached computed values
+    private var _realQSOs: [QSO]?
+    private var _activationGroups: [String: [QSO]]?
+    private var _activityByDate: [Date: Int]?
+    private var _uniqueEntities: Int?
+    private var _uniqueGrids: Int?
+    private var _uniqueBands: Int?
+    private var _confirmedQSLs: Int?
+    private var _uniqueParks: Int?
+    private var _categoryItemsCache: [StatCategoryType: [StatCategoryItem]] = [:]
+
     /// QSOs filtered to exclude metadata modes - use this for all stat calculations
+    /// Cached after first computation
     private var realQSOs: [QSO] {
-        qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
+        if let cached = _realQSOs {
+            return cached
+        }
+        let result = qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
+        _realQSOs = result
+        return result
+    }
+
+    /// Cached activation grouping (park + UTC date combinations)
+    /// Used by both successfulActivations and attemptedActivations
+    private var activationGroups: [String: [QSO]] {
+        if let cached = _activationGroups {
+            return cached
+        }
+        // Filter to QSOs with park references (realQSOs already excludes metadata)
+        let parksOnly = realQSOs.filter {
+            $0.parkReference != nil && !$0.parkReference!.isEmpty
+        }
+        // Group by park + UTC date (each UTC day at a park is a separate activation)
+        let result = Dictionary(grouping: parksOnly) { qso in
+            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
+        }
+        _activationGroups = result
+        return result
     }
 
     private func groupedByEntity() -> [StatCategoryItem] {
@@ -171,24 +263,13 @@ struct QSOStatistics {
     }
 
     private func groupedByPark() -> [StatCategoryItem] {
-        // Filter to QSOs with park references (realQSOs already excludes metadata)
-        let parksOnly = realQSOs.filter {
-            $0.parkReference != nil && !$0.parkReference!.isEmpty
-        }
-        // Group by park + UTC date (each UTC day at a park is a separate activation)
-        let grouped = Dictionary(grouping: parksOnly) { qso in
-            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
-        }
-        let dateFormatter = DateFormatter()
-        dateFormatter.dateStyle = .medium
-        dateFormatter.timeStyle = .none
-        dateFormatter.timeZone = TimeZone(identifier: "UTC")
-        return grouped.map { _, qsos in
+        // Reuse cached activation groups
+        activationGroups.map { _, qsos in
             let park = qsos.first?.parkReference ?? "Unknown"
             let date = qsos.first?.utcDateOnly ?? Date()
             let status = qsos.count >= 10 ? "Valid" : "\(qsos.count)/10 QSOs"
             return StatCategoryItem(
-                identifier: "\(park) - \(dateFormatter.string(from: date))",
+                identifier: "\(park) - \(Self.parkDateFormatter.string(from: date))",
                 description: status,
                 qsos: qsos,
                 date: date,

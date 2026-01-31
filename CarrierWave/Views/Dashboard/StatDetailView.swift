@@ -9,13 +9,19 @@ struct StatDetailView: View {
 
     var body: some View {
         List {
-            ForEach(sortedItems) { item in
+            ForEach(cachedSortedItems) { item in
                 StatItemRow(item: item)
             }
         }
         .listStyle(.plain)
         .navigationTitle(category.title)
         .miniTour(.statsDrilldown, tourState: tourState)
+        .task {
+            updateSortedItems()
+        }
+        .onChange(of: sortMode) { _, _ in
+            updateSortedItems()
+        }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
@@ -69,21 +75,22 @@ struct StatDetailView: View {
     }
 
     @State private var sortMode: SortMode = .date
+    @State private var cachedSortedItems: [StatCategoryItem] = []
 
-    private var sortedItems: [StatCategoryItem] {
+    private func updateSortedItems() {
         switch sortMode {
         case .date:
             // Sort by date descending; fall back to count if no date
-            items.sorted { lhs, rhs in
+            cachedSortedItems = items.sorted { lhs, rhs in
                 if let lhsDate = lhs.date, let rhsDate = rhs.date {
                     return lhsDate > rhsDate
                 }
                 return lhs.count > rhs.count
             }
         case .count:
-            items.sorted { $0.count > $1.count }
+            cachedSortedItems = items.sorted { $0.count > $1.count }
         case .alphabetical:
-            items.sorted {
+            cachedSortedItems = items.sorted {
                 $0.identifier.localizedCaseInsensitiveCompare($1.identifier) == .orderedAscending
             }
         }

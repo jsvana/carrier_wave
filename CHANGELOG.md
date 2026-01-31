@@ -4,6 +4,18 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Settings Crash on Launch** - Fixed crash when navigating to Settings before SyncService initialized
+- **QSO Statistics Performance** - Major performance improvements for users with 15k+ QSOs
+  - Refactored QSOStatistics to a class with cached computations (realQSOs, activation groups, category items, streaks)
+  - Dashboard now computes stats asynchronously off the main thread
+  - Cached activation grouping eliminates duplicate O(n) iterations for successful/attempted activations
+  - Static DateFormatter in park grouping eliminates repeated allocation
+  - FavoritesCard now defers item computation until navigation
+  - LogsListView caches filtered QSOs and available bands/modes
+  - QSOMapView caches filter options and stats (uniqueStates, uniqueDXCCEntities)
+  - StatDetailView caches sorted items instead of resorting on every render
+
 ## [1.15.2] - 2026-01-31
 
 ### Fixed

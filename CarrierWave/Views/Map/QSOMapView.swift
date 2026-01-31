@@ -108,9 +108,13 @@ struct QSOMapView: View {
             .presentationDetents([.medium, .large])
         }
         .task {
+            updateCachedFilterOptions()
             updateCachedMapData()
         }
-        .onChange(of: allQSOs.count) { _, _ in
+        .onChange(of: allQSOs.count) { _, newCount in
+            if newCount != lastQSOCount {
+                updateCachedFilterOptions()
+            }
             updateCachedMapData()
         }
         .onChange(of: filterState.selectedBand) { _, _ in
@@ -161,7 +165,13 @@ struct QSOMapView: View {
     // Cached computed values to avoid expensive recalculation on every render
     @State private var cachedAnnotations: [QSOAnnotation] = []
     @State private var cachedArcs: [QSOArc] = []
-    @State private var lastCacheKey: String = ""
+    @State private var cachedUniqueStates: Int = 0
+    @State private var cachedUniqueDXCCEntities: Int = 0
+    @State private var cachedAvailableBands: [String] = []
+    @State private var cachedAvailableModes: [String] = []
+    @State private var cachedAvailableParks: [String] = []
+    @State private var cachedEarliestQSODate: Date?
+    @State private var lastQSOCount: Int = 0
 
     private var filteredQSOs: [QSO] {
         allQSOs.filter { qso in
@@ -296,34 +306,30 @@ struct QSOMapView: View {
     }
 
     private var availableBands: [String] {
-        Array(Set(allQSOs.map(\.band))).sorted { band1, band2 in
-            bandSortOrder(band1) < bandSortOrder(band2)
-        }
+        cachedAvailableBands
     }
 
     private var availableModes: [String] {
-        Array(Set(allQSOs.map(\.mode)))
-            .filter { !Self.metadataModes.contains($0.uppercased()) }
-            .sorted()
+        cachedAvailableModes
     }
 
     /// Earliest QSO date for date picker defaults
     private var earliestQSODate: Date? {
-        allQSOs.map(\.timestamp).min()
+        cachedEarliestQSODate
     }
 
     private var availableParks: [String] {
-        Array(Set(allQSOs.compactMap(\.parkReference))).sorted()
+        cachedAvailableParks
     }
 
     /// Unique US states from filtered QSOs
     private var uniqueStates: Int {
-        Set(filteredQSOs.compactMap(\.state).filter { !$0.isEmpty }).count
+        cachedUniqueStates
     }
 
     /// Unique DXCC entities from filtered QSOs
     private var uniqueDXCCEntities: Int {
-        Set(filteredQSOs.compactMap { $0.dxccEntity?.number }).count
+        cachedUniqueDXCCEntities
     }
 
     private func bandSortOrder(_ band: String) -> Int {
@@ -338,5 +344,23 @@ struct QSOMapView: View {
     private func updateCachedMapData() {
         cachedAnnotations = annotations
         cachedArcs = arcs
+
+        // Update stats that depend on filtered QSOs
+        let filtered = filteredQSOs
+        cachedUniqueStates = Set(filtered.compactMap(\.state).filter { !$0.isEmpty }).count
+        cachedUniqueDXCCEntities = Set(filtered.compactMap { $0.dxccEntity?.number }).count
+    }
+
+    /// Update cached filter options when QSO data changes
+    private func updateCachedFilterOptions() {
+        cachedAvailableBands = Array(Set(allQSOs.map(\.band))).sorted { band1, band2 in
+            bandSortOrder(band1) < bandSortOrder(band2)
+        }
+        cachedAvailableModes = Array(Set(allQSOs.map(\.mode)))
+            .filter { !Self.metadataModes.contains($0.uppercased()) }
+            .sorted()
+        cachedAvailableParks = Array(Set(allQSOs.compactMap(\.parkReference))).sorted()
+        cachedEarliestQSODate = allQSOs.map(\.timestamp).min()
+        lastQSOCount = allQSOs.count
     }
 }

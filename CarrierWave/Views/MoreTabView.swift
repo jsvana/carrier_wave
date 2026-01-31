@@ -63,12 +63,10 @@ struct MoreTabView: View {
             )
             .environmentObject(syncService)
         } else {
-            SettingsMainView(
-                potaAuth: potaAuthService,
-                destination: $settingsDestination,
-                tourState: tourState,
-                isInNavigationContext: true
-            )
+            // SyncService not yet available - show loading state to prevent
+            // crashes in child views that expect @EnvironmentObject<SyncService>
+            ProgressView("Loading...")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
 

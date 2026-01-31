@@ -289,39 +289,39 @@ struct FavoritesCard: View {
                 .font(.headline)
 
             VStack(spacing: 0) {
-                // Top Frequency
+                // Top Frequency - items computed lazily on navigation
                 FavoriteRow(
                     title: "Top Frequency",
                     icon: "dial.medium.fill",
                     topItem: stats.topFrequencies(limit: 1).first,
                     category: .frequencies,
-                    allItems: stats.items(for: .frequencies),
+                    stats: stats,
                     tourState: tourState
                 )
 
                 Divider()
                     .padding(.leading, 44)
 
-                // Best Friend
+                // Best Friend - items computed lazily on navigation
                 FavoriteRow(
                     title: "Best Friend",
                     icon: "person.2.fill",
                     topItem: stats.topFriends(limit: 1).first,
                     category: .bestFriends,
-                    allItems: stats.items(for: .bestFriends),
+                    stats: stats,
                     tourState: tourState
                 )
 
                 Divider()
                     .padding(.leading, 44)
 
-                // Best Hunter
+                // Best Hunter - items computed lazily on navigation
                 FavoriteRow(
                     title: "Best Hunter",
                     icon: "scope",
                     topItem: stats.topHunters(limit: 1).first,
                     category: .bestHunters,
-                    allItems: stats.items(for: .bestHunters),
+                    stats: stats,
                     tourState: tourState
                 )
             }
@@ -339,12 +339,15 @@ private struct FavoriteRow: View {
     let icon: String
     let topItem: StatCategoryItem?
     let category: StatCategoryType
-    let allItems: [StatCategoryItem]
+    let stats: QSOStatistics
     let tourState: TourState
 
     var body: some View {
         NavigationLink {
-            StatDetailView(category: category, items: allItems, tourState: tourState)
+            // Items computed lazily when navigation occurs (already cached in stats)
+            StatDetailView(
+                category: category, items: stats.items(for: category), tourState: tourState
+            )
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: icon)

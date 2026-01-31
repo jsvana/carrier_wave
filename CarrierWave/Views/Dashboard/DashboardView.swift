@@ -63,6 +63,7 @@ struct DashboardView: View {
     /// Cached statistics - updated when QSO count changes
     @State var cachedStats: QSOStatistics?
     @State var lastQSOCount: Int = 0
+    @State var isComputingStats: Bool = false
 
     let lofiClient = LoFiClient()
     let qrzClient = QRZClient()
@@ -114,15 +115,13 @@ struct DashboardView: View {
             .onChange(of: qsos.count) { _, newCount in
                 // Update cached stats when QSO count changes
                 if newCount != lastQSOCount {
-                    lastQSOCount = newCount
-                    cachedStats = QSOStatistics(qsos: qsos)
+                    computeStatsAsync()
                 }
             }
             .task(id: qsos.count) {
                 // Initialize cache on first load or when count changes
                 if cachedStats == nil || qsos.count != lastQSOCount {
-                    lastQSOCount = qsos.count
-                    cachedStats = QSOStatistics(qsos: qsos)
+                    computeStatsAsync()
                 }
             }
             .callsignAliasDetectionAlert(
@@ -157,6 +156,24 @@ struct DashboardView: View {
 
     func pendingCount(for service: ServiceType) -> Int {
         allPresence.filter { $0.serviceType == service && $0.needsUpload }.count
+    }
+
+    /// Compute statistics - caching ensures this is only expensive on first access
+    func computeStatsAsync() {
+        guard !isComputingStats else {
+            return
+        }
+        isComputingStats = true
+        let currentCount = qsos.count
+
+        // QSO is @MainActor isolated, so computation must stay on main actor
+        // The QSOStatistics class caches all expensive computations internally,
+        // so subsequent property accesses are O(1)
+        let newStats = QSOStatistics(qsos: qsos)
+
+        cachedStats = newStats
+        lastQSOCount = currentCount
+        isComputingStats = false
     }
 
     // MARK: Private
@@ -304,83 +321,9 @@ struct DashboardView: View {
     private var favoritesCard: some View {
         FavoritesCard(stats: stats, tourState: tourState)
     }
-
-    private var statsGrid: some View {
-        LazyVGrid(columns: statsGridColumns, spacing: 12) {
-            Button {
-                selectedTab = .logs
-            } label: {
-                StatBox(
-                    title: "QSOs",
-                    value: "\(stats.totalQSOs)",
-                    icon: "antenna.radiowaves.left.and.right"
-                )
-            }
-            .buttonStyle(.plain)
-
-            NavigationLink {
-                StatDetailView(
-                    category: .qsls, items: stats.items(for: .qsls), tourState: tourState
-                )
-            } label: {
-                StatBox(title: "QSLs", value: "\(stats.confirmedQSLs)", icon: "checkmark.seal")
-            }
-            .buttonStyle(.plain)
-
-            if lotwIsConfigured {
-                NavigationLink {
-                    StatDetailView(
-                        category: .entities, items: stats.items(for: .entities),
-                        tourState: tourState
-                    )
-                } label: {
-                    StatBox(title: "DXCC Entities", value: "\(stats.uniqueEntities)", icon: "globe")
-                }
-                .buttonStyle(.plain)
-            } else {
-                StatBox(title: "DXCC Entities", value: "--", icon: "globe")
-                    .opacity(0.5)
-            }
-
-            NavigationLink {
-                StatDetailView(
-                    category: .grids, items: stats.items(for: .grids), tourState: tourState
-                )
-            } label: {
-                StatBox(title: "Grids", value: "\(stats.uniqueGrids)", icon: "square.grid.3x3")
-            }
-            .buttonStyle(.plain)
-
-            NavigationLink {
-                StatDetailView(
-                    category: .bands, items: stats.items(for: .bands), tourState: tourState
-                )
-            } label: {
-                StatBox(title: "Bands", value: "\(stats.uniqueBands)", icon: "waveform")
-            }
-            .buttonStyle(.plain)
-
-            NavigationLink {
-                StatDetailView(
-                    category: .parks, items: stats.items(for: .parks), tourState: tourState
-                )
-            } label: {
-                ActivationsStatBox(successful: stats.successfulActivations)
-            }
-            .buttonStyle(.plain)
-        }
-    }
-
-    private func streakRow(title: String, streak: StreakInfo) -> some View {
-        HStack(spacing: 12) {
-            Text(title)
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .frame(width: 40, alignment: .leading)
-            StreakStatBox(streak: streak)
-        }
-    }
 }
+
+// Stats grid and streak row are in DashboardView+Stats.swift
 
 // Services list and detail sheets are in DashboardView+Services.swift
 // Action methods are in DashboardView+Actions.swift

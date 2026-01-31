@@ -5,54 +5,71 @@ import Foundation
 extension QSOStatistics {
     /// Daily QSO streak (UTC dates for consistency with POTA)
     var dailyStreak: StreakInfo {
-        let activeDates = Set(qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
-            .map(\.utcDateOnly))
+        if let cached = cachedDailyStreak {
+            return cached
+        }
+        let activeDates = Set(cachedRealQSOs.map(\.utcDateOnly))
         let result = StreakCalculator.calculateStreak(from: activeDates, useUTC: true)
-        return makeStreakInfo(id: "daily", category: .daily, result: result)
+        let info = makeStreakInfo(id: "daily", category: .daily, result: result)
+        cachedDailyStreak = info
+        return info
     }
 
     /// POTA activation streak (UTC dates, 10+ QSOs per activation)
     var potaActivationStreak: StreakInfo {
-        let parksOnly = qsos.filter {
-            !Self.metadataModes.contains($0.mode.uppercased()) &&
-                $0.parkReference != nil && !$0.parkReference!.isEmpty
+        if let cached = cachedPotaActivationStreak {
+            return cached
         }
-        let grouped = Dictionary(grouping: parksOnly) { qso in
-            "\(qso.parkReference!)|\(qso.utcDateOnly.timeIntervalSince1970)"
-        }
-        let validDates = Set(grouped.compactMap { _, qsos -> Date? in
-            guard qsos.count >= 10, let first = qsos.first else {
-                return nil
+        // Reuse cached activation groups from main class
+        let validDates = Set(
+            cachedActivationGroups.compactMap { _, qsos -> Date? in
+                guard qsos.count >= 10, let first = qsos.first else {
+                    return nil
+                }
+                return first.utcDateOnly
             }
-            return first.utcDateOnly
-        })
+        )
         let result = StreakCalculator.calculateStreak(from: validDates, useUTC: true)
-        return makeStreakInfo(id: "pota", category: .pota, result: result)
+        let info = makeStreakInfo(id: "pota", category: .pota, result: result)
+        cachedPotaActivationStreak = info
+        return info
     }
 
     /// All mode streaks sorted by current streak length (UTC dates)
     var modeStreaks: [StreakInfo] {
-        let realQSOs = qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
+        if let cached = cachedModeStreaks {
+            return cached
+        }
+        let realQSOs = cachedRealQSOs
         let modes = Set(realQSOs.map { $0.mode.uppercased() })
-        return modes.map { mode in
+        let result = modes.map { mode in
             let dates = Set(realQSOs.filter { $0.mode.uppercased() == mode }.map(\.utcDateOnly))
             let result = StreakCalculator.calculateStreak(from: dates, useUTC: true)
-            return makeStreakInfo(id: "mode-\(mode)", category: .mode, subcategory: mode, result: result)
+            return makeStreakInfo(
+                id: "mode-\(mode)", category: .mode, subcategory: mode, result: result
+            )
         }.sorted { $0.currentStreak > $1.currentStreak }
+        cachedModeStreaks = result
+        return result
     }
 
     /// All band streaks sorted by current streak length (UTC dates)
     var bandStreaks: [StreakInfo] {
-        let realQSOs = qsos.filter { !Self.metadataModes.contains($0.mode.uppercased()) }
+        if let cached = cachedBandStreaks {
+            return cached
+        }
+        let realQSOs = cachedRealQSOs
         let bands = Set(realQSOs.map { $0.band.lowercased() })
-        return bands.map { band in
+        let result = bands.map { band in
             let dates = Set(realQSOs.filter { $0.band.lowercased() == band }.map(\.utcDateOnly))
             let result = StreakCalculator.calculateStreak(from: dates, useUTC: true)
-            return makeStreakInfo(id: "band-\(band)", category: .band, subcategory: band, result: result)
+            return makeStreakInfo(
+                id: "band-\(band)", category: .band, subcategory: band, result: result
+            )
         }.sorted { $0.currentStreak > $1.currentStreak }
+        cachedBandStreaks = result
+        return result
     }
-
-    private static let metadataModes: Set<String> = ["WEATHER", "SOLAR", "NOTE"]
 
     private func makeStreakInfo(
         id: String, category: StreakCategory, subcategory: String? = nil, result: StreakResult
