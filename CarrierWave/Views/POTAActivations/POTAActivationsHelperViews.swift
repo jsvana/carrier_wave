@@ -12,6 +12,7 @@ struct ActivationRow: View {
 
     let activation: POTAActivation
     var isUploadDisabled: Bool = false
+    var showUploadButton: Bool = true
     let onUploadTapped: () -> Void
     let onRejectTapped: () -> Void
     var showParkReference: Bool = false
@@ -47,7 +48,7 @@ struct ActivationRow: View {
 
                 Spacer()
 
-                if activation.hasQSOsToUpload {
+                if activation.hasQSOsToUpload, showUploadButton {
                     Button("Upload") {
                         onUploadTapped()
                     }

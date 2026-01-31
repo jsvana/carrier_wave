@@ -192,12 +192,13 @@ struct POTAActivationsContentView: View {
             }
 
             // Ready to Upload section - pending activations sorted by date
-            if !pendingActivations.isEmpty {
+            if !pendingActivations.isEmpty, isAuthenticated {
                 Section {
                     ForEach(pendingActivations) { activation in
                         ActivationRow(
                             activation: activation,
                             isUploadDisabled: isInMaintenance || potaClient == nil,
+                            showUploadButton: isAuthenticated,
                             onUploadTapped: { activationToUpload = activation },
                             onRejectTapped: { activationToReject = activation },
                             showParkReference: true
@@ -215,6 +216,7 @@ struct POTAActivationsContentView: View {
                         ActivationRow(
                             activation: activation,
                             isUploadDisabled: isInMaintenance || potaClient == nil,
+                            showUploadButton: isAuthenticated,
                             onUploadTapped: { activationToUpload = activation },
                             onRejectTapped: { activationToReject = activation }
                         )
