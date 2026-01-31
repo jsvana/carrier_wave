@@ -118,6 +118,9 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `RBNClient.swift` | Vail ReRBN API client for reverse beacon network spots |
 | `NOAAClient.swift` | NOAA API client for solar conditions and weather |
 | `POTAClient+Spot.swift` | POTA self-spotting extension |
+| `POTAClient+Spots.swift` | POTA spots and spot comments API |
+| `SpotsService.swift` | Combined RBN + POTA spots service |
+| `SpotCommentsService.swift` | Background polling for POTA spot comments |
 | `BandPlanService.swift` | Validates frequency/mode against license class privileges |
 | `FrequencyActivityService.swift` | Aggregates nearby frequency activity from RBN |
 | `HamDBClient.swift` | HamDB.org API client for US callsign license class lookup |
@@ -129,8 +132,9 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `LoggerView.swift` | Main logger view with session header, callsign input, QSO form |
 | `LoggerCallsignCard.swift` | Callsign info display card for logger |
 | `SessionStartSheet.swift` | Session wizard for mode, frequency, activation type |
-| `LoggerSettingsView.swift` | Logger settings (license class, defaults, preferences) |
-| `RBNPanelView.swift` | RBN spots panel with mini-map |
+| `LoggerSettingsView.swift` | (Deprecated) Logger settings moved to main SettingsView |
+| `RBNPanelView.swift` | Combined RBN/POTA spots panel with mini-map |
+| `SpotCommentsSheet.swift` | POTA spot comments display sheet |
 | `SolarPanelView.swift` | Solar conditions panel (K-index, SFI, propagation) |
 | `WeatherPanelView.swift` | Weather conditions panel from NOAA |
 | `FrequencyActivityView.swift` | Nearby frequency activity display with QRM assessment |

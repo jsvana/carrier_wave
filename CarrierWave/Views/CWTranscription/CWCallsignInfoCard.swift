@@ -91,6 +91,15 @@ struct CWCallsignInfoCard: View {
                 .background(Color.orange.opacity(0.2))
                 .foregroundStyle(.orange)
                 .clipShape(RoundedRectangle(cornerRadius: 4))
+
+        case .hamdb:
+            Text("HamDB")
+                .font(.caption2.weight(.medium))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Color.green.opacity(0.2))
+                .foregroundStyle(.green)
+                .clipShape(RoundedRectangle(cornerRadius: 4))
         }
     }
 }

@@ -1,0 +1,141 @@
+// Spot comments polling service
+//
+// Polls POTA for spot comments during an active POTA activation,
+// allowing activators to see hunter feedback in real-time.
+
+import Foundation
+import SwiftUI
+
+// MARK: - SpotCommentsService
+
+/// Service that polls for POTA spot comments during an activation
+@MainActor
+@Observable
+final class SpotCommentsService {
+    // MARK: Lifecycle
+
+    init() {
+        potaClient = POTAClient(authService: POTAAuthService())
+    }
+
+    // MARK: Internal
+
+    /// Current spot comments
+    private(set) var comments: [POTASpotComment] = []
+
+    /// Number of new (unread) comments
+    private(set) var newCommentCount: Int = 0
+
+    /// Whether currently polling
+    private(set) var isPolling: Bool = false
+
+    /// Last error (if any)
+    private(set) var lastError: String?
+
+    /// Start polling for spot comments
+    /// - Parameters:
+    ///   - activator: The activator's callsign
+    ///   - parkRef: The park reference (e.g., "K-1234")
+    func startPolling(activator: String, parkRef: String) {
+        stopPolling()
+
+        self.activator = activator
+        self.parkRef = parkRef
+        isPolling = true
+        lastError = nil
+
+        // Fetch immediately
+        Task {
+            await fetchComments()
+        }
+
+        // Schedule recurring fetches every 60 seconds
+        pollTimer = Timer.scheduledTimer(
+            withTimeInterval: pollInterval,
+            repeats: true
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.fetchComments()
+            }
+        }
+
+        SyncDebugLog.shared.info(
+            "Started spot comments polling for \(activator) at \(parkRef)",
+            service: .pota
+        )
+    }
+
+    /// Stop polling for spot comments
+    func stopPolling() {
+        pollTimer?.invalidate()
+        pollTimer = nil
+        isPolling = false
+        activator = nil
+        parkRef = nil
+
+        SyncDebugLog.shared.info("Stopped spot comments polling", service: .pota)
+    }
+
+    /// Mark all comments as read
+    func markAllRead() {
+        seenSpotIds = Set(comments.map(\.spotId))
+        newCommentCount = 0
+    }
+
+    /// Clear all comments (e.g., when session ends)
+    func clear() {
+        comments = []
+        newCommentCount = 0
+        seenSpotIds = []
+        lastError = nil
+    }
+
+    // MARK: Private
+
+    private let potaClient: POTAClient
+    private var pollTimer: Timer?
+    private var activator: String?
+    private var parkRef: String?
+    private var seenSpotIds: Set<Int64> = []
+
+    /// Poll interval in seconds
+    private let pollInterval: TimeInterval = 60
+
+    private func fetchComments() async {
+        guard let activator, let parkRef else {
+            return
+        }
+
+        do {
+            let fetchedComments = try await potaClient.fetchSpotComments(
+                activator: activator,
+                parkRef: parkRef
+            )
+
+            // Sort by timestamp, most recent first
+            let sorted = fetchedComments.sorted { c1, c2 in
+                (c1.timestamp ?? .distantPast) > (c2.timestamp ?? .distantPast)
+            }
+
+            // Calculate new comments
+            let newIds = Set(sorted.map(\.spotId)).subtracting(seenSpotIds)
+            newCommentCount = newIds.count
+
+            comments = sorted
+            lastError = nil
+
+            if !newIds.isEmpty {
+                SyncDebugLog.shared.info(
+                    "Received \(newIds.count) new spot comments",
+                    service: .pota
+                )
+            }
+        } catch {
+            lastError = error.localizedDescription
+            SyncDebugLog.shared.warning(
+                "Spot comments fetch failed: \(error.localizedDescription)",
+                service: .pota
+            )
+        }
+    }
+}

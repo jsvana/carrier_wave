@@ -1,0 +1,172 @@
+// POTA spots and spot comments API extension
+//
+// Provides functionality to fetch active POTA spots and spot comments
+// for activations.
+
+import Foundation
+
+// MARK: - POTASpot
+
+/// A spot from the POTA spotting system
+struct POTASpot: Decodable, Identifiable, Sendable {
+    let spotId: Int64
+    let activator: String
+    let frequency: String
+    let mode: String
+    let reference: String
+    let parkName: String?
+    let spotTime: String
+    let spotter: String
+    let comments: String?
+    let source: String?
+    let name: String?
+    let locationDesc: String?
+
+    var id: Int64 {
+        spotId
+    }
+
+    /// Parse frequency string to kHz
+    var frequencyKHz: Double? {
+        Double(frequency)
+    }
+
+    /// Parse spot time to Date
+    var timestamp: Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: spotTime) {
+            return date
+        }
+        // Try without fractional seconds
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: spotTime)
+    }
+
+    /// Time ago string
+    var timeAgo: String {
+        guard let timestamp else {
+            return ""
+        }
+        let seconds = Date().timeIntervalSince(timestamp)
+        if seconds < 60 {
+            return "\(Int(seconds))s ago"
+        } else if seconds < 3_600 {
+            return "\(Int(seconds / 60))m ago"
+        } else {
+            return "\(Int(seconds / 3_600))h ago"
+        }
+    }
+}
+
+// MARK: - POTASpotComment
+
+/// A comment on a POTA spot
+struct POTASpotComment: Decodable, Identifiable, Sendable {
+    let spotId: Int64
+    let spotter: String
+    let comments: String?
+    let spotTime: String
+    let source: String?
+
+    var id: Int64 {
+        spotId
+    }
+
+    /// Parse spot time to Date
+    var timestamp: Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = formatter.date(from: spotTime) {
+            return date
+        }
+        formatter.formatOptions = [.withInternetDateTime]
+        return formatter.date(from: spotTime)
+    }
+
+    /// Time ago string
+    var timeAgo: String {
+        guard let timestamp else {
+            return ""
+        }
+        let seconds = Date().timeIntervalSince(timestamp)
+        if seconds < 60 {
+            return "\(Int(seconds))s ago"
+        } else if seconds < 3_600 {
+            return "\(Int(seconds / 60))m ago"
+        } else {
+            return "\(Int(seconds / 3_600))h ago"
+        }
+    }
+}
+
+// MARK: - POTAClient Spots Extension
+
+extension POTAClient {
+    /// Fetch all currently active POTA spots (no auth required)
+    func fetchActiveSpots() async throws -> [POTASpot] {
+        guard let url = URL(string: "\(baseURL)/spot/activator") else {
+            throw POTAError.fetchFailed("Invalid URL")
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw POTAError.fetchFailed("Invalid response")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw POTAError.fetchFailed("HTTP \(httpResponse.statusCode): \(body)")
+        }
+
+        return try JSONDecoder().decode([POTASpot].self, from: data)
+    }
+
+    /// Fetch spots for a specific callsign from active spots
+    func fetchSpots(for callsign: String) async throws -> [POTASpot] {
+        let allSpots = try await fetchActiveSpots()
+        let upper = callsign.uppercased()
+        return allSpots.filter { $0.activator.uppercased() == upper }
+    }
+
+    /// Fetch spot comments for an activation (no auth required)
+    /// - Parameters:
+    ///   - activator: The activator's callsign
+    ///   - parkRef: The park reference (e.g., "K-1234")
+    func fetchSpotComments(activator: String, parkRef: String) async throws -> [POTASpotComment] {
+        let encodedActivator =
+            activator.addingPercentEncoding(
+                withAllowedCharacters: .urlPathAllowed
+            ) ?? activator
+        let encodedPark =
+            parkRef.addingPercentEncoding(
+                withAllowedCharacters: .urlPathAllowed
+            ) ?? parkRef
+
+        guard
+            let url = URL(
+                string: "\(baseURL)/spot/comments/\(encodedActivator)/\(encodedPark)"
+            )
+        else {
+            throw POTAError.fetchFailed("Invalid URL")
+        }
+
+        let (data, response) = try await URLSession.shared.data(from: url)
+
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw POTAError.fetchFailed("Invalid response")
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            // 404 likely means no comments yet, return empty array
+            if httpResponse.statusCode == 404 {
+                return []
+            }
+            let body = String(data: data, encoding: .utf8) ?? ""
+            throw POTAError.fetchFailed("HTTP \(httpResponse.statusCode): \(body)")
+        }
+
+        return try JSONDecoder().decode([POTASpotComment].self, from: data)
+    }
+}

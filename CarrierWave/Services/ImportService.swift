@@ -195,8 +195,10 @@ class ImportService: ObservableObject {
         let timestamp: Date =
             if let startMillis = operation.startAtMillisMin {
                 Date(timeIntervalSince1970: Double(startMillis) / 1_000.0)
+            } else if let qsoTimestamp = lofiQso.timestamp {
+                qsoTimestamp
             } else {
-                lofiQso.timestamp
+                Date() // Fallback to now if no timestamp available
             }
 
         var calendar = Calendar.current
@@ -236,10 +238,11 @@ class ImportService: ObservableObject {
 
         let myCallsign = lofiQso.ourCall ?? operation.stationCall
         let parkRef = lofiQso.myPotaRef(from: operation.refs)
+        let qsoTimestamp = lofiQso.timestamp ?? Date()
 
         return QSO(
             callsign: callsign, band: band, mode: mode, frequency: lofiQso.freqMHz,
-            timestamp: lofiQso.timestamp, rstSent: lofiQso.rstSent, rstReceived: lofiQso.rstRcvd,
+            timestamp: qsoTimestamp, rstSent: lofiQso.rstSent, rstReceived: lofiQso.rstRcvd,
             myCallsign: myCallsign, myGrid: operation.grid, theirGrid: lofiQso.theirGrid,
             parkReference: parkRef, notes: lofiQso.notes, importSource: .lofi
         )

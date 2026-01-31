@@ -4,7 +4,27 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **iPad Settings Navigation** - Changing sidebar tab now properly exits Settings submenus
+
 ### Added
+- **Editable Session Title** - Tap the session title to customize it
+  - Custom title persists across app restarts
+  - Clear custom title to revert to default (callsign + activation type)
+- **Navigate to Logs on Session End** - Automatically switch to Logs tab when ending a session with QSOs
+- **RBN/POTA Spot Lookup** - View combined spots from RBN and POTA
+  - `RBN` command shows your spots from both RBN and POTA
+  - `RBN <callsign>` command to look up any callsign's spots
+  - Unified spot display with source badges (RBN/POTA)
+  - Mini-map view for RBN spotter locations
+- **POTA Spot Comments** - Real-time hunter feedback during activations
+  - Background polling for spot comments during active POTA sessions
+  - Spot comments button in session header with new comment count badge
+  - Comments sheet to view all hunter feedback
+- **POTA Auto-Spotting** - Automatic self-spotting during POTA activations
+  - Toggle in Logger Settings to enable auto-spotting every 10 minutes
+  - Automatically posts initial spot when starting a POTA session
+  - Timer pauses when session is paused and resumes with the session
 - **User Onboarding Flow** - Profile setup after intro tour
   - Enter callsign and automatically fetch profile from HamDB.org
   - Displays name, QTH, grid square, license class, and expiration date
@@ -21,10 +41,24 @@ All notable changes to Carrier Wave will be documented in this file.
   - Supports Extra, General, Technician, Advanced (mapped to Extra), and Novice (mapped to Technician)
 - LoFi sync test script (`scripts/lofi-sync-test.swift`) for local testing
 
+### Changed
+- Onboarding profile setup now skipped if callsign is already configured
+- Add "Later" button to onboarding flow to defer profile setup
+
 ### Fixed
+- Fix crash on iOS 26 when checking for existing profile during onboarding (actor isolation violation)
 - LoFi sync pagination now fetches all operations (was stopping after first page of 50)
   - Server returns `next_updated_at_millis` when using `synced_since_millis` pagination
 - LoFi QSOs with missing `startAtMillis` field no longer crash sync (field is now optional)
+- **Logger Field Testing Fixes** - Multiple improvements from POTA activation feedback
+  - Screen timeout prevention during active logging sessions (new "Keep screen on" setting, enabled by default)
+  - Quick Log Mode setting to disable animations for faster pileup logging
+  - UTC time display consistency - QSO list now shows UTC times with "Z" suffix
+  - QRZ callsign lookup now works - implemented QRZ XML callbook API integration
+  - Compact callsign info bar appears above keyboard when typing
+  - SPOT command now accepts comments (e.g., `SPOT QRT`, `SPOT QSY 14.062`)
+  - Map now shows activation QSOs - grid from callsign lookup is saved to QSO
+  - State, country, and QTH from callsign lookup are now saved to logged QSOs
 
 ## [1.13.1] - 2026-01-29
 

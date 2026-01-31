@@ -11,6 +11,8 @@ struct LoggerSettingsView: View {
             licenseSection
             defaultsSection
             displaySection
+            behaviorSection
+            potaSection
         }
         .navigationTitle("Logger Settings")
         .navigationBarTitleDisplayMode(.inline)
@@ -30,6 +32,9 @@ struct LoggerSettingsView: View {
     @AppStorage("loggerSkipWizard") private var skipWizard = false
     @AppStorage("loggerShowActivityPanel") private var showActivityPanel = true
     @AppStorage("loggerShowLicenseWarnings") private var showLicenseWarnings = true
+    @AppStorage("loggerKeepScreenOn") private var keepScreenOn = true
+    @AppStorage("loggerQuickLogMode") private var quickLogMode = false
+    @AppStorage("potaAutoSpotEnabled") private var potaAutoSpotEnabled = false
 
     @State private var isLookingUp = false
     @State private var showLookupResult = false
@@ -116,6 +121,33 @@ struct LoggerSettingsView: View {
         }
     }
 
+    private var behaviorSection: some View {
+        Section {
+            Toggle("Keep screen on", isOn: $keepScreenOn)
+            Toggle("Quick Log Mode", isOn: $quickLogMode)
+        } header: {
+            Text("Behavior")
+        } footer: {
+            Text(
+                "Keep screen on prevents device sleep during active sessions. "
+                    + "Quick Log Mode disables animations for faster QSO entry during pileups."
+            )
+        }
+    }
+
+    private var potaSection: some View {
+        Section {
+            Toggle("Auto-spot every 10 minutes", isOn: $potaAutoSpotEnabled)
+        } header: {
+            Text("POTA Activations")
+        } footer: {
+            Text(
+                "When enabled, automatically posts a spot to POTA every 10 minutes "
+                    + "during active POTA sessions."
+            )
+        }
+    }
+
     private func lookupLicenseClass() {
         guard !defaultCallsign.isEmpty else {
             return
@@ -135,7 +167,8 @@ struct LoggerSettingsView: View {
                     }
                 } else {
                     await MainActor.run {
-                        lookupResultMessage = "Callsign \(defaultCallsign.uppercased()) not found in HamDB"
+                        lookupResultMessage =
+                            "Callsign \(defaultCallsign.uppercased()) not found in HamDB"
                         showLookupResult = true
                         isLookingUp = false
                     }

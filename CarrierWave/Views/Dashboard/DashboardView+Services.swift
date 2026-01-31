@@ -189,7 +189,7 @@ extension DashboardView {
             onConfigure: {
                 selectedService = nil
                 settingsDestination = .lofi
-                selectedTab = .settings
+                selectedTab = .more
             }
         )
     }
@@ -216,7 +216,7 @@ extension DashboardView {
             onConfigure: {
                 selectedService = nil
                 settingsDestination = .qrz
-                selectedTab = .settings
+                selectedTab = .more
             }
         )
     }
@@ -246,7 +246,7 @@ extension DashboardView {
             onConfigure: {
                 selectedService = nil
                 settingsDestination = .pota
-                selectedTab = .settings
+                selectedTab = .more
             }
         )
     }
@@ -273,7 +273,7 @@ extension DashboardView {
             onConfigure: {
                 selectedService = nil
                 settingsDestination = .hamrs
-                selectedTab = .settings
+                selectedTab = .more
             }
         )
     }
@@ -300,7 +300,7 @@ extension DashboardView {
             onConfigure: {
                 selectedService = nil
                 settingsDestination = .lotw
-                selectedTab = .settings
+                selectedTab = .more
             }
         )
     }
@@ -327,7 +327,7 @@ extension DashboardView {
             onConfigure: {
                 selectedService = nil
                 settingsDestination = .icloud
-                selectedTab = .settings
+                selectedTab = .more
             }
         )
     }

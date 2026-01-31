@@ -8,9 +8,7 @@ enum AppTab: Hashable, CaseIterable {
     case logger
     case logs
     case cwDecoder
-    case map
-    case activity
-    case settings
+    case more
 
     // MARK: Internal
 
@@ -20,9 +18,7 @@ enum AppTab: Hashable, CaseIterable {
         case .logger: "Logger"
         case .logs: "Logs"
         case .cwDecoder: "CW"
-        case .map: "Map"
-        case .activity: "Activity"
-        case .settings: "Settings"
+        case .more: "More"
         }
     }
 
@@ -32,9 +28,7 @@ enum AppTab: Hashable, CaseIterable {
         case .logger: "pencil.and.list.clipboard"
         case .logs: "list.bullet"
         case .cwDecoder: "waveform"
-        case .map: "map"
-        case .activity: "person.2"
-        case .settings: "gear"
+        case .more: "ellipsis"
         }
     }
 }
@@ -99,8 +93,8 @@ struct ContentView: View {
             else {
                 return
             }
-            // Navigate to activity tab
-            selectedTab = .activity
+            // Navigate to More tab (Activity is now within More)
+            selectedTab = .more
         }
         .fullScreenCover(isPresented: $showIntroTour) {
             IntroTourView(tourState: tourState)
@@ -114,6 +108,10 @@ struct ContentView: View {
                 showOnboarding = true
             }
         }
+        .onChange(of: selectedTab) { _, _ in
+            // Reset navigation paths when switching tabs to avoid stale submenu state
+            moreTabNavigationPath = NavigationPath()
+        }
     }
 
     // MARK: Private
@@ -121,31 +119,34 @@ struct ContentView: View {
     @Environment(\.modelContext) private var modelContext
     @StateObject private var iCloudMonitor = ICloudMonitor()
     @StateObject private var potaAuthService = POTAAuthService()
-    @State private var selectedTab: AppTab = .dashboard
+    @State private var selectedTab: AppTab? = .dashboard
     @State private var settingsDestination: SettingsDestination?
     @State private var syncService: SyncService?
     @State private var potaClient: POTAClient?
     @State private var showIntroTour = false
     @State private var showOnboarding = false
+    @State private var moreTabNavigationPath = NavigationPath()
 
     private let lofiClient = LoFiClient()
     private let qrzClient = QRZClient()
     private let hamrsClient = HAMRSClient()
     private let lotwClient = LoTWClient()
 
+    // MARK: - iPhone Navigation (TabView)
+
+    private var selectedTabBinding: Binding<AppTab> {
+        Binding(
+            get: { selectedTab ?? .dashboard },
+            set: { selectedTab = $0 }
+        )
+    }
+
     // MARK: - iPad Navigation (Sidebar)
 
     private var iPadNavigation: some View {
         NavigationSplitView {
-            List {
-                ForEach(AppTab.allCases, id: \.self) { tab in
-                    Button {
-                        selectedTab = tab
-                    } label: {
-                        Label(tab.title, systemImage: tab.icon)
-                    }
-                    .listRowBackground(selectedTab == tab ? Color.accentColor.opacity(0.2) : nil)
-                }
+            List(AppTab.allCases, id: \.self, selection: $selectedTab) { tab in
+                Label(tab.title, systemImage: tab.icon)
             }
             .navigationTitle("Carrier Wave")
         } detail: {
@@ -153,10 +154,8 @@ struct ContentView: View {
         }
     }
 
-    // MARK: - iPhone Navigation (TabView)
-
     private var iPhoneNavigation: some View {
-        TabView(selection: $selectedTab) {
+        TabView(selection: selectedTabBinding) {
             ForEach(AppTab.allCases, id: \.self) { tab in
                 selectedTabContent(for: tab)
                     .tabItem {
@@ -169,25 +168,13 @@ struct ContentView: View {
 
     // MARK: - Tab Content
 
-    private var selectedTabContent: some View {
-        selectedTabContent(for: selectedTab)
-    }
-
     @ViewBuilder
-    private var settingsTabContent: some View {
-        if let syncService {
-            SettingsMainView(
-                potaAuth: potaAuthService,
-                destination: $settingsDestination,
-                tourState: tourState
-            )
-            .environmentObject(syncService)
+    private var selectedTabContent: some View {
+        if let tab = selectedTab {
+            selectedTabContent(for: tab)
         } else {
-            SettingsMainView(
-                potaAuth: potaAuthService,
-                destination: $settingsDestination,
-                tourState: tourState
-            )
+            Text("Select a tab")
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -209,7 +196,9 @@ struct ContentView: View {
             }
 
         case .logger:
-            LoggerView()
+            LoggerView(onSessionEnd: {
+                selectedTab = .logs
+            })
 
         case .logs:
             LogsContainerView(
@@ -230,16 +219,14 @@ struct ContentView: View {
                 }
             )
 
-        case .map:
-            NavigationStack {
-                QSOMapView()
-            }
-
-        case .activity:
-            ActivityView(tourState: tourState)
-
-        case .settings:
-            settingsTabContent
+        case .more:
+            MoreTabView(
+                potaAuthService: potaAuthService,
+                settingsDestination: $settingsDestination,
+                navigationPath: $moreTabNavigationPath,
+                tourState: tourState,
+                syncService: syncService
+            )
         }
     }
 }

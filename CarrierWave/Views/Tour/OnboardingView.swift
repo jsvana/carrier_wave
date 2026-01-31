@@ -101,7 +101,7 @@ struct OnboardingView: View {
         VStack(spacing: 20) {
             Image(systemName: "antenna.radiowaves.left.and.right")
                 .font(.system(size: 60))
-                .foregroundStyle(.accent)
+                .foregroundStyle(Color.accentColor)
 
             Text("Let's set up your profile")
                 .font(.title2)
@@ -187,7 +187,7 @@ struct OnboardingView: View {
         VStack(spacing: 20) {
             Image(systemName: "link.circle")
                 .font(.system(size: 60))
-                .foregroundStyle(.accent)
+                .foregroundStyle(Color.accentColor)
 
             Text("Connect your logging services")
                 .font(.title2)
@@ -311,7 +311,12 @@ struct OnboardingView: View {
 
     private var navigationButtons: some View {
         HStack {
-            if currentStep != .callsign {
+            if currentStep == .callsign {
+                Button("Later") {
+                    dismiss()
+                }
+                .foregroundStyle(.secondary)
+            } else if currentStep != .complete {
                 Button("Back") {
                     withAnimation {
                         if let previous = OnboardingStep(rawValue: currentStep.rawValue - 1) {
@@ -420,7 +425,7 @@ struct OnboardingView: View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
                 Image(systemName: icon)
-                    .foregroundStyle(.accent)
+                    .foregroundStyle(Color.accentColor)
                 Text(name)
                     .fontWeight(.medium)
                 Spacer()
@@ -519,7 +524,7 @@ struct OnboardingView: View {
             }
 
             await MainActor.run {
-                connectedServices.insert("qrz")
+                _ = connectedServices.insert("qrz")
             }
         } catch {
             await MainActor.run {
@@ -540,13 +545,13 @@ struct OnboardingView: View {
         do {
             let client = LoTWClient()
             // Use callsign as username for LoTW
-            try await client.validateCredentials(
+            try await client.testCredentials(
                 username: callsign.uppercased(), password: lotwPassword
             )
             try client.saveCredentials(username: callsign.uppercased(), password: lotwPassword)
 
             await MainActor.run {
-                connectedServices.insert("lotw")
+                _ = connectedServices.insert("lotw")
             }
         } catch {
             await MainActor.run {
@@ -571,7 +576,7 @@ struct OnboardingView: View {
             try potaAuth.saveCredentials(username: potaUsername, password: potaPassword)
 
             await MainActor.run {
-                connectedServices.insert("pota")
+                _ = connectedServices.insert("pota")
             }
         } catch {
             await MainActor.run {

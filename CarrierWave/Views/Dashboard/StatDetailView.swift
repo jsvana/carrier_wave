@@ -23,20 +23,35 @@ struct StatDetailView: View {
                         Button {
                             sortMode = .date
                         } label: {
-                            Label("By Date", systemImage: sortMode == .date ? "checkmark" : "")
+                            HStack {
+                                Text("By Date")
+                                if sortMode == .date {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
                         }
                     }
 
                     Button {
                         sortMode = .count
                     } label: {
-                        Label("By Count", systemImage: sortMode == .count ? "checkmark" : "")
+                        HStack {
+                            Text("By Count")
+                            if sortMode == .count {
+                                Image(systemName: "checkmark")
+                            }
+                        }
                     }
 
                     Button {
                         sortMode = .alphabetical
                     } label: {
-                        Label("A-Z", systemImage: sortMode == .alphabetical ? "checkmark" : "")
+                        HStack {
+                            Text("A-Z")
+                            if sortMode == .alphabetical {
+                                Image(systemName: "checkmark")
+                            }
+                        }
                     }
                 } label: {
                     Image(systemName: "arrow.up.arrow.down")

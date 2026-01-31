@@ -15,7 +15,7 @@ struct DashboardView: View {
     @ObservedObject var iCloudMonitor: ICloudMonitor
     @ObservedObject var potaAuth: POTAAuthService
     @ObservedObject var syncService: SyncService
-    @Binding var selectedTab: AppTab
+    @Binding var selectedTab: AppTab?
     @Binding var settingsDestination: SettingsDestination?
     let tourState: TourState
 
@@ -107,7 +107,7 @@ struct DashboardView: View {
                 showingAlert: $showingCallsignAliasAlert,
                 onAccept: { await addUnconfiguredCallsignsAsAliases() },
                 onOpenSettings: {
-                    selectedTab = .settings
+                    selectedTab = .more
                     settingsDestination = nil
                 }
             )

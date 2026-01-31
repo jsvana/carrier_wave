@@ -175,7 +175,7 @@ struct IntroTourView: View {
             Button("Skip") {
                 withAnimation { advanceStep() }
             }
-            .foregroundStyle(.secondary)
+            .buttonStyle(.borderedProminent)
         } else {
             Button {
                 Task { await validateAndConnect() }

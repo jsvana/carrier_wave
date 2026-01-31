@@ -2,12 +2,14 @@
 import Foundation
 import SwiftData
 import SwiftUI
+import UIKit
 
 // MARK: - LoggingSessionManager
 
 /// Manages logging session lifecycle and QSO creation
 @MainActor
 @Observable
+// swiftlint:disable:next type_body_length
 final class LoggingSessionManager {
     // MARK: Lifecycle
 
@@ -20,6 +22,9 @@ final class LoggingSessionManager {
 
     /// Currently active session
     private(set) var activeSession: LoggingSession?
+
+    /// Service for polling POTA spot comments
+    let spotCommentsService = SpotCommentsService()
 
     /// Whether there's an active session
     var hasActiveSession: Bool {
@@ -56,6 +61,17 @@ final class LoggingSessionManager {
         activeSession = session
         saveActiveSessionId(session.id)
 
+        // Prevent screen timeout during active session
+        if keepScreenOn {
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
+
+        // Start auto-spot timer for POTA activations
+        startAutoSpotTimer()
+
+        // Start spot comments polling for POTA activations
+        startSpotCommentsPolling()
+
         try? modelContext.save()
     }
 
@@ -69,6 +85,16 @@ final class LoggingSessionManager {
         activeSession = nil
         clearActiveSessionId()
 
+        // Stop auto-spot timer
+        stopAutoSpotTimer()
+
+        // Stop spot comments polling
+        spotCommentsService.stopPolling()
+        spotCommentsService.clear()
+
+        // Re-enable screen timeout
+        UIApplication.shared.isIdleTimerDisabled = false
+
         try? modelContext.save()
     }
 
@@ -78,6 +104,13 @@ final class LoggingSessionManager {
             return
         }
         session.pause()
+
+        // Stop auto-spot timer while paused
+        stopAutoSpotTimer()
+
+        // Pause spot comments polling
+        spotCommentsService.stopPolling()
+
         try? modelContext.save()
     }
 
@@ -87,6 +120,13 @@ final class LoggingSessionManager {
             return
         }
         session.resume()
+
+        // Restart auto-spot timer
+        startAutoSpotTimer()
+
+        // Restart spot comments polling
+        startSpotCommentsPolling()
+
         try? modelContext.save()
     }
 
@@ -95,11 +135,24 @@ final class LoggingSessionManager {
         // End any existing active session
         if let existing = activeSession, existing.id != session.id {
             existing.end()
+            stopAutoSpotTimer()
+            spotCommentsService.stopPolling()
         }
 
         session.resume()
         activeSession = session
         saveActiveSessionId(session.id)
+
+        // Prevent screen timeout during active session
+        if keepScreenOn {
+            UIApplication.shared.isIdleTimerDisabled = true
+        }
+
+        // Restart auto-spot timer
+        startAutoSpotTimer()
+
+        // Restart spot comments polling
+        startSpotCommentsPolling()
 
         try? modelContext.save()
     }
@@ -116,6 +169,12 @@ final class LoggingSessionManager {
         try? modelContext.save()
     }
 
+    /// Update session title
+    func updateTitle(_ title: String?) {
+        activeSession?.customTitle = title
+        try? modelContext.save()
+    }
+
     /// Log a new QSO
     func logQSO(
         callsign: String,
@@ -125,7 +184,10 @@ final class LoggingSessionManager {
         theirParkReference: String? = nil,
         notes: String? = nil,
         name: String? = nil,
-        operatorName: String? = nil
+        operatorName: String? = nil,
+        state: String? = nil,
+        country: String? = nil,
+        qth: String? = nil
     ) -> QSO? {
         guard let session = activeSession else {
             return nil
@@ -154,7 +216,10 @@ final class LoggingSessionManager {
             theirParkReference: theirParkReference,
             notes: combineNotes(notes: notes, operatorName: operatorName),
             importSource: .logger,
-            name: name
+            name: name,
+            qth: qth,
+            state: state,
+            country: country
         )
 
         // Set the logging session ID
@@ -228,6 +293,111 @@ final class LoggingSessionManager {
     /// Key for storing active session ID in UserDefaults
     private let activeSessionIdKey = "activeLoggingSessionId"
 
+    /// Timer for auto-spotting to POTA
+    private var autoSpotTimer: Timer?
+
+    /// Auto-spot interval (10 minutes)
+    private let autoSpotInterval: TimeInterval = 10 * 60
+
+    /// Whether to keep screen on during active session (from settings)
+    private var keepScreenOn: Bool {
+        UserDefaults.standard.bool(forKey: "loggerKeepScreenOn")
+    }
+
+    /// Whether auto-spotting is enabled (from settings)
+    private var potaAutoSpotEnabled: Bool {
+        UserDefaults.standard.bool(forKey: "potaAutoSpotEnabled")
+    }
+
+    /// Start the auto-spot timer for POTA activations
+    private func startAutoSpotTimer() {
+        stopAutoSpotTimer()
+
+        guard potaAutoSpotEnabled,
+              let session = activeSession,
+              session.activationType == .pota
+        else {
+            return
+        }
+
+        // Post an initial spot immediately
+        Task {
+            await postAutoSpot()
+        }
+
+        // Schedule recurring spots every 10 minutes
+        autoSpotTimer = Timer.scheduledTimer(
+            withTimeInterval: autoSpotInterval,
+            repeats: true
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.postAutoSpot()
+            }
+        }
+    }
+
+    /// Stop the auto-spot timer
+    private func stopAutoSpotTimer() {
+        autoSpotTimer?.invalidate()
+        autoSpotTimer = nil
+    }
+
+    /// Start spot comments polling for POTA activations
+    private func startSpotCommentsPolling() {
+        guard let session = activeSession,
+              session.activationType == .pota,
+              let parkRef = session.parkReference
+        else {
+            return
+        }
+
+        let callsign =
+            session.myCallsign ?? UserDefaults.standard.string(
+                forKey: "loggerDefaultCallsign"
+            ) ?? ""
+        guard !callsign.isEmpty else {
+            return
+        }
+
+        spotCommentsService.startPolling(activator: callsign, parkRef: parkRef)
+    }
+
+    /// Post an auto-spot to POTA
+    private func postAutoSpot() async {
+        guard let session = activeSession,
+              session.activationType == .pota,
+              let parkRef = session.parkReference,
+              let freq = session.frequency
+        else {
+            return
+        }
+
+        let callsign =
+            session.myCallsign ?? UserDefaults.standard.string(
+                forKey: "loggerDefaultCallsign"
+            ) ?? ""
+        guard !callsign.isEmpty else {
+            return
+        }
+
+        do {
+            let potaClient = POTAClient(authService: POTAAuthService())
+            _ = try await potaClient.postSpot(
+                callsign: callsign,
+                reference: parkRef,
+                frequency: freq * 1_000, // Convert MHz to kHz
+                mode: session.mode ?? "CW",
+                comments: nil
+            )
+            SyncDebugLog.shared.info("Auto-spot posted for \(parkRef)", service: .pota)
+        } catch {
+            SyncDebugLog.shared.error(
+                "Auto-spot failed: \(error.localizedDescription)",
+                service: .pota
+            )
+        }
+    }
+
     /// Load active session from persisted ID
     private func loadActiveSession() {
         guard let idString = UserDefaults.standard.string(forKey: activeSessionIdKey),
@@ -246,6 +416,14 @@ final class LoggingSessionManager {
             let sessions = try modelContext.fetch(descriptor)
             if let session = sessions.first, session.isActive {
                 activeSession = session
+                // Prevent screen timeout for restored active session
+                if keepScreenOn {
+                    UIApplication.shared.isIdleTimerDisabled = true
+                }
+                // Restart auto-spot timer for restored POTA session
+                startAutoSpotTimer()
+                // Restart spot comments polling for restored POTA session
+                startSpotCommentsPolling()
             } else {
                 // Session was ended or not found, clear the stored ID
                 clearActiveSessionId()

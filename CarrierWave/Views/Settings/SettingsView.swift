@@ -2,8 +2,11 @@ import SwiftData
 import SwiftUI
 import UIKit
 
+// swiftlint:disable file_length
+
 // MARK: - SettingsMainView
 
+// swiftlint:disable:next type_body_length
 struct SettingsMainView: View {
     // MARK: Internal
 
@@ -12,88 +15,16 @@ struct SettingsMainView: View {
 
     let tourState: TourState
 
+    /// When true, the view is already inside a navigation context (e.g., "More" tab)
+    /// and should not add its own NavigationStack
+    var isInNavigationContext: Bool = false
+
     var body: some View {
-        NavigationStack(path: $navigationPath) {
-            List {
-                profileSection
-                SyncSourcesSection(
-                    potaAuth: potaAuth,
-                    lofiClient: lofiClient,
-                    qrzClient: qrzClient,
-                    hamrsClient: hamrsClient,
-                    lotwClient: lotwClient,
-                    iCloudMonitor: iCloudMonitor,
-                    qrzIsConfigured: qrzIsConfigured,
-                    qrzCallsign: qrzCallsign,
-                    lotwIsConfigured: lotwIsConfigured,
-                    lotwUsername: lotwUsername,
-                    challengeSources: challengeSources,
-                    tourState: tourState
-                )
-                deduplicationSection
-                developerSection
-                dataSection
-                aboutSection
-            }
-            .navigationDestination(for: SettingsDestination.self) { dest in
-                switch dest {
-                case .qrz:
-                    QRZSettingsView()
-                case .pota:
-                    POTASettingsView(potaAuth: potaAuth, tourState: tourState)
-                case .lofi:
-                    LoFiSettingsView(tourState: tourState)
-                case .hamrs:
-                    HAMRSSettingsView()
-                case .lotw:
-                    LoTWSettingsView()
-                case .icloud:
-                    ICloudSettingsView()
-                }
-            }
-            .onAppear {
-                loadServiceStatus()
-            }
-            .task(id: destination) {
-                // Handle deep link - task restarts when destination changes
-                guard let dest = destination else {
-                    return
-                }
-                // Small delay to ensure NavigationStack is ready after tab switch
-                try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
-                navigationPath.append(dest)
-                destination = nil
-            }
-            .alert("Error", isPresented: $showingError) {
-                Button("OK") {}
-            } message: {
-                Text(errorMessage)
-            }
-            .alert("Clear All QSOs?", isPresented: $showingClearAllConfirmation) {
-                Button("Cancel", role: .cancel) {}
-                Button("Clear All", role: .destructive) {
-                    Task { await clearAllQSOs() }
-                }
-            } message: {
-                Text(
-                    "This will permanently delete all QSOs from this device. This cannot be undone."
-                )
-            }
-            .alert("Deduplication Complete", isPresented: $showingDedupeResult) {
-                Button("OK") {}
-            } message: {
-                Text(dedupeResultMessage)
-            }
-            .sheet(
-                item: $exportedFile,
-                onDismiss: { isExportingDatabase = false },
-                content: { file in ShareSheet(activityItems: [file.url]) }
-            )
-            .sheet(isPresented: $showingBugReport) {
-                BugReportView(potaAuth: potaAuth, iCloudMonitor: iCloudMonitor)
-            }
-            .fullScreenCover(isPresented: $showIntroTour) {
-                IntroTourView(tourState: tourState)
+        if isInNavigationContext {
+            settingsContent
+        } else {
+            NavigationStack(path: $navigationPath) {
+                settingsContent
             }
         }
     }
@@ -120,6 +51,15 @@ struct SettingsMainView: View {
     @AppStorage("readOnlyMode") private var readOnlyMode = false
     @AppStorage("bypassPOTAMaintenance") private var bypassPOTAMaintenance = false
 
+    // Logger settings
+    @AppStorage("loggerDefaultMode") private var defaultMode = "CW"
+    @AppStorage("loggerSkipWizard") private var skipWizard = false
+    @AppStorage("loggerShowActivityPanel") private var showActivityPanel = true
+    @AppStorage("loggerShowLicenseWarnings") private var showLicenseWarnings = true
+    @AppStorage("loggerKeepScreenOn") private var keepScreenOn = true
+    @AppStorage("loggerQuickLogMode") private var quickLogMode = false
+    @AppStorage("potaAutoSpotEnabled") private var potaAutoSpotEnabled = false
+
     @StateObject private var iCloudMonitor = ICloudMonitor()
     @State private var qrzIsConfigured = false
     @State private var qrzCallsign: String?
@@ -135,6 +75,92 @@ struct SettingsMainView: View {
     private let qrzClient = QRZClient()
     private let hamrsClient = HAMRSClient()
     private let lotwClient = LoTWClient()
+
+    private var settingsContent: some View {
+        List {
+            profileSection
+            loggerSection
+            potaSection
+            SyncSourcesSection(
+                potaAuth: potaAuth,
+                lofiClient: lofiClient,
+                qrzClient: qrzClient,
+                hamrsClient: hamrsClient,
+                lotwClient: lotwClient,
+                iCloudMonitor: iCloudMonitor,
+                qrzIsConfigured: qrzIsConfigured,
+                qrzCallsign: qrzCallsign,
+                lotwIsConfigured: lotwIsConfigured,
+                lotwUsername: lotwUsername,
+                challengeSources: challengeSources,
+                tourState: tourState
+            )
+            deduplicationSection
+            developerSection
+            dataSection
+            aboutSection
+        }
+        .navigationDestination(for: SettingsDestination.self) { dest in
+            switch dest {
+            case .qrz:
+                QRZSettingsView()
+            case .pota:
+                POTASettingsView(potaAuth: potaAuth, tourState: tourState)
+            case .lofi:
+                LoFiSettingsView(tourState: tourState)
+            case .hamrs:
+                HAMRSSettingsView()
+            case .lotw:
+                LoTWSettingsView()
+            case .icloud:
+                ICloudSettingsView()
+            }
+        }
+        .onAppear {
+            loadServiceStatus()
+        }
+        .task(id: destination) {
+            // Handle deep link - task restarts when destination changes
+            guard let dest = destination else {
+                return
+            }
+            // Small delay to ensure NavigationStack is ready after tab switch
+            try? await Task.sleep(nanoseconds: 100_000_000) // 0.1 seconds
+            navigationPath.append(dest)
+            destination = nil
+        }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK") {}
+        } message: {
+            Text(errorMessage)
+        }
+        .alert("Clear All QSOs?", isPresented: $showingClearAllConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear All", role: .destructive) {
+                Task { await clearAllQSOs() }
+            }
+        } message: {
+            Text(
+                "This will permanently delete all QSOs from this device. This cannot be undone."
+            )
+        }
+        .alert("Deduplication Complete", isPresented: $showingDedupeResult) {
+            Button("OK") {}
+        } message: {
+            Text(dedupeResultMessage)
+        }
+        .sheet(
+            item: $exportedFile,
+            onDismiss: { isExportingDatabase = false },
+            content: { file in ShareSheet(activityItems: [file.url]) }
+        )
+        .sheet(isPresented: $showingBugReport) {
+            BugReportView(potaAuth: potaAuth, iCloudMonitor: iCloudMonitor)
+        }
+        .fullScreenCover(isPresented: $showIntroTour) {
+            IntroTourView(tourState: tourState)
+        }
+    }
 
     // MARK: - Sections
 
@@ -172,6 +198,53 @@ struct SettingsMainView: View {
             }
         } header: {
             Text("My Profile")
+        }
+    }
+
+    private var loggerSection: some View {
+        Section {
+            // License class (read-only, from profile)
+            if let profile = userProfile, let licenseClass = profile.licenseClass {
+                HStack {
+                    Text("License Class")
+                    Spacer()
+                    Text(licenseClass.displayName)
+                        .foregroundStyle(.secondary)
+                }
+
+                Toggle("Show band privilege warnings", isOn: $showLicenseWarnings)
+            }
+
+            Picker("Default Mode", selection: $defaultMode) {
+                ForEach(["CW", "SSB", "FT8", "FT4", "RTTY"], id: \.self) { mode in
+                    Text(mode).tag(mode)
+                }
+            }
+
+            Toggle("Skip session wizard", isOn: $skipWizard)
+            Toggle("Show frequency activity", isOn: $showActivityPanel)
+            Toggle("Keep screen on", isOn: $keepScreenOn)
+            Toggle("Quick Log Mode", isOn: $quickLogMode)
+        } header: {
+            Text("Logger")
+        } footer: {
+            Text(
+                "Quick Log Mode disables animations for faster QSO entry. "
+                    + "Keep screen on prevents device sleep during sessions."
+            )
+        }
+    }
+
+    private var potaSection: some View {
+        Section {
+            Toggle("Auto-spot every 10 minutes", isOn: $potaAutoSpotEnabled)
+        } header: {
+            Text("POTA Activations")
+        } footer: {
+            Text(
+                "When enabled, automatically posts a spot to POTA every 10 minutes "
+                    + "during active POTA sessions."
+            )
         }
     }
 

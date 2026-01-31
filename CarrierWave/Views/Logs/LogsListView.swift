@@ -142,7 +142,7 @@ struct QSORow: View {
 
                 Spacer()
 
-                Text(qso.timestamp, format: .dateTime.month(.abbreviated).day().hour().minute())
+                Text(formattedTimestamp)
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -190,7 +190,18 @@ struct QSORow: View {
 
     // MARK: Private
 
+    private static let utcFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d HH:mm"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }()
+
     @State private var parkName: String?
+
+    private var formattedTimestamp: String {
+        Self.utcFormatter.string(from: qso.timestamp) + "Z"
+    }
 
     private var sortedPresence: [ServicePresence] {
         qso.servicePresence.sorted { $0.serviceType.rawValue < $1.serviceType.rawValue }

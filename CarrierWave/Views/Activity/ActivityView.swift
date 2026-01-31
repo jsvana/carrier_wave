@@ -8,123 +8,19 @@ struct ActivityView: View {
 
     let tourState: TourState
 
+    /// When true, the view is already inside a navigation context
+    var isInNavigationContext: Bool = false
+
     @Environment(\.modelContext) var modelContext
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                if horizontalSizeClass == .regular {
-                    // iPad: Side-by-side layout
-                    HStack(alignment: .top, spacing: 24) {
-                        challengesSection
-                            .frame(minWidth: 300, idealWidth: 350, maxWidth: 400)
-                        activityFeedSection
-                            .frame(maxWidth: .infinity)
-                    }
-                    .padding()
-                } else {
-                    // iPhone: Vertical stack
-                    VStack(spacing: 24) {
-                        challengesSection
-                        activityFeedSection
-                    }
-                    .padding()
-                }
+        if isInNavigationContext {
+            activityContent
+        } else {
+            NavigationStack {
+                activityContent
             }
-            .navigationTitle("Activity")
-            .toolbar {
-                ToolbarItemGroup(placement: .topBarLeading) {
-                    NavigationLink {
-                        FriendsListView()
-                    } label: {
-                        Image(systemName: "person.2")
-                    }
-                    .accessibilityLabel("Friends")
-
-                    NavigationLink {
-                        ClubsListView()
-                    } label: {
-                        Image(systemName: "person.3")
-                    }
-                    .accessibilityLabel("Clubs")
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button {
-                        Task { await refresh() }
-                    } label: {
-                        if isRefreshing {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "arrow.triangle.2.circlepath")
-                        }
-                    }
-                    .disabled(isRefreshing)
-                    .accessibilityLabel("Refresh")
-                }
-                ToolbarItem(placement: .secondaryAction) {
-                    Button {
-                        showingSummarySheet = true
-                    } label: {
-                        Label("Share Summary", systemImage: "square.and.arrow.up")
-                    }
-                }
-            }
-            .onAppear {
-                if syncService == nil {
-                    syncService = ChallengesSyncService(modelContext: modelContext)
-                }
-                if friendsSyncService == nil {
-                    friendsSyncService = FriendsSyncService(modelContext: modelContext)
-                }
-                if clubsSyncService == nil {
-                    clubsSyncService = ClubsSyncService(modelContext: modelContext)
-                }
-                if feedSyncService == nil {
-                    feedSyncService = ActivityFeedSyncService(modelContext: modelContext)
-                }
-            }
-            .alert("Error", isPresented: $showingError) {
-                Button("OK") { showingError = false }
-            } message: {
-                Text(errorMessage ?? "An unknown error occurred")
-            }
-            .sheet(isPresented: $showingInviteSheet) {
-                if let invite = pendingInvite {
-                    InviteJoinSheet(
-                        invite: invite,
-                        syncService: syncService,
-                        isJoining: $isJoiningFromInvite,
-                        onComplete: { success in
-                            showingInviteSheet = false
-                            pendingInvite = nil
-                            if !success {
-                                errorMessage = "Failed to join challenge"
-                                showingError = true
-                            }
-                        }
-                    )
-                }
-            }
-            .sheet(isPresented: $showingShareSheet) {
-                if let item = itemToShare {
-                    ShareSheetView(item: item)
-                }
-            }
-            .sheet(isPresented: $showingSummarySheet) {
-                SummaryCardSheet(callsign: currentCallsign)
-            }
-            .onReceive(
-                NotificationCenter.default.publisher(for: .didReceiveChallengeInvite)
-            ) { notification in
-                handleInviteNotification(notification)
-            }
-            .onReceive(
-                NotificationCenter.default.publisher(for: .didSyncQSOs)
-            ) { _ in
-                Task { await evaluateNewQSOs() }
-            }
-            .miniTour(.challenges, tourState: tourState)
         }
     }
 
@@ -172,8 +68,10 @@ struct ActivityView: View {
 
     private var currentCallsign: String {
         // Try to get from keychain first
-        if let callsign = try? KeychainHelper.shared.readString(for: KeychainHelper.Keys.currentCallsign),
-           !callsign.isEmpty
+        if let callsign = try? KeychainHelper.shared.readString(
+            for: KeychainHelper.Keys.currentCallsign
+        ),
+            !callsign.isEmpty
         {
             return callsign
         }
@@ -194,6 +92,121 @@ struct ActivityView: View {
             }
             return allActivityItems.filter { club.isMember(callsign: $0.callsign) }
         }
+    }
+
+    private var activityContent: some View {
+        ScrollView {
+            if horizontalSizeClass == .regular {
+                // iPad: Side-by-side layout
+                HStack(alignment: .top, spacing: 24) {
+                    challengesSection
+                        .frame(minWidth: 300, idealWidth: 350, maxWidth: 400)
+                    activityFeedSection
+                        .frame(maxWidth: .infinity)
+                }
+                .padding()
+            } else {
+                // iPhone: Vertical stack
+                VStack(spacing: 24) {
+                    challengesSection
+                    activityFeedSection
+                }
+                .padding()
+            }
+        }
+        .navigationTitle("Activity")
+        .toolbar {
+            ToolbarItemGroup(placement: .topBarLeading) {
+                NavigationLink {
+                    FriendsListView()
+                } label: {
+                    Image(systemName: "person.2")
+                }
+                .accessibilityLabel("Friends")
+
+                NavigationLink {
+                    ClubsListView()
+                } label: {
+                    Image(systemName: "person.3")
+                }
+                .accessibilityLabel("Clubs")
+            }
+            ToolbarItem(placement: .primaryAction) {
+                Button {
+                    Task { await refresh() }
+                } label: {
+                    if isRefreshing {
+                        ProgressView()
+                    } else {
+                        Image(systemName: "arrow.triangle.2.circlepath")
+                    }
+                }
+                .disabled(isRefreshing)
+                .accessibilityLabel("Refresh")
+            }
+            ToolbarItem(placement: .secondaryAction) {
+                Button {
+                    showingSummarySheet = true
+                } label: {
+                    Label("Share Summary", systemImage: "square.and.arrow.up")
+                }
+            }
+        }
+        .onAppear {
+            if syncService == nil {
+                syncService = ChallengesSyncService(modelContext: modelContext)
+            }
+            if friendsSyncService == nil {
+                friendsSyncService = FriendsSyncService(modelContext: modelContext)
+            }
+            if clubsSyncService == nil {
+                clubsSyncService = ClubsSyncService(modelContext: modelContext)
+            }
+            if feedSyncService == nil {
+                feedSyncService = ActivityFeedSyncService(modelContext: modelContext)
+            }
+        }
+        .alert("Error", isPresented: $showingError) {
+            Button("OK") { showingError = false }
+        } message: {
+            Text(errorMessage ?? "An unknown error occurred")
+        }
+        .sheet(isPresented: $showingInviteSheet) {
+            if let invite = pendingInvite {
+                InviteJoinSheet(
+                    invite: invite,
+                    syncService: syncService,
+                    isJoining: $isJoiningFromInvite,
+                    onComplete: { success in
+                        showingInviteSheet = false
+                        pendingInvite = nil
+                        if !success {
+                            errorMessage = "Failed to join challenge"
+                            showingError = true
+                        }
+                    }
+                )
+            }
+        }
+        .sheet(isPresented: $showingShareSheet) {
+            if let item = itemToShare {
+                ShareSheetView(item: item)
+            }
+        }
+        .sheet(isPresented: $showingSummarySheet) {
+            SummaryCardSheet(callsign: currentCallsign)
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .didReceiveChallengeInvite)
+        ) { notification in
+            handleInviteNotification(notification)
+        }
+        .onReceive(
+            NotificationCenter.default.publisher(for: .didSyncQSOs)
+        ) { _ in
+            Task { await evaluateNewQSOs() }
+        }
+        .miniTour(.challenges, tourState: tourState)
     }
 
     // MARK: - Challenges Section

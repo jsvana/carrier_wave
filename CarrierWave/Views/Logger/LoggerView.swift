@@ -6,6 +6,12 @@ import SwiftUI
 
 /// Main logging view for QSO entry
 struct LoggerView: View {
+    // MARK: Lifecycle
+
+    init(onSessionEnd: (() -> Void)? = nil) {
+        self.onSessionEnd = onSessionEnd
+    }
+
     // MARK: Internal
 
     var body: some View {
@@ -15,51 +21,54 @@ struct LoggerView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 0) {
-                    if let session = sessionManager?.activeSession {
-                        sessionHeader(session)
+                    sessionHeader
 
-                        // License warning banner
-                        if let violation = currentViolation {
-                            LicenseWarningBanner(violation: violation) {
-                                dismissedViolation = violation.message
-                            }
-                            .padding(.horizontal)
-                            .padding(.top, 8)
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                    // License warning banner
+                    if let violation = currentViolation {
+                        LicenseWarningBanner(violation: violation) {
+                            dismissedViolation = violation.message
                         }
-                    } else {
-                        noSessionHeader
+                        .padding(.horizontal)
+                        .padding(.top, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                     }
 
                     ScrollView {
                         VStack(spacing: 12) {
                             UnderConstructionBanner()
 
-                            callsignInputSection
+                            // Only show QSO form when session is active
+                            if sessionManager?.hasActiveSession == true {
+                                callsignInputSection
 
-                            if let info = lookupResult {
-                                LoggerCallsignCard(info: info)
-                                    .transition(
-                                        .asymmetric(
-                                            insertion: .move(edge: .top).combined(with: .opacity),
-                                            removal: .opacity
+                                if let info = lookupResult {
+                                    LoggerCallsignCard(info: info)
+                                        .transition(
+                                            .asymmetric(
+                                                insertion: .move(edge: .top).combined(
+                                                    with: .opacity
+                                                ),
+                                                removal: .opacity
+                                            )
                                         )
-                                    )
-                            }
+                                }
 
-                            qsoFormSection
+                                qsoFormSection
 
-                            if showMoreFields {
-                                moreFieldsSection
-                                    .transition(
-                                        .asymmetric(
-                                            insertion: .move(edge: .top).combined(with: .opacity),
-                                            removal: .opacity
+                                if showMoreFields {
+                                    moreFieldsSection
+                                        .transition(
+                                            .asymmetric(
+                                                insertion: .move(edge: .top).combined(
+                                                    with: .opacity
+                                                ),
+                                                removal: .opacity
+                                            )
                                         )
-                                    )
-                            }
+                                }
 
-                            logButtonSection
+                                logButtonSection
+                            }
 
                             qsoListSection
                         }
@@ -80,14 +89,30 @@ struct LoggerView: View {
                     onDismiss: { showSessionSheet = false }
                 )
             }
+            .sheet(isPresented: $showTitleEditSheet) {
+                SessionTitleEditSheet(
+                    title: $editingTitle,
+                    defaultTitle: sessionManager?.activeSession?.defaultTitle ?? "",
+                    onSave: { newTitle in
+                        sessionManager?.updateTitle(newTitle.isEmpty ? nil : newTitle)
+                        showTitleEditSheet = false
+                    },
+                    onCancel: {
+                        showTitleEditSheet = false
+                    }
+                )
+                .presentationDetents([.height(200)])
+            }
             .onAppear {
                 if sessionManager == nil {
                     sessionManager = LoggingSessionManager(modelContext: modelContext)
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: lookupResult != nil)
-            .animation(.easeInOut(duration: 0.2), value: showMoreFields)
-            .animation(.easeInOut(duration: 0.2), value: currentViolation?.message)
+            .animation(quickLogMode ? nil : .easeInOut(duration: 0.2), value: lookupResult != nil)
+            .animation(quickLogMode ? nil : .easeInOut(duration: 0.2), value: showMoreFields)
+            .animation(
+                quickLogMode ? nil : .easeInOut(duration: 0.2), value: currentViolation?.message
+            )
             .onChange(of: sessionManager?.activeSession?.frequency) { _, _ in
                 dismissedViolation = nil
             }
@@ -105,11 +130,17 @@ struct LoggerView: View {
             .toastContainer()
             .safeAreaInset(edge: .bottom) {
                 if callsignFieldFocused {
-                    numberRowAccessory
-                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    VStack(spacing: 0) {
+                        // Show compact callsign info when keyboard is visible
+                        if let info = lookupResult {
+                            CompactCallsignBar(info: info)
+                        }
+                        numberRowAccessory
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
             }
-            .animation(.easeInOut(duration: 0.2), value: callsignFieldFocused)
+            .animation(quickLogMode ? nil : .easeInOut(duration: 0.2), value: callsignFieldFocused)
             .onReceive(
                 NotificationCenter.default.publisher(for: UIResponder.keyboardWillShowNotification)
             ) { notification in
@@ -133,6 +164,7 @@ struct LoggerView: View {
 
     @AppStorage("userLicenseClass") private var licenseClassRaw: String = LicenseClass.extra
         .rawValue
+    @AppStorage("loggerQuickLogMode") private var quickLogMode = false
 
     @Query(
         filter: #Predicate<QSO> { !$0.isHidden },
@@ -164,9 +196,14 @@ struct LoggerView: View {
 
     // Command panels
     @State private var showRBNPanel = false
+    @State private var rbnTargetCallsign: String?
     @State private var showSolarPanel = false
     @State private var showWeatherPanel = false
     @State private var showHelpAlert = false
+
+    // Session title editing
+    @State private var showTitleEditSheet = false
+    @State private var editingTitle = ""
 
     /// License warning
     @State private var dismissedViolation: String?
@@ -174,19 +211,20 @@ struct LoggerView: View {
     /// Keyboard tracking
     @State private var keyboardHeight: CGFloat = 0
 
+    /// Callback when session ends with QSOs logged
+    private let onSessionEnd: (() -> Void)?
+
     private var userLicenseClass: LicenseClass {
         LicenseClass(rawValue: licenseClassRaw) ?? .extra
     }
 
-    /// QSOs for the current session, or recent QSOs if no session
+    /// QSOs for the current session only
     private var displayQSOs: [QSO] {
-        if let session = sessionManager?.activeSession {
-            let sessionId = session.id
-            return allQSOs.filter { $0.loggingSessionId == sessionId }
-        } else {
-            // Show most recent 10 QSOs when no session
-            return Array(allQSOs.prefix(10))
+        guard let session = sessionManager?.activeSession else {
+            return []
         }
+        let sessionId = session.id
+        return allQSOs.filter { $0.loggingSessionId == sessionId }
     }
 
     /// Whether the log button should be enabled
@@ -269,9 +307,11 @@ struct LoggerView: View {
                     RBNPanelView(
                         callsign: sessionManager?.activeSession?.myCallsign
                             ?? UserDefaults.standard.string(forKey: "loggerDefaultCallsign")
-                            ?? "UNKNOWN"
+                            ?? "UNKNOWN",
+                        targetCallsign: rbnTargetCallsign
                     ) {
                         showRBNPanel = false
+                        rbnTargetCallsign = nil
                     }
                 }
                 .padding()
@@ -306,9 +346,20 @@ struct LoggerView: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showWeatherPanel)
     }
 
+    /// Session header - shows active session info or "no session" prompt
+    private var sessionHeader: some View {
+        Group {
+            if let session = sessionManager?.activeSession {
+                activeSessionHeader(session)
+            } else {
+                noSessionHeader
+            }
+        }
+    }
+
     private var noSessionHeader: some View {
         HStack {
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text("No Active Session")
                     .font(.headline)
                 Text("Start a session to begin logging")
@@ -336,7 +387,11 @@ struct LoggerView: View {
         Menu {
             if sessionManager?.hasActiveSession == true {
                 Button {
+                    let hadQSOs = (sessionManager?.activeSession?.qsoCount ?? 0) > 0
                     sessionManager?.endSession()
+                    if hadQSOs {
+                        onSessionEnd?()
+                    }
                 } label: {
                     Label("End Session", systemImage: "stop.fill")
                 }
@@ -352,14 +407,6 @@ struct LoggerView: View {
                 } label: {
                     Label("Start Session", systemImage: "play.fill")
                 }
-            }
-
-            Divider()
-
-            NavigationLink {
-                LoggerSettingsView()
-            } label: {
-                Label("Logger Settings", systemImage: "gear")
             }
         } label: {
             Image(systemName: "ellipsis.circle")
@@ -430,7 +477,7 @@ struct LoggerView: View {
                 .transition(.move(edge: .top).combined(with: .opacity))
             }
         }
-        .animation(.easeInOut(duration: 0.15), value: detectedCommand != nil)
+        .animation(quickLogMode ? nil : .easeInOut(duration: 0.15), value: detectedCommand != nil)
     }
 
     // MARK: - QSO Form
@@ -576,43 +623,59 @@ struct LoggerView: View {
 
     // MARK: - QSO List
 
+    @ViewBuilder
     private var qsoListSection: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Recent QSOs")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.secondary)
-                Spacer()
-                Text("\(displayQSOs.count)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
+        // Only show QSO list when there's an active session
+        if sessionManager?.hasActiveSession == true {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Text("Session QSOs")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Text("\(displayQSOs.count)")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
-            if displayQSOs.isEmpty {
-                Text("No QSOs yet")
-                    .font(.subheadline)
-                    .foregroundStyle(.tertiary)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.vertical, 20)
-            } else {
-                ForEach(displayQSOs.prefix(10)) { qso in
-                    LoggerQSORow(qso: qso)
+                if displayQSOs.isEmpty {
+                    Text("No QSOs yet")
+                        .font(.subheadline)
+                        .foregroundStyle(.tertiary)
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .padding(.vertical, 20)
+                } else {
+                    ForEach(displayQSOs.prefix(10)) { qso in
+                        LoggerQSORow(qso: qso)
+                    }
                 }
             }
+            .padding()
+            .background(Color(.secondarySystemGroupedBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
         }
-        .padding()
-        .background(Color(.secondarySystemGroupedBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     // MARK: - Session Header
 
-    private func sessionHeader(_ session: LoggingSession) -> some View {
+    // swiftlint:disable:next function_body_length
+    private func activeSessionHeader(_ session: LoggingSession) -> some View {
         VStack(spacing: 4) {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(session.displayTitle)
-                        .font(.headline.monospaced())
+                    Button {
+                        editingTitle = session.customTitle ?? ""
+                        showTitleEditSheet = true
+                    } label: {
+                        HStack(spacing: 4) {
+                            Text(session.displayTitle)
+                                .font(.headline.monospaced())
+                            Image(systemName: "pencil")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
 
                     if let parkName = lookupParkName(session.parkReference) {
                         Text(parkName)
@@ -649,6 +712,19 @@ struct LoggerView: View {
 
                 Spacer()
 
+                // Spot comments button for POTA activations
+                if session.activationType == .pota,
+                   let parkRef = session.parkReference,
+                   let commentsService = sessionManager?.spotCommentsService
+                {
+                    SpotCommentsButton(
+                        comments: commentsService.comments,
+                        newCount: commentsService.newCommentCount,
+                        parkRef: parkRef,
+                        onMarkRead: { commentsService.markAllRead() }
+                    )
+                }
+
                 if let band = session.band {
                     Text(band)
                         .font(.caption)
@@ -684,12 +760,13 @@ struct LoggerView: View {
             sessionManager?.updateMode(newMode)
             ToastManager.shared.commandExecuted("MODE", result: newMode)
 
-        case .spot:
+        case let .spot(comment):
             Task {
-                await postSpot()
+                await postSpot(comment: comment)
             }
 
-        case .rbn:
+        case let .rbn(callsign):
+            rbnTargetCallsign = callsign
             showRBNPanel = true
 
         case .solar:
@@ -703,7 +780,7 @@ struct LoggerView: View {
         }
     }
 
-    private func postSpot() async {
+    private func postSpot(comment: String? = nil) async {
         guard let session = sessionManager?.activeSession,
               session.activationType == .pota,
               let parkRef = session.parkReference,
@@ -727,10 +804,15 @@ struct LoggerView: View {
                 callsign: callsign,
                 reference: parkRef,
                 frequency: freq * 1_000, // Convert MHz to kHz
-                mode: session.mode ?? "CW"
+                mode: session.mode ?? "CW",
+                comments: comment
             )
             if success {
-                ToastManager.shared.spotPosted(park: parkRef)
+                if let comment, !comment.isEmpty {
+                    ToastManager.shared.spotPosted(park: parkRef, comment: comment)
+                } else {
+                    ToastManager.shared.spotPosted(park: parkRef)
+                }
             }
         } catch {
             ToastManager.shared.error("Spot failed: \(error.localizedDescription)")
@@ -776,15 +858,26 @@ struct LoggerView: View {
             return
         }
 
+        // Use manually entered grid, or fall back to grid from callsign lookup
+        let gridToUse: String? =
+            if !theirGrid.isEmpty {
+                theirGrid
+            } else {
+                lookupResult?.grid
+            }
+
         _ = sessionManager?.logQSO(
             callsign: callsignInput,
             rstSent: rstSent.isEmpty ? "599" : rstSent,
             rstReceived: rstReceived.isEmpty ? "599" : rstReceived,
-            theirGrid: theirGrid.isEmpty ? nil : theirGrid,
+            theirGrid: gridToUse,
             theirParkReference: theirPark.isEmpty ? nil : theirPark,
             notes: notes.isEmpty ? nil : notes,
             name: lookupResult?.name,
-            operatorName: operatorName.isEmpty ? nil : operatorName
+            operatorName: operatorName.isEmpty ? nil : operatorName,
+            state: lookupResult?.state,
+            country: lookupResult?.country,
+            qth: lookupResult?.qth
         )
 
         // Reset form
@@ -919,6 +1012,58 @@ struct SwipeToDismissPanel<Content: View>: View {
     // MARK: Private
 
     @State private var dragOffset: CGFloat = 0
+}
+
+// MARK: - SessionTitleEditSheet
+
+/// Sheet for editing the session title
+struct SessionTitleEditSheet: View {
+    // MARK: Internal
+
+    @Binding var title: String
+
+    let defaultTitle: String
+    let onSave: (String) -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 16) {
+                TextField("Session title", text: $title)
+                    .font(.title3)
+                    .textFieldStyle(.roundedBorder)
+                    .focused($isFocused)
+
+                Text("Leave empty to use default: \(defaultTitle)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Spacer()
+            }
+            .padding()
+            .navigationTitle("Edit Title")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        onCancel()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        onSave(title)
+                    }
+                }
+            }
+            .onAppear {
+                isFocused = true
+            }
+        }
+    }
+
+    // MARK: Private
+
+    @FocusState private var isFocused: Bool
 }
 
 // MARK: - Preview

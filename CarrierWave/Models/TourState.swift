@@ -26,11 +26,15 @@ final class TourState {
     }
 
     private(set) var hasCompletedIntroTour: Bool {
-        didSet { UserDefaults.standard.set(hasCompletedIntroTour, forKey: Keys.hasCompletedIntroTour) }
+        didSet {
+            UserDefaults.standard.set(hasCompletedIntroTour, forKey: Keys.hasCompletedIntroTour)
+        }
     }
 
     private(set) var hasCompletedOnboarding: Bool {
-        didSet { UserDefaults.standard.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding) }
+        didSet {
+            UserDefaults.standard.set(hasCompletedOnboarding, forKey: Keys.hasCompletedOnboarding)
+        }
     }
 
     private(set) var lastTourVersion: String {
@@ -46,7 +50,7 @@ final class TourState {
     }
 
     func shouldShowOnboarding() -> Bool {
-        hasCompletedIntroTour && !hasCompletedOnboarding
+        hasCompletedIntroTour && !hasCompletedOnboarding && !hasExistingProfile()
     }
 
     func completeIntroTour(version: String) {
@@ -94,5 +98,12 @@ final class TourState {
         static let hasCompletedOnboarding = "tour.hasCompletedOnboarding"
         static let lastTourVersion = "tour.lastTourVersion"
         static let seenMiniTours = "tour.seenMiniTours"
+    }
+
+    /// Check if user already has a profile set up (skip onboarding if so)
+    /// Note: We check UserDefaults directly instead of calling UserProfileService
+    /// because UserProfileService is @MainActor and TourState is not.
+    private func hasExistingProfile() -> Bool {
+        UserDefaults.standard.string(forKey: "loggerDefaultCallsign") != nil
     }
 }

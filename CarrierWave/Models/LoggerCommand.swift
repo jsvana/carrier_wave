@@ -11,11 +11,11 @@ enum LoggerCommand: Equatable {
     /// Change mode (e.g., "MODE CW")
     case mode(String)
 
-    /// Self-spot to POTA
-    case spot
+    /// Self-spot to POTA with optional comment
+    case spot(comment: String?)
 
-    /// Show RBN spots panel
-    case rbn
+    /// Show RBN spots panel for a callsign (nil = user's callsign)
+    case rbn(callsign: String?)
 
     /// Show solar conditions panel
     case solar
@@ -33,13 +33,15 @@ enum LoggerCommand: Equatable {
         """
         Available Commands:
 
-        FREQ <MHz>  - Set frequency (e.g., 14.060)
-        MODE <mode> - Set mode (CW, SSB, FT8, etc.)
-        SPOT        - Self-spot to POTA
-        RBN         - Show RBN spots
-        SOLAR       - Show solar conditions
-        WEATHER     - Show weather (or WX)
-        HELP        - Show this help (or ?)
+        FREQ <MHz>      - Set frequency (e.g., 14.060)
+        MODE <mode>     - Set mode (CW, SSB, FT8, etc.)
+        SPOT [comment]  - Self-spot to POTA
+                          e.g., SPOT QRT, SPOT QSY
+        RBN [callsign]  - Show RBN/POTA spots
+                          e.g., RBN W1AW (or just RBN for your spots)
+        SOLAR           - Show solar conditions
+        WEATHER         - Show weather (or WX)
+        HELP            - Show this help (or ?)
 
         You can also just type a frequency like "14.060"
         """
@@ -52,10 +54,18 @@ enum LoggerCommand: Equatable {
             String(format: "Set frequency to %.3f MHz", freq)
         case let .mode(mode):
             "Set mode to \(mode)"
-        case .spot:
-            "Self-spot to POTA"
-        case .rbn:
-            "Show RBN spots"
+        case let .spot(comment):
+            if let comment, !comment.isEmpty {
+                "Self-spot to POTA: \"\(comment)\""
+            } else {
+                "Self-spot to POTA"
+            }
+        case let .rbn(callsign):
+            if let callsign {
+                "Show spots for \(callsign)"
+            } else {
+                "Show your spots"
+            }
         case .solar:
             "Show solar conditions"
         case .weather:
@@ -115,12 +125,27 @@ enum LoggerCommand: Equatable {
             return nil
         }
 
+        // Check for SPOT command (with optional comment)
+        if upper == "SPOT" {
+            return .spot(comment: nil)
+        }
+        if upper.hasPrefix("SPOT ") {
+            let comment = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+            return .spot(comment: comment.isEmpty ? nil : comment)
+        }
+
+        // Check for RBN command (with optional callsign)
+        if upper == "RBN" {
+            return .rbn(callsign: nil)
+        }
+        if upper.hasPrefix("RBN ") {
+            let callsign = String(trimmed.dropFirst(4)).trimmingCharacters(in: .whitespaces)
+                .uppercased()
+            return .rbn(callsign: callsign.isEmpty ? nil : callsign)
+        }
+
         // Single-word commands
         switch upper {
-        case "SPOT":
-            return .spot
-        case "RBN":
-            return .rbn
         case "SOLAR":
             return .solar
         case "WEATHER",
@@ -212,7 +237,14 @@ extension LoggerCommand {
             suggestions.append(
                 CommandSuggestion(
                     command: "RBN",
-                    description: "Show RBN spots",
+                    description: "Show your spots",
+                    icon: "dot.radiowaves.up.forward"
+                )
+            )
+            suggestions.append(
+                CommandSuggestion(
+                    command: "RBN W1AW",
+                    description: "Show spots for callsign",
                     icon: "dot.radiowaves.up.forward"
                 )
             )

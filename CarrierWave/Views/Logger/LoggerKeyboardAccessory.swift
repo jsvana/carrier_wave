@@ -34,10 +34,12 @@ struct LoggerKeyboardAccessory: View {
             // Quick command buttons
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
-                    commandButton("RBN", icon: "dot.radiowaves.up.forward", command: .rbn)
+                    commandButton(
+                        "RBN", icon: "dot.radiowaves.up.forward", command: .rbn(callsign: nil)
+                    )
                     commandButton("SOLAR", icon: "sun.max", command: .solar)
                     commandButton("WX", icon: "cloud.sun", command: .weather)
-                    commandButton("SPOT", icon: "mappin.and.ellipse", command: .spot)
+                    commandButton("SPOT", icon: "mappin.and.ellipse", command: .spot(comment: nil))
                     commandButton("HELP", icon: "questionmark.circle", command: .help)
 
                     Divider()

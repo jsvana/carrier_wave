@@ -1,6 +1,6 @@
 // RBN Panel View for Logger
 //
-// Displays Reverse Beacon Network spots for the user's callsign
+// Displays combined RBN and POTA spots for a callsign
 // with optional mini-map showing spotter locations.
 
 import MapKit
@@ -11,8 +11,18 @@ import SwiftUI
 struct RBNPanelView: View {
     // MARK: Internal
 
+    /// The callsign to show spots for
     let callsign: String
+
+    /// Optional target callsign (if looking up someone else's spots)
+    let targetCallsign: String?
+
     let onDismiss: () -> Void
+
+    /// The effective callsign to display spots for
+    var displayCallsign: String {
+        targetCallsign ?? callsign
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -39,31 +49,41 @@ struct RBNPanelView: View {
 
     // MARK: Private
 
-    @State private var spots: [RBNSpot] = []
-    @State private var stats: RBNStats?
+    @State private var spots: [UnifiedSpot] = []
     @State private var isLoading = true
     @State private var errorMessage: String?
     @State private var showMap = false
 
-    private let rbnClient = RBNClient()
+    /// Created lazily on first use (view is @MainActor so this is safe)
+    private var spotsService: SpotsService {
+        SpotsService(
+            rbnClient: RBNClient(),
+            potaClient: POTAClient(authService: POTAAuthService())
+        )
+    }
 
     // MARK: - Header
 
     private var header: some View {
         HStack {
-            Image(systemName: "antenna.radiowaves.left.and.right")
+            Image(systemName: "dot.radiowaves.up.forward")
                 .foregroundStyle(.blue)
 
-            Text("RBN Spots")
-                .font(.headline)
+            VStack(alignment: .leading, spacing: 0) {
+                Text("Spots")
+                    .font(.headline)
+                if targetCallsign != nil {
+                    Text(displayCallsign)
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
 
             Spacer()
 
-            if let stats {
-                Text("\(stats.totalSpots) spots/hr")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
+            Text("\(spots.count) spots")
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             Button {
                 showMap.toggle()
@@ -95,7 +115,7 @@ struct RBNPanelView: View {
     private var loadingView: some View {
         VStack(spacing: 12) {
             ProgressView()
-            Text("Loading RBN spots...")
+            Text("Loading spots...")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
@@ -107,12 +127,14 @@ struct RBNPanelView: View {
             Image(systemName: "antenna.radiowaves.left.and.right.slash")
                 .font(.title2)
                 .foregroundStyle(.secondary)
-            Text("No spots for \(callsign)")
+            Text("No spots for \(displayCallsign)")
                 .font(.caption)
                 .foregroundStyle(.secondary)
-            Text("Start transmitting to be spotted!")
-                .font(.caption2)
-                .foregroundStyle(.tertiary)
+            if targetCallsign == nil {
+                Text("Start transmitting to be spotted!")
+                    .font(.caption2)
+                    .foregroundStyle(.tertiary)
+            }
         }
         .padding()
         .frame(maxWidth: .infinity, minHeight: 150)
@@ -121,7 +143,7 @@ struct RBNPanelView: View {
     private var spotsList: some View {
         Group {
             if showMap {
-                RBNMiniMapView(spots: spots)
+                SpotsMiniMapView(spots: spots)
                     .frame(height: 200)
             } else {
                 ScrollView {
@@ -159,16 +181,19 @@ struct RBNPanelView: View {
         .frame(maxWidth: .infinity, minHeight: 150)
     }
 
-    private func spotRow(_ spot: RBNSpot) -> some View {
+    // swiftlint:disable:next function_body_length
+    private func spotRow(_ spot: UnifiedSpot) -> some View {
         HStack(spacing: 12) {
-            // Signal strength indicator
-            signalIndicator(snr: spot.snr)
+            // Source indicator
+            sourceIndicator(spot)
 
             VStack(alignment: .leading, spacing: 2) {
                 HStack {
-                    Text(spot.spotter)
-                        .font(.system(.body, design: .monospaced))
-                        .fontWeight(.medium)
+                    if let spotter = spot.spotter {
+                        Text(spotter)
+                            .font(.system(.body, design: .monospaced))
+                            .fontWeight(.medium)
+                    }
 
                     Spacer()
 
@@ -178,14 +203,24 @@ struct RBNPanelView: View {
                 }
 
                 HStack {
-                    Text("\(spot.snr) dB")
-                        .font(.caption)
-                        .foregroundStyle(snrColor(spot.snr))
+                    // RBN-specific: SNR and WPM
+                    if let snr = spot.snr {
+                        Text("\(snr) dB")
+                            .font(.caption)
+                            .foregroundStyle(snrColor(snr))
+                    }
 
                     if let wpm = spot.wpm {
                         Text("\(wpm) WPM")
                             .font(.caption)
                             .foregroundStyle(.secondary)
+                    }
+
+                    // POTA-specific: park info
+                    if let parkRef = spot.parkRef {
+                        Text(parkRef)
+                            .font(.caption)
+                            .foregroundStyle(.green)
                     }
 
                     Text(spot.mode)
@@ -201,25 +236,65 @@ struct RBNPanelView: View {
                         .font(.caption2)
                         .foregroundStyle(.tertiary)
                 }
+
+                // POTA comments
+                if let comments = spot.comments, !comments.isEmpty {
+                    Text(comments)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(2)
+                }
+
+                // POTA park name
+                if let parkName = spot.parkName, !parkName.isEmpty {
+                    Text(parkName)
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                        .lineLimit(1)
+                }
             }
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
     }
 
-    private func signalIndicator(snr: Int) -> some View {
+    private func sourceIndicator(_ spot: UnifiedSpot) -> some View {
         ZStack {
             Circle()
-                .fill(snrColor(snr).opacity(0.2))
+                .fill(sourceColor(spot).opacity(0.2))
                 .frame(width: 32, height: 32)
 
-            Image(systemName: signalIcon(snr: snr))
+            Image(systemName: sourceIcon(spot))
                 .font(.system(size: 14))
-                .foregroundStyle(snrColor(snr))
+                .foregroundStyle(sourceColor(spot))
         }
     }
 
     // MARK: - Helpers
+
+    private func sourceColor(_ spot: UnifiedSpot) -> Color {
+        switch spot.source {
+        case .rbn:
+            if let snr = spot.snr {
+                return snrColor(snr)
+            }
+            return .blue
+        case .pota:
+            return .green
+        }
+    }
+
+    private func sourceIcon(_ spot: UnifiedSpot) -> String {
+        switch spot.source {
+        case .rbn:
+            if let snr = spot.snr {
+                return signalIcon(snr: snr)
+            }
+            return "antenna.radiowaves.left.and.right"
+        case .pota:
+            return "leaf.fill"
+        }
+    }
 
     private func snrColor(_ snr: Int) -> Color {
         switch snr {
@@ -246,12 +321,7 @@ struct RBNPanelView: View {
         errorMessage = nil
 
         do {
-            async let spotsTask = rbnClient.spots(for: callsign, hours: 6, limit: 50)
-            async let statsTask = rbnClient.stats(hours: 1)
-
-            spots = try await spotsTask
-            stats = try? await statsTask
-
+            spots = try await spotsService.fetchSpots(for: displayCallsign, hours: 6)
             isLoading = false
         } catch {
             errorMessage = error.localizedDescription
@@ -260,12 +330,12 @@ struct RBNPanelView: View {
     }
 }
 
-// MARK: - RBNMiniMapView
+// MARK: - SpotsMiniMapView
 
-struct RBNMiniMapView: View {
+struct SpotsMiniMapView: View {
     // MARK: Internal
 
-    let spots: [RBNSpot]
+    let spots: [UnifiedSpot]
 
     var body: some View {
         Map {
@@ -279,12 +349,7 @@ struct RBNMiniMapView: View {
 
     // MARK: Private
 
-    @State private var region = MKCoordinateRegion(
-        center: CLLocationCoordinate2D(latitude: 39.8283, longitude: -98.5795),
-        span: MKCoordinateSpan(latitudeDelta: 50, longitudeDelta: 50)
-    )
-
-    private var spotAnnotations: [SpotAnnotation] {
+    private var spotAnnotations: [SpotMapAnnotation] {
         spots.compactMap { spot in
             guard let grid = spot.spotterGrid,
                   let (lat, lon) = gridToCoordinates(grid)
@@ -292,11 +357,23 @@ struct RBNMiniMapView: View {
                 return nil
             }
 
-            return SpotAnnotation(
+            let color: Color =
+                switch spot.source {
+                case .rbn:
+                    if let snr = spot.snr {
+                        snrColor(snr)
+                    } else {
+                        .blue
+                    }
+                case .pota:
+                    .green
+                }
+
+            return SpotMapAnnotation(
                 id: spot.id,
-                title: spot.spotter,
+                title: spot.spotter ?? spot.callsign,
                 coordinate: CLLocationCoordinate2D(latitude: lat, longitude: lon),
-                color: snrColor(spot.snr)
+                color: color
             )
         }
     }
@@ -348,16 +425,16 @@ struct RBNMiniMapView: View {
     }
 }
 
-// MARK: - SpotAnnotation
+// MARK: - SpotMapAnnotation
 
-private struct SpotAnnotation: Identifiable {
-    let id: Int
+private struct SpotMapAnnotation: Identifiable {
+    let id: String
     let title: String
     let coordinate: CLLocationCoordinate2D
     let color: Color
 }
 
 #Preview {
-    RBNPanelView(callsign: "W1AW") {}
+    RBNPanelView(callsign: "W1AW", targetCallsign: nil) {}
         .padding()
 }

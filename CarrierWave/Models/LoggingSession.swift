@@ -125,6 +125,9 @@ final class LoggingSession {
     /// Session notes
     var notes: String?
 
+    /// Custom title set by user (overrides displayTitle)
+    var customTitle: String?
+
     /// Number of QSOs logged in this session
     var qsoCount: Int = 0
 
@@ -171,8 +174,16 @@ final class LoggingSession {
         return Self.bandForFrequency(freq)
     }
 
-    /// Display title for the session
+    /// Display title for the session (uses customTitle if set)
     var displayTitle: String {
+        if let custom = customTitle, !custom.isEmpty {
+            return custom
+        }
+        return defaultTitle
+    }
+
+    /// Default generated title based on activation type
+    var defaultTitle: String {
         switch activationType {
         case .pota:
             if let park = parkReference {
@@ -226,7 +237,8 @@ final class LoggingSession {
         case "CW": cwFrequencies
         case "SSB",
              "USB",
-             "LSB": ssbFrequencies
+             "LSB":
+            ssbFrequencies
         default: cwFrequencies // Default to CW
         }
     }

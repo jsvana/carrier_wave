@@ -65,6 +65,8 @@ struct LoggerCallsignCard: View {
             "from Polo Notes"
         case .qrz:
             "from QRZ"
+        case .hamdb:
+            "from HamDB"
         }
     }
 
@@ -166,6 +168,88 @@ struct DetailChip: View {
             .padding(.vertical, 4)
             .background(Color(.tertiarySystemGroupedBackground))
             .clipShape(RoundedRectangle(cornerRadius: 6))
+    }
+}
+
+// MARK: - CompactCallsignBar
+
+/// A compact single-line callsign info display for use above the keyboard
+struct CompactCallsignBar: View {
+    // MARK: Internal
+
+    let info: CallsignInfo
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if let emoji = info.emoji {
+                Text(emoji)
+                    .font(.body)
+            }
+
+            if let name = info.name {
+                Text(name)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+            }
+
+            if let state = info.state {
+                Text(state)
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color(.tertiarySystemBackground))
+                    .clipShape(Capsule())
+            }
+
+            if let grid = info.grid {
+                Text(grid.prefix(4))
+                    .font(.caption.monospaced())
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.blue.opacity(0.2))
+                    .clipShape(Capsule())
+            }
+
+            Spacer()
+
+            if let flag = countryFlag(for: info) {
+                Text(flag)
+                    .font(.body)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Color(.secondarySystemBackground))
+    }
+
+    // MARK: Private
+
+    private func countryFlag(for info: CallsignInfo) -> String? {
+        let callsign = info.callsign.uppercased()
+
+        if callsign.hasPrefix("W") || callsign.hasPrefix("K") || callsign.hasPrefix("N")
+            || callsign.hasPrefix("A")
+        {
+            return "🇺🇸"
+        } else if callsign.hasPrefix("VE") || callsign.hasPrefix("VA") {
+            return "🇨🇦"
+        } else if callsign.hasPrefix("G") || callsign.hasPrefix("M") {
+            return "🇬🇧"
+        } else if callsign.hasPrefix("DL") || callsign.hasPrefix("DA") || callsign.hasPrefix("DB")
+            || callsign.hasPrefix("DC")
+        {
+            return "🇩🇪"
+        } else if callsign.hasPrefix("F") {
+            return "🇫🇷"
+        } else if callsign.hasPrefix("JA") || callsign.hasPrefix("JH") || callsign.hasPrefix("JR") {
+            return "🇯🇵"
+        } else if callsign.hasPrefix("VK") {
+            return "🇦🇺"
+        } else if callsign.hasPrefix("ZL") {
+            return "🇳🇿"
+        }
+
+        return nil
     }
 }
 

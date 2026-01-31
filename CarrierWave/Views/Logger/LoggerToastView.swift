@@ -21,7 +21,8 @@ enum ToastType: Sendable {
     var icon: String {
         switch self {
         case .success,
-             .qsoLogged: "checkmark.circle.fill"
+             .qsoLogged:
+            "checkmark.circle.fill"
         case .error: "xmark.circle.fill"
         case .warning: "exclamationmark.triangle.fill"
         case .info: "info.circle.fill"
@@ -35,7 +36,8 @@ enum ToastType: Sendable {
         switch self {
         case .success,
              .qsoLogged,
-             .spotPosted: .green
+             .spotPosted:
+            .green
         case .error: .red
         case .warning: .orange
         case .info: .blue
@@ -142,6 +144,10 @@ final class ToastManager {
 
     func spotPosted(park: String) {
         show(.spotPosted, message: "Spotted at \(park)")
+    }
+
+    func spotPosted(park: String, comment: String) {
+        show(.spotPosted, message: "Spotted at \(park): \(comment)")
     }
 
     func friendSpotted(callsign: String, frequency: Double, mode: String) {

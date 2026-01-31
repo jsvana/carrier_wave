@@ -56,11 +56,11 @@ actor CallsignLookupService {
                 return poloInfo
             }
 
-            // Tier 2: QRZ XML API (remote) - placeholder for future implementation
-            // if let qrzInfo = await lookupInQRZ(normalizedCallsign) {
-            //     updateCache(qrzInfo)
-            //     return qrzInfo
-            // }
+            // Tier 2: QRZ XML API (remote)
+            if let qrzInfo = await lookupInQRZ(normalizedCallsign) {
+                updateCache(qrzInfo)
+                return qrzInfo
+            }
 
             return nil
         }
@@ -192,16 +192,164 @@ actor CallsignLookupService {
     }
 }
 
-// MARK: - QRZ XML API (Placeholder)
+// MARK: - QRZ XML API
 
 extension CallsignLookupService {
+    /// QRZ XML callbook API base URL
+    private static let qrzXMLURL = "https://xmldata.qrz.com/xml/current/"
+
     /// Look up a callsign in QRZ XML callbook
-    /// NOTE: This requires a QRZ XML subscription and separate credentials
-    /// from the logbook API. Currently returns nil - QRZ API integration planned.
-    private func lookupInQRZ(_: String) async -> CallsignInfo? {
-        // QRZ XML callbook API integration planned for future release
-        // Endpoint: https://xmldata.qrz.com/xml/current/
-        // Authentication: Session key from username/password login
-        nil
+    /// Uses the logbook API key which also works for XML callbook lookups
+    private func lookupInQRZ(_ callsign: String) async -> CallsignInfo? {
+        // Get API key from keychain
+        guard let apiKey = try? KeychainHelper.shared.readString(for: KeychainHelper.Keys.qrzApiKey)
+        else {
+            return nil
+        }
+
+        // First, get a session key using the API key
+        guard let sessionKey = await getQRZSessionKey(apiKey: apiKey) else {
+            return nil
+        }
+
+        // Then look up the callsign
+        return await performQRZLookup(callsign: callsign, sessionKey: sessionKey)
+    }
+
+    /// Get a QRZ session key using the API key
+    private func getQRZSessionKey(apiKey: String) async -> String? {
+        guard var urlComponents = URLComponents(string: Self.qrzXMLURL) else {
+            return nil
+        }
+
+        // QRZ XML API accepts logbook API key with "apikey:" prefix
+        urlComponents.queryItems = [
+            URLQueryItem(name: "username", value: apiKey),
+            URLQueryItem(name: "password", value: "apikey"),
+        ]
+
+        guard let url = urlComponents.url else {
+            return nil
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.setValue("CarrierWave/1.0", forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 5
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200
+            else {
+                return nil
+            }
+
+            guard let xmlString = String(data: data, encoding: .utf8) else {
+                return nil
+            }
+
+            // Parse session key from XML response
+            // Format: <Key>SESSION_KEY</Key>
+            return parseXMLValue(from: xmlString, tag: "Key")
+        } catch {
+            return nil
+        }
+    }
+
+    /// Perform the actual callsign lookup with a session key
+    private func performQRZLookup(callsign: String, sessionKey: String) async -> CallsignInfo? {
+        guard var urlComponents = URLComponents(string: Self.qrzXMLURL) else {
+            return nil
+        }
+
+        urlComponents.queryItems = [
+            URLQueryItem(name: "s", value: sessionKey),
+            URLQueryItem(name: "callsign", value: callsign),
+        ]
+
+        guard let url = urlComponents.url else {
+            return nil
+        }
+
+        do {
+            var request = URLRequest(url: url)
+            request.setValue("CarrierWave/1.0", forHTTPHeaderField: "User-Agent")
+            request.timeoutInterval = 5
+
+            let (data, response) = try await URLSession.shared.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200
+            else {
+                return nil
+            }
+
+            guard let xmlString = String(data: data, encoding: .utf8) else {
+                return nil
+            }
+
+            // Check for error
+            if xmlString.contains("<Error>") {
+                return nil
+            }
+
+            // Parse callsign info from XML
+            let name = combineNames(
+                first: parseXMLValue(from: xmlString, tag: "fname"),
+                last: parseXMLValue(from: xmlString, tag: "name")
+            )
+            let grid = parseXMLValue(from: xmlString, tag: "grid")
+            let qth = parseXMLValue(from: xmlString, tag: "addr2") // City
+            let state = parseXMLValue(from: xmlString, tag: "state")
+            let country = parseXMLValue(from: xmlString, tag: "country")
+            let licenseClass = parseXMLValue(from: xmlString, tag: "class")
+
+            // Only return if we got at least some useful info
+            guard name != nil || grid != nil || qth != nil else {
+                return nil
+            }
+
+            return CallsignInfo(
+                callsign: callsign,
+                name: name,
+                qth: qth,
+                state: state,
+                country: country,
+                grid: grid,
+                licenseClass: licenseClass,
+                source: .qrz
+            )
+        } catch {
+            return nil
+        }
+    }
+
+    /// Parse a value from XML by tag name
+    private func parseXMLValue(from xml: String, tag: String) -> String? {
+        let openTag = "<\(tag)>"
+        let closeTag = "</\(tag)>"
+
+        guard let startRange = xml.range(of: openTag),
+              let endRange = xml.range(of: closeTag, range: startRange.upperBound ..< xml.endIndex)
+        else {
+            return nil
+        }
+
+        let value = String(xml[startRange.upperBound ..< endRange.lowerBound])
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        return value.isEmpty ? nil : value
+    }
+
+    /// Combine first and last name
+    private func combineNames(first: String?, last: String?) -> String? {
+        if let first, let last {
+            "\(first) \(last)"
+        } else if let first {
+            first
+        } else if let last {
+            last
+        } else {
+            nil
+        }
     }
 }
