@@ -86,6 +86,16 @@ struct DashboardView: View {
         return QSOStatistics(qsos: qsos)
     }
 
+    var statsGridColumns: [GridItem] {
+        if horizontalSizeClass == .regular {
+            // iPad: 6 columns (all stats in one row)
+            Array(repeating: GridItem(.flexible()), count: 6)
+        } else {
+            // iPhone: 3 columns (2 rows)
+            Array(repeating: GridItem(.flexible()), count: 3)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             ScrollView {
@@ -177,16 +187,6 @@ struct DashboardView: View {
     }
 
     // MARK: Private
-
-    private var statsGridColumns: [GridItem] {
-        if horizontalSizeClass == .regular {
-            // iPad: 6 columns (all stats in one row)
-            Array(repeating: GridItem(.flexible()), count: 6)
-        } else {
-            // iPhone: 3 columns (2 rows)
-            Array(repeating: GridItem(.flexible()), count: 3)
-        }
-    }
 
     // MARK: - Toolbar
 
