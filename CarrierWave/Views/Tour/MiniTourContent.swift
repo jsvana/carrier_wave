@@ -3,6 +3,57 @@ import Foundation
 // MARK: - MiniTourContent
 
 enum MiniTourContent {
+    static let logger: [TourPage] = [
+        TourPage(
+            icon: "pencil.and.list.clipboard",
+            title: "QSO Logger",
+            body: """
+            Log your contacts here. Each session tracks your frequency, mode, \
+            and activation type (casual, POTA, or SOTA).
+            """
+        ),
+        TourPage(
+            icon: "play.fill",
+            title: "Starting a Session",
+            body: """
+            Tap the Start button in the header to begin a new session. \
+            Set your callsign, frequency, mode, and optionally a park or summit reference.
+            """
+        ),
+        TourPage(
+            icon: "stop.fill",
+            title: "Ending a Session",
+            body: """
+            Tap the red END button in the session header when you're done. \
+            Your QSOs are saved and ready to sync to QRZ, POTA, or LoFi.
+            """
+        ),
+        TourPage(
+            icon: "person.text.rectangle",
+            title: "Callsign Lookup",
+            body: """
+            As you type, callsign info is fetched from QRZ (requires QRZ XML subscription) \
+            or HamDB. Name, location, and grid are saved with your QSO.
+            """
+        ),
+        TourPage(
+            icon: "note.text",
+            title: "Callsign Notes",
+            body: """
+            Add Polo-style notes files in Settings to see custom info and emoji for callsigns. \
+            Great for tracking club members or favorite operators.
+            """
+        ),
+        TourPage(
+            icon: "command",
+            title: "Logger Commands",
+            body: """
+            Type commands like FREQ, MODE, SPOT, RBN, SOLAR, WEATHER, MAP, or HELP \
+            directly in the callsign field. Press Return to execute.
+            """
+        ),
+    ]
+
     static let potaActivations: [TourPage] = [
         TourPage(
             icon: "tree",
@@ -106,6 +157,7 @@ enum MiniTourContent {
 
     static func pages(for id: TourState.MiniTourID) -> [TourPage] {
         switch id {
+        case .logger: logger
         case .potaActivations: potaActivations
         case .potaAccountSetup: potaAccountSetup
         case .challenges: challenges

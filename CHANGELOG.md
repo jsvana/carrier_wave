@@ -4,11 +4,16 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+## [1.14.0] - 2026-01-30
+
 ### Added
 - **QSY Auto-Spotting** - Automatically post QSY spot to POTA when frequency changes during active POTA session
 - **HIDDEN Command** - View and restore deleted QSOs from current session
   - Type `HIDDEN` or `DELETED` in logger input to show deleted QSOs
   - Restore button to un-delete individual QSOs
+
+### Changed
+- **Cleaner Logger UI** - Removed navigation bar title and top bar Start Session button
 
 ### Fixed
 - **iPad Settings Navigation** - Changing sidebar tab now properly exits Settings submenus

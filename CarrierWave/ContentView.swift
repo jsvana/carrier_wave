@@ -196,9 +196,12 @@ struct ContentView: View {
             }
 
         case .logger:
-            LoggerView(onSessionEnd: {
-                selectedTab = .logs
-            })
+            LoggerView(
+                tourState: tourState,
+                onSessionEnd: {
+                    selectedTab = .logs
+                }
+            )
 
         case .logs:
             LogsContainerView(
