@@ -1,3 +1,4 @@
+// swiftlint:disable file_length
 import Foundation
 import SwiftData
 
@@ -550,34 +551,12 @@ extension CallsignLookupService {
         callsign: String,
         sessionKey: String
     ) async -> CallsignLookupResult {
-        guard var urlComponents = URLComponents(string: Self.qrzXMLURL) else {
-            return .error(.networkError("Invalid URL"), qrzAttempted: true)
-        }
-
-        urlComponents.queryItems = [
-            URLQueryItem(name: "s", value: sessionKey),
-            URLQueryItem(name: "callsign", value: callsign),
-        ]
-
-        guard let url = urlComponents.url else {
+        guard let url = buildQRZLookupURL(sessionKey: sessionKey, callsign: callsign) else {
             return .error(.networkError("Invalid URL"), qrzAttempted: true)
         }
 
         do {
-            var request = URLRequest(url: url)
-            request.setValue("CarrierWave/1.0", forHTTPHeaderField: "User-Agent")
-            request.timeoutInterval = 30
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200
-            else {
-                return .error(.networkError("HTTP error"), qrzAttempted: true)
-            }
-
-            guard let xmlString = String(data: data, encoding: .utf8) else {
-                return .error(.networkError("Invalid response"), qrzAttempted: true)
-            }
+            let xmlString = try await fetchQRZResponse(url: url)
 
             // Check for error
             if let errorMsg = parseXMLValue(from: xmlString, tag: "Error") {
@@ -587,36 +566,74 @@ extension CallsignLookupService {
                 return .error(.networkError(errorMsg), qrzAttempted: true)
             }
 
-            // Parse callsign info from XML
-            let name = combineNames(
-                first: parseXMLValue(from: xmlString, tag: "fname"),
-                last: parseXMLValue(from: xmlString, tag: "name")
-            )
-            let grid = parseXMLValue(from: xmlString, tag: "grid")
-            let qth = parseXMLValue(from: xmlString, tag: "addr2") // City
-            let state = parseXMLValue(from: xmlString, tag: "state")
-            let country = parseXMLValue(from: xmlString, tag: "country")
-            let licenseClass = parseXMLValue(from: xmlString, tag: "class")
-
-            // Only return if we got at least some useful info
-            guard name != nil || grid != nil || qth != nil else {
+            guard let info = parseCallsignInfoFromXML(xmlString, callsign: callsign) else {
                 return .notFound(qrzAttempted: true, poloNotesChecked: true)
             }
-
-            let info = CallsignInfo(
-                callsign: callsign,
-                name: name,
-                qth: qth,
-                state: state,
-                country: country,
-                grid: grid,
-                licenseClass: licenseClass,
-                source: .qrz
-            )
             return .fromQRZ(info)
         } catch {
             return .error(.networkError(error.localizedDescription), qrzAttempted: true)
         }
+    }
+
+    private func buildQRZLookupURL(sessionKey: String, callsign: String) -> URL? {
+        guard var urlComponents = URLComponents(string: Self.qrzXMLURL) else {
+            return nil
+        }
+        urlComponents.queryItems = [
+            URLQueryItem(name: "s", value: sessionKey),
+            URLQueryItem(name: "callsign", value: callsign),
+        ]
+        return urlComponents.url
+    }
+
+    private func fetchQRZResponse(url: URL) async throws -> String {
+        var request = URLRequest(url: url)
+        request.setValue("CarrierWave/1.0", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 30
+
+        let (data, response) = try await URLSession.shared.data(for: request)
+
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+            throw QRZLookupError.httpError
+        }
+
+        guard let xmlString = String(data: data, encoding: .utf8) else {
+            throw QRZLookupError.invalidResponse
+        }
+
+        return xmlString
+    }
+
+    private func parseCallsignInfoFromXML(_ xmlString: String, callsign: String) -> CallsignInfo? {
+        let name = combineNames(
+            first: parseXMLValue(from: xmlString, tag: "fname"),
+            last: parseXMLValue(from: xmlString, tag: "name")
+        )
+        let grid = parseXMLValue(from: xmlString, tag: "grid")
+        let qth = parseXMLValue(from: xmlString, tag: "addr2")
+        let state = parseXMLValue(from: xmlString, tag: "state")
+        let country = parseXMLValue(from: xmlString, tag: "country")
+        let licenseClass = parseXMLValue(from: xmlString, tag: "class")
+
+        guard name != nil || grid != nil || qth != nil else {
+            return nil
+        }
+
+        return CallsignInfo(
+            callsign: callsign,
+            name: name,
+            qth: qth,
+            state: state,
+            country: country,
+            grid: grid,
+            licenseClass: licenseClass,
+            source: .qrz
+        )
+    }
+
+    private enum QRZLookupError: Error {
+        case httpError
+        case invalidResponse
     }
 
     /// Get a QRZ session key using username/password credentials
@@ -661,66 +678,19 @@ extension CallsignLookupService {
 
     /// Perform the actual callsign lookup with a session key
     private func performQRZLookup(callsign: String, sessionKey: String) async -> CallsignInfo? {
-        guard var urlComponents = URLComponents(string: Self.qrzXMLURL) else {
-            return nil
-        }
-
-        urlComponents.queryItems = [
-            URLQueryItem(name: "s", value: sessionKey),
-            URLQueryItem(name: "callsign", value: callsign),
-        ]
-
-        guard let url = urlComponents.url else {
+        guard let url = buildQRZLookupURL(sessionKey: sessionKey, callsign: callsign) else {
             return nil
         }
 
         do {
-            var request = URLRequest(url: url)
-            request.setValue("CarrierWave/1.0", forHTTPHeaderField: "User-Agent")
-            request.timeoutInterval = 30
-
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200
-            else {
-                return nil
-            }
-
-            guard let xmlString = String(data: data, encoding: .utf8) else {
-                return nil
-            }
+            let xmlString = try await fetchQRZResponse(url: url)
 
             // Check for error
             if xmlString.contains("<Error>") {
                 return nil
             }
 
-            // Parse callsign info from XML
-            let name = combineNames(
-                first: parseXMLValue(from: xmlString, tag: "fname"),
-                last: parseXMLValue(from: xmlString, tag: "name")
-            )
-            let grid = parseXMLValue(from: xmlString, tag: "grid")
-            let qth = parseXMLValue(from: xmlString, tag: "addr2") // City
-            let state = parseXMLValue(from: xmlString, tag: "state")
-            let country = parseXMLValue(from: xmlString, tag: "country")
-            let licenseClass = parseXMLValue(from: xmlString, tag: "class")
-
-            // Only return if we got at least some useful info
-            guard name != nil || grid != nil || qth != nil else {
-                return nil
-            }
-
-            return CallsignInfo(
-                callsign: callsign,
-                name: name,
-                qth: qth,
-                state: state,
-                country: country,
-                grid: grid,
-                licenseClass: licenseClass,
-                source: .qrz
-            )
+            return parseCallsignInfoFromXML(xmlString, callsign: callsign)
         } catch {
             return nil
         }

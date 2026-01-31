@@ -1,4 +1,4 @@
-// swiftlint:disable identifier_name
+// swiftlint:disable identifier_name file_length
 import Foundation
 import SwiftData
 import SwiftUI
@@ -187,11 +187,12 @@ final class LoggingSessionManager {
         let currentMode = session.mode.uppercased()
 
         // Only suggest if different from current mode
-        let modeToSuggest: String? = if let suggested = suggestedMode, suggested != currentMode {
-            suggested
-        } else {
-            nil
-        }
+        let modeToSuggest: String? =
+            if let suggested = suggestedMode, suggested != currentMode {
+                suggested
+            } else {
+                nil
+            }
 
         return FrequencyUpdateResult(
             shouldPromptForSpot: shouldPromptForSpot,

@@ -59,11 +59,20 @@ struct SettingsMainView: View {
     @AppStorage("loggerKeepScreenOn") private var keepScreenOn = true
     @AppStorage("loggerQuickLogMode") private var quickLogMode = false
     @AppStorage("potaAutoSpotEnabled") private var potaAutoSpotEnabled = false
+    @AppStorage("loggerAutoModeSwitch") private var autoModeSwitch = true
     @AppStorage("callsignNotesDisplayMode") private var notesDisplayMode = "emoji"
+
+    // Logger visible fields
+    @AppStorage("loggerShowNotes") private var showNotes = false
+    @AppStorage("loggerShowTheirGrid") private var showTheirGrid = false
+    @AppStorage("loggerShowTheirPark") private var showTheirPark = false
+    @AppStorage("loggerShowOperator") private var showOperator = false
 
     @StateObject private var iCloudMonitor = ICloudMonitor()
     @State private var qrzIsConfigured = false
     @State private var qrzCallsign: String?
+
+    @State private var qrzCallbookIsConfigured = false
 
     @State private var lotwIsConfigured = false
     @State private var lotwUsername: String?
@@ -80,6 +89,7 @@ struct SettingsMainView: View {
     private var settingsContent: some View {
         List {
             profileSection
+            tabsSection
             loggerSection
             potaSection
             SyncSourcesSection(
@@ -202,6 +212,26 @@ struct SettingsMainView: View {
         }
     }
 
+    private var tabsSection: some View {
+        Section {
+            NavigationLink {
+                TabConfigurationView()
+            } label: {
+                HStack {
+                    Label("Tab Bar", systemImage: "square.grid.2x2")
+                    Spacer()
+                    let visibleCount = TabConfiguration.visibleTabs().filter { $0 != .more }.count
+                    Text("\(visibleCount) in tab bar")
+                        .foregroundStyle(.secondary)
+                }
+            }
+        } header: {
+            Text("Navigation")
+        } footer: {
+            Text("Choose which tabs appear in the tab bar. Hidden tabs are accessible from More.")
+        }
+    }
+
     private var loggerSection: some View {
         Section {
             // License class (read-only, from profile)
@@ -226,10 +256,18 @@ struct SettingsMainView: View {
             Toggle("Show frequency activity", isOn: $showActivityPanel)
             Toggle("Keep screen on", isOn: $keepScreenOn)
             Toggle("Quick Log Mode", isOn: $quickLogMode)
+            Toggle("Auto-switch mode for frequency", isOn: $autoModeSwitch)
 
             Picker("Notes display", selection: $notesDisplayMode) {
                 Text("Emoji").tag("emoji")
                 Text("Source names").tag("sources")
+            }
+
+            DisclosureGroup("Always visible fields") {
+                Toggle("Notes", isOn: $showNotes)
+                Toggle("Their Grid", isOn: $showTheirGrid)
+                Toggle("Their Park", isOn: $showTheirPark)
+                Toggle("Operator", isOn: $showOperator)
             }
         } header: {
             Text("Logger")
@@ -237,7 +275,7 @@ struct SettingsMainView: View {
             Text(
                 "Quick Log Mode disables animations for faster QSO entry. "
                     + "Keep screen on prevents device sleep during sessions. "
-                    + "Notes display controls how callsign notes are shown."
+                    + "Always visible fields appear without tapping \"More\"."
             )
         }
     }
@@ -333,6 +371,27 @@ struct SettingsMainView: View {
 
     private var dataSection: some View {
         Section {
+            // QRZ Callbook (for callsign lookups)
+            NavigationLink {
+                QRZCallbookSettingsView()
+            } label: {
+                HStack {
+                    Label("QRZ Callbook", systemImage: "magnifyingglass")
+                    Spacer()
+                    if qrzCallbookIsConfigured {
+                        if let username = try? KeychainHelper.shared.readString(
+                            for: KeychainHelper.Keys.qrzCallbookUsername
+                        ) {
+                            Text(username)
+                                .foregroundStyle(.secondary)
+                        }
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundStyle(.green)
+                            .accessibilityLabel("Connected")
+                    }
+                }
+            }
+
             NavigationLink {
                 CallsignNotesSettingsView()
             } label: {
@@ -363,7 +422,10 @@ struct SettingsMainView: View {
         } header: {
             Text("Data")
         } footer: {
-            Text("Export a complete copy of the QSO database for backup or analysis.")
+            Text(
+                "QRZ Callbook enables callsign lookups (requires QRZ XML subscription). "
+                    + "Export creates a backup of the QSO database."
+            )
         }
     }
 
@@ -466,6 +528,8 @@ struct SettingsMainView: View {
         qrzIsConfigured = qrzClient.hasApiKey()
         qrzCallsign = qrzClient.getCallsign()
 
+        qrzCallbookIsConfigured = checkQRZCallbookAuth()
+
         lotwIsConfigured = lotwClient.hasCredentials()
         if lotwIsConfigured {
             if let creds = try? lotwClient.getCredentials() {
@@ -474,6 +538,15 @@ struct SettingsMainView: View {
         }
 
         userProfile = UserProfileService.shared.getProfile()
+    }
+
+    private func checkQRZCallbookAuth() -> Bool {
+        (try? KeychainHelper.shared.readString(
+            for: KeychainHelper.Keys.qrzCallbookUsername
+        )) != nil
+            && (try? KeychainHelper.shared.readString(
+                for: KeychainHelper.Keys.qrzCallbookPassword
+            )) != nil
     }
 }
 
@@ -538,6 +611,162 @@ enum DatabaseExporter {
 
             return exportURL
         }.value
+    }
+}
+
+// MARK: - TabConfigurationView
+
+struct TabConfigurationView: View {
+    // MARK: Internal
+
+    var body: some View {
+        List {
+            // Tab Bar section - shows visible tabs
+            Section {
+                ForEach(tabBarTabs, id: \.self) { tab in
+                    tabRow(tab, inTabBar: true)
+                }
+                .onMove(perform: moveTabBarTab)
+            } header: {
+                Text("Tab Bar")
+            } footer: {
+                if tabBarTabs.count >= maxVisibleTabs {
+                    Text("Maximum \(maxVisibleTabs) tabs. Drag to reorder.")
+                } else {
+                    Text("Drag to reorder. Tap to move to More.")
+                }
+            }
+
+            // More section - shows hidden tabs
+            Section {
+                if moreTabs.isEmpty {
+                    Text("No hidden tabs")
+                        .foregroundStyle(.secondary)
+                } else {
+                    ForEach(moreTabs, id: \.self) { tab in
+                        tabRow(tab, inTabBar: false)
+                    }
+                    .onMove(perform: moveMoreTab)
+                }
+            } header: {
+                HStack {
+                    Text("More Menu")
+                    Spacer()
+                    Image(systemName: "ellipsis")
+                        .foregroundStyle(.secondary)
+                }
+            } footer: {
+                Text("These tabs are accessible from the More tab.")
+            }
+
+            Section {
+                Button("Reset to Defaults") {
+                    TabConfiguration.reset()
+                    refreshTabs()
+                    notifyChange()
+                }
+            }
+        }
+        .navigationTitle("Tab Bar")
+        .environment(\.editMode, .constant(.active))
+        .onAppear {
+            refreshTabs()
+        }
+    }
+
+    // MARK: Private
+
+    @State private var tabBarTabs: [AppTab] = []
+    @State private var moreTabs: [AppTab] = []
+
+    /// Maximum tabs visible in tab bar (excluding More)
+    private let maxVisibleTabs = 4
+
+    private func tabRow(_ tab: AppTab, inTabBar: Bool) -> some View {
+        let canMoveToTabBar = !inTabBar && tabBarTabs.count < maxVisibleTabs
+
+        return Button {
+            toggleTab(tab, inTabBar: inTabBar)
+        } label: {
+            HStack {
+                Image(systemName: tab.icon)
+                    .foregroundStyle(
+                        inTabBar || canMoveToTabBar ? Color.accentColor : Color.secondary
+                    )
+                    .frame(width: 28)
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(tab.title)
+                        .foregroundStyle(inTabBar || canMoveToTabBar ? .primary : .secondary)
+                    Text(tab.description)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                Spacer()
+
+                // Show action hint
+                if inTabBar {
+                    Image(systemName: "arrow.down")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                } else if canMoveToTabBar {
+                    Image(systemName: "arrow.up")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(!inTabBar && !canMoveToTabBar)
+    }
+
+    private func refreshTabs() {
+        let order = TabConfiguration.tabOrder()
+        let hidden = TabConfiguration.hiddenTabs()
+
+        tabBarTabs = order.filter { $0 != .more && !hidden.contains($0) }
+        moreTabs = order.filter { $0 != .more && hidden.contains($0) }
+    }
+
+    private func toggleTab(_ tab: AppTab, inTabBar: Bool) {
+        var hidden = TabConfiguration.hiddenTabs()
+
+        if inTabBar {
+            // Move from tab bar to more
+            hidden.insert(tab)
+        } else {
+            // Move from more to tab bar (only if under limit)
+            if tabBarTabs.count < maxVisibleTabs {
+                hidden.remove(tab)
+            }
+        }
+
+        TabConfiguration.saveHidden(hidden)
+        refreshTabs()
+        notifyChange()
+    }
+
+    private func moveTabBarTab(from source: IndexSet, to destination: Int) {
+        tabBarTabs.move(fromOffsets: source, toOffset: destination)
+        saveTabOrder()
+    }
+
+    private func moveMoreTab(from source: IndexSet, to destination: Int) {
+        moreTabs.move(fromOffsets: source, toOffset: destination)
+        saveTabOrder()
+    }
+
+    private func saveTabOrder() {
+        // Combine tab bar tabs + more tabs + .more at end
+        let newOrder = tabBarTabs + moreTabs + [.more]
+        TabConfiguration.saveOrder(newOrder)
+        notifyChange()
+    }
+
+    private func notifyChange() {
+        NotificationCenter.default.post(name: .tabConfigurationChanged, object: nil)
     }
 }
 

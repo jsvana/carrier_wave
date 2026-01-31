@@ -277,6 +277,131 @@ struct CompactCallsignBar: View {
     }
 }
 
+// MARK: - CallsignLookupErrorBanner
+
+/// Displays callsign lookup errors with actionable suggestions
+struct CallsignLookupErrorBanner: View {
+    // MARK: Internal
+
+    let error: CallsignLookupError
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon)
+                .foregroundStyle(iconColor)
+                .font(.title3)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(error.errorDescription ?? "Lookup failed")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+
+                if let suggestion = error.recoverySuggestion {
+                    Text(suggestion)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Spacer()
+        }
+        .padding()
+        .background(backgroundColor)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+    }
+
+    /// Shared helpers for both banner and compact bar
+    static func icon(for error: CallsignLookupError) -> String {
+        switch error {
+        case .noQRZApiKey,
+             .noSourcesConfigured:
+            "gear.badge.questionmark"
+        case .qrzAuthFailed:
+            "key.slash"
+        case .networkError:
+            "wifi.slash"
+        case .notFound:
+            "magnifyingglass"
+        }
+    }
+
+    static func iconColor(for error: CallsignLookupError) -> Color {
+        switch error {
+        case .noQRZApiKey,
+             .noSourcesConfigured:
+            .orange
+        case .qrzAuthFailed:
+            .red
+        case .networkError:
+            .yellow
+        case .notFound:
+            .secondary
+        }
+    }
+
+    static func backgroundColor(for error: CallsignLookupError) -> Color {
+        switch error {
+        case .noQRZApiKey,
+             .noSourcesConfigured:
+            Color.orange.opacity(0.15)
+        case .qrzAuthFailed:
+            Color.red.opacity(0.15)
+        case .networkError:
+            Color.yellow.opacity(0.15)
+        case .notFound:
+            Color(.secondarySystemGroupedBackground)
+        }
+    }
+
+    // MARK: Private
+
+    private var icon: String {
+        CallsignLookupErrorBanner.icon(for: error)
+    }
+
+    private var iconColor: Color {
+        CallsignLookupErrorBanner.iconColor(for: error)
+    }
+
+    private var backgroundColor: Color {
+        CallsignLookupErrorBanner.backgroundColor(for: error)
+    }
+}
+
+// MARK: - CompactLookupErrorBar
+
+/// Compact error display for use above the keyboard
+struct CompactLookupErrorBar: View {
+    let error: CallsignLookupError
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: CallsignLookupErrorBanner.icon(for: error))
+                .foregroundStyle(CallsignLookupErrorBanner.iconColor(for: error))
+                .font(.subheadline)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(error.errorDescription ?? "Lookup failed")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+
+                if let suggestion = error.recoverySuggestion {
+                    Text(suggestion)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                        .lineLimit(1)
+                }
+            }
+
+            Spacer()
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(CallsignLookupErrorBanner.backgroundColor(for: error))
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
@@ -305,6 +430,10 @@ struct CompactCallsignBar: View {
                 source: .qrz
             )
         )
+
+        CallsignLookupErrorBanner(error: .noQRZApiKey)
+        CallsignLookupErrorBanner(error: .qrzAuthFailed)
+        CallsignLookupErrorBanner(error: .networkError("Connection timed out"))
     }
     .padding()
     .background(Color(.systemGroupedBackground))

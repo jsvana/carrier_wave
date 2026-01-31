@@ -162,18 +162,36 @@ struct ActivityGrid: View {
     let activityData: [Date: Int]
 
     var body: some View {
+        ActivityGridContent(activityData: activityData, selectedDate: $selectedDate)
+            .accessibilityElement(children: .contain)
+            .accessibilityLabel("Activity grid showing QSO history")
+    }
+
+    // MARK: Private
+
+    @State private var selectedDate: Date?
+}
+
+// MARK: - ActivityGridContent
+
+/// Internal view that calculates and reports its ideal size
+private struct ActivityGridContent: View {
+    // MARK: Internal
+
+    let activityData: [Date: Int]
+
+    @Binding var selectedDate: Date?
+
+    var body: some View {
         GeometryReader { geometry in
-            let spacing: CGFloat = 2
             let gridWidth = geometry.size.width
-            // Target cell size of ~14pt, with minimum 26 weeks and maximum 52 weeks
-            let targetCellSize: CGFloat = 14
             let calculatedColumns = Int((gridWidth + spacing) / (targetCellSize + spacing))
             let columnCount = min(max(calculatedColumns, 26), 52)
             let cellSize = (gridWidth - CGFloat(columnCount - 1) * spacing) / CGFloat(columnCount)
             let gridHeight = CGFloat(rows) * cellSize + CGFloat(rows - 1) * spacing
             let columnWidth = cellSize + spacing
 
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: gridToLabelSpacing) {
                 HStack(alignment: .top, spacing: spacing) {
                     ForEach(0 ..< columnCount, id: \.self) { column in
                         VStack(spacing: spacing) {
@@ -235,18 +253,19 @@ struct ActivityGrid: View {
                             .offset(x: CGFloat(item.column) * columnWidth)
                     }
                 }
-                .frame(width: gridWidth, height: 14, alignment: .topLeading)
+                .frame(width: gridWidth, height: monthLabelHeight, alignment: .topLeading)
             }
         }
-        .accessibilityElement(children: .contain)
-        .accessibilityLabel("Activity grid showing QSO history")
+        .frame(height: calculatedHeight)
     }
 
     // MARK: Private
 
-    @State private var selectedDate: Date?
-
     private let rows = 7
+    private let spacing: CGFloat = 2
+    private let targetCellSize: CGFloat = 14
+    private let monthLabelHeight: CGFloat = 14
+    private let gridToLabelSpacing: CGFloat = 4
 
     private let calendar = Calendar.current
     private let monthFormatter: DateFormatter = {
@@ -263,6 +282,14 @@ struct ActivityGrid: View {
 
     private var maxCount: Int {
         activityData.values.max() ?? 1
+    }
+
+    /// Calculate the expected height based on target cell size
+    /// This provides an ideal height that works across different widths
+    private var calculatedHeight: CGFloat {
+        // Use target cell size for consistent height calculation
+        let gridHeight = CGFloat(rows) * targetCellSize + CGFloat(rows - 1) * spacing
+        return gridHeight + gridToLabelSpacing + monthLabelHeight
     }
 
     private func monthLabelPositions(columnCount: Int) -> [(column: Int, label: String)] {

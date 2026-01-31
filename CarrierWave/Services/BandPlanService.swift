@@ -147,6 +147,37 @@ enum BandPlanService {
         }
     }
 
+    /// Suggest the typical operating mode for a frequency
+    /// Returns CW for CW/DATA segments, SSB for phone segments, nil if ambiguous or out of band
+    static func suggestedMode(for frequencyMHz: Double) -> String? {
+        let matchingSegments = BandPlan.segments.filter { $0.contains(frequencyMHz: frequencyMHz) }
+
+        guard !matchingSegments.isEmpty else {
+            return nil
+        }
+
+        // Check what modes are allowed
+        let allModes = Set(matchingSegments.flatMap(\.modes))
+
+        // If only CW/DATA modes, suggest CW
+        if allModes.isSubset(of: ["CW", "DATA"]) {
+            return "CW"
+        }
+
+        // If only phone modes, suggest SSB
+        if allModes.isSubset(of: ["SSB", "PHONE", "USB", "LSB", "AM", "FM"]) {
+            return "SSB"
+        }
+
+        // If ALL modes allowed (VHF/UHF), don't auto-switch
+        if allModes.contains("ALL") {
+            return nil
+        }
+
+        // Mixed segment - don't auto-switch
+        return nil
+    }
+
     // MARK: Private
 
     private static func normalizeMode(_ mode: String) -> String {

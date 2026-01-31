@@ -1,5 +1,47 @@
 import SwiftUI
 
+// MARK: - CallsignSuffix
+
+/// Standard amateur radio callsign suffixes
+enum CallsignSuffix: String, CaseIterable, Identifiable {
+    case none = "None"
+    case portable = "Portable"
+    case mobile = "Mobile"
+    case maritime = "Maritime Mobile"
+    case aeronautical = "Aeronautical Mobile"
+    case custom = "Custom"
+
+    // MARK: Internal
+
+    var id: String {
+        rawValue
+    }
+
+    /// The suffix code used in the callsign
+    var code: String {
+        switch self {
+        case .none: ""
+        case .portable: "P"
+        case .mobile: "M"
+        case .maritime: "MM"
+        case .aeronautical: "AM"
+        case .custom: ""
+        }
+    }
+
+    /// Description for display
+    var description: String {
+        switch self {
+        case .none: "No suffix"
+        case .portable: "/P – Portable station"
+        case .mobile: "/M – Land vehicle"
+        case .maritime: "/MM – Vessel"
+        case .aeronautical: "/AM – Aircraft"
+        case .custom: "Custom suffix"
+        }
+    }
+}
+
 // MARK: - SessionStartSheet
 
 /// Session setup wizard for starting a new logging session
@@ -43,7 +85,6 @@ struct SessionStartSheet: View {
     @AppStorage("loggerDefaultGrid") private var defaultGrid = ""
     @AppStorage("loggerSkipWizard") private var skipWizard = false
 
-    @State private var myCallsign = ""
     @State private var selectedMode = "CW"
     @State private var frequency = ""
     @State private var activationType: ActivationType = .casual
@@ -51,8 +92,50 @@ struct SessionStartSheet: View {
     @State private var sotaReference = ""
     @State private var myGrid = ""
 
+    // Callsign prefix/suffix
+    @State private var callsignPrefix = ""
+    @State private var selectedSuffix: CallsignSuffix = .none
+    @State private var customSuffix = ""
+
+    /// The full constructed callsign (prefix/base/suffix)
+    private var fullCallsign: String {
+        var parts: [String] = []
+
+        let prefix = callsignPrefix.trimmingCharacters(in: .whitespaces).uppercased()
+        if !prefix.isEmpty {
+            parts.append(prefix)
+        }
+
+        parts.append(defaultCallsign.uppercased())
+
+        let suffix = effectiveSuffix
+        if !suffix.isEmpty {
+            parts.append(suffix)
+        }
+
+        return parts.joined(separator: "/")
+    }
+
+    /// The effective suffix based on selection
+    private var effectiveSuffix: String {
+        switch selectedSuffix {
+        case .none:
+            ""
+        case .portable:
+            "P"
+        case .mobile:
+            "M"
+        case .maritime:
+            "MM"
+        case .aeronautical:
+            "AM"
+        case .custom:
+            customSuffix.trimmingCharacters(in: .whitespaces).uppercased()
+        }
+    }
+
     private var canStart: Bool {
-        !myCallsign.isEmpty && myCallsign.count >= 3
+        !defaultCallsign.isEmpty && defaultCallsign.count >= 3
     }
 
     private var parsedFrequency: Double? {
@@ -63,37 +146,111 @@ struct SessionStartSheet: View {
 
     private var callsignSection: some View {
         Section {
-            TextField("Your Callsign", text: $myCallsign)
-                .textInputAutocapitalization(.characters)
-                .autocorrectionDisabled()
-                .font(.title3.monospaced())
-
-            if !defaultGrid.isEmpty || !myGrid.isEmpty {
-                HStack {
-                    Text("Grid")
-                        .foregroundStyle(.secondary)
-                    Spacer()
-                    TextField("FN31", text: $myGrid)
-                        .textInputAutocapitalization(.characters)
-                        .multilineTextAlignment(.trailing)
-                        .font(.subheadline.monospaced())
-                }
-            }
+            callsignDisplayView
+            callsignPrefixRow
+            suffixPicker
+            customSuffixRow
+            gridRow
         } header: {
             Text("Station")
         } footer: {
-            if myCallsign.isEmpty {
-                Text("Enter your callsign to start logging")
-            }
+            callsignFooter
         }
         .onAppear {
-            if myCallsign.isEmpty, !defaultCallsign.isEmpty {
-                myCallsign = defaultCallsign
-            }
             if myGrid.isEmpty, !defaultGrid.isEmpty {
                 myGrid = defaultGrid
             }
             selectedMode = defaultMode
+        }
+    }
+
+    @ViewBuilder
+    private var callsignDisplayView: some View {
+        if !defaultCallsign.isEmpty {
+            VStack(spacing: 8) {
+                Text(fullCallsign)
+                    .font(.title2.monospaced().bold())
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+
+                if !callsignPrefix.isEmpty || selectedSuffix != .none {
+                    callsignBreakdownView
+                }
+            }
+        }
+    }
+
+    private var callsignBreakdownView: some View {
+        CallsignBreakdownView(
+            prefix: callsignPrefix,
+            baseCallsign: defaultCallsign,
+            suffix: effectiveSuffix
+        )
+    }
+
+    private var callsignPrefixRow: some View {
+        HStack {
+            Text("Prefix")
+                .foregroundStyle(.secondary)
+            Spacer()
+            TextField("e.g. I, VE", text: $callsignPrefix)
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .multilineTextAlignment(.trailing)
+                .font(.subheadline.monospaced())
+                .frame(width: 80)
+        }
+    }
+
+    private var suffixPicker: some View {
+        Picker("Suffix", selection: $selectedSuffix) {
+            ForEach(CallsignSuffix.allCases) { suffix in
+                Text(suffix.rawValue).tag(suffix)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var customSuffixRow: some View {
+        if selectedSuffix == .custom {
+            HStack {
+                Text("Custom Suffix")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                TextField("e.g. 1, 2, QRP", text: $customSuffix)
+                    .textInputAutocapitalization(.characters)
+                    .autocorrectionDisabled()
+                    .multilineTextAlignment(.trailing)
+                    .font(.subheadline.monospaced())
+                    .frame(width: 100)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var gridRow: some View {
+        if !defaultGrid.isEmpty || !myGrid.isEmpty {
+            HStack {
+                Text("Grid")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                TextField("FN31", text: $myGrid)
+                    .textInputAutocapitalization(.characters)
+                    .multilineTextAlignment(.trailing)
+                    .font(.subheadline.monospaced())
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var callsignFooter: some View {
+        if defaultCallsign.isEmpty {
+            Text("Set your callsign in Settings → About Me")
+        } else if !callsignPrefix.isEmpty {
+            Text(
+                "Prefix indicates operating from another location (e.g., I/W6JSV for W6JSV in Italy)"
+            )
         }
     }
 
@@ -128,37 +285,7 @@ struct SessionStartSheet: View {
     }
 
     private var frequencySuggestions: some View {
-        let suggestions = LoggingSession.suggestedFrequencies(for: selectedMode)
-        let sortedBands = ["160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m"]
-            .filter { suggestions[$0] != nil }
-
-        return ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                ForEach(sortedBands, id: \.self) { band in
-                    if let freq = suggestions[band] {
-                        Button {
-                            frequency = String(format: "%.3f", freq)
-                        } label: {
-                            VStack(spacing: 2) {
-                                Text(band)
-                                    .font(.caption.weight(.medium))
-                                Text(String(format: "%.3f", freq))
-                                    .font(.caption2.monospaced())
-                            }
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(
-                                frequency == String(format: "%.3f", freq)
-                                    ? Color.accentColor.opacity(0.2)
-                                    : Color(.tertiarySystemGroupedBackground)
-                            )
-                            .clipShape(RoundedRectangle(cornerRadius: 8))
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
-        }
+        FrequencySuggestionsView(selectedMode: selectedMode, frequency: $frequency)
     }
 
     private var activationSection: some View {
@@ -221,7 +348,7 @@ struct SessionStartSheet: View {
 
     private func startSession() {
         sessionManager?.startSession(
-            myCallsign: myCallsign.uppercased(),
+            myCallsign: fullCallsign,
             mode: selectedMode,
             frequency: parsedFrequency,
             activationType: activationType,
@@ -230,14 +357,10 @@ struct SessionStartSheet: View {
             myGrid: myGrid.isEmpty ? nil : myGrid.uppercased()
         )
 
-        // Save callsign as default for next time
-        defaultCallsign = myCallsign.uppercased()
-
         onDismiss()
     }
 
     private func saveDefaults() {
-        defaultCallsign = myCallsign.uppercased()
         defaultMode = selectedMode
         if !myGrid.isEmpty {
             defaultGrid = myGrid.uppercased()
@@ -249,6 +372,107 @@ struct SessionStartSheet: View {
             return nil
         }
         return POTAParksCache.shared.name(for: reference.uppercased())
+    }
+}
+
+// MARK: - CallsignBreakdownView
+
+/// Extracted view showing callsign prefix/base/suffix breakdown
+struct CallsignBreakdownView: View {
+    let prefix: String
+    let baseCallsign: String
+    let suffix: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            if !prefix.isEmpty {
+                Text(prefix.uppercased())
+                    .font(.caption.monospaced())
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.orange.opacity(0.2))
+                    .clipShape(Capsule())
+                Text("/")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Text(baseCallsign.uppercased())
+                .font(.caption.monospaced())
+                .padding(.horizontal, 6)
+                .padding(.vertical, 2)
+                .background(Color.blue.opacity(0.2))
+                .clipShape(Capsule())
+
+            if !suffix.isEmpty {
+                Text("/")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                Text(suffix)
+                    .font(.caption.monospaced())
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.green.opacity(0.2))
+                    .clipShape(Capsule())
+            }
+        }
+    }
+}
+
+// MARK: - FrequencySuggestionsView
+
+/// Extracted view for frequency band suggestions
+struct FrequencySuggestionsView: View {
+    // MARK: Internal
+
+    let selectedMode: String
+
+    @Binding var frequency: String
+
+    var body: some View {
+        let suggestions = LoggingSession.suggestedFrequencies(for: selectedMode)
+        let availableBands = Self.sortedBands.filter { suggestions[$0] != nil }
+
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 8) {
+                ForEach(availableBands, id: \.self) { band in
+                    if let freq = suggestions[band] {
+                        bandButton(band: band, freq: freq)
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Private
+
+    private static let sortedBands = [
+        "160m", "80m", "40m", "30m", "20m", "17m", "15m", "12m", "10m",
+    ]
+
+    private func bandButton(band: String, freq: Double) -> some View {
+        let freqString = String(format: "%.3f", freq)
+        let isSelected = frequency == freqString
+
+        return Button {
+            frequency = freqString
+        } label: {
+            VStack(spacing: 2) {
+                Text(band)
+                    .font(.caption.weight(.medium))
+                Text(freqString)
+                    .font(.caption2.monospaced())
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                isSelected
+                    ? Color.accentColor.opacity(0.2)
+                    : Color(.tertiarySystemGroupedBackground)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 8))
+        }
+        .buttonStyle(.plain)
     }
 }
 

@@ -49,9 +49,10 @@ final class CallsignAliasService {
 
     /// Save the list of previous callsigns
     func savePreviousCallsigns(_ callsigns: [String]) throws {
-        let normalized = callsigns
-            .map { $0.uppercased().trimmingCharacters(in: .whitespaces) }
-            .filter { !$0.isEmpty }
+        let normalized =
+            callsigns
+                .map { $0.uppercased().trimmingCharacters(in: .whitespaces) }
+                .filter { !$0.isEmpty }
         let data = try JSONEncoder().encode(normalized)
         try keychain.save(data, for: KeychainHelper.Keys.previousCallsigns)
     }
@@ -91,20 +92,87 @@ final class CallsignAliasService {
     }
 
     /// Check if a given callsign belongs to the user
+    /// Handles portable suffixes like /P, /M, /QRP by extracting the base callsign
     func isUserCallsign(_ callsign: String) -> Bool {
         let normalized = callsign.uppercased().trimmingCharacters(in: .whitespaces)
-        return getAllUserCallsigns().contains(normalized)
+        let userCallsigns = getAllUserCallsigns()
+
+        // Direct match
+        if userCallsigns.contains(normalized) {
+            return true
+        }
+
+        // Check if base callsign (without suffix) matches any user callsign
+        let baseCallsign = extractBaseCallsign(normalized)
+        return userCallsigns.contains(baseCallsign)
     }
 
     /// Find callsigns in the given set that are not configured as user callsigns
+    /// Handles portable suffixes like /P, /M, /QRP by extracting the base callsign
     func getUnconfiguredCallsigns(from allCallsigns: Set<String>) -> Set<String> {
         let userCallsigns = getAllUserCallsigns()
-        return allCallsigns.filter { !userCallsigns.contains($0.uppercased()) }
+        let userBaseCallsigns = Set(userCallsigns.map { extractBaseCallsign($0) })
+
+        return allCallsigns.filter { callsign in
+            let upper = callsign.uppercased()
+            // Check direct match
+            if userCallsigns.contains(upper) {
+                return false
+            }
+            // Check base callsign match
+            let baseCallsign = extractBaseCallsign(upper)
+            return !userBaseCallsigns.contains(baseCallsign)
+        }
     }
 
     // MARK: Private
 
     private let keychain = KeychainHelper.shared
+
+    /// Extract the base callsign from a potentially prefixed/suffixed callsign
+    /// e.g., "W6JSV/P" -> "W6JSV", "VE3/W6JSV" -> "W6JSV", "W6JSV/QRP" -> "W6JSV"
+    private func extractBaseCallsign(_ callsign: String) -> String {
+        let parts = callsign.split(separator: "/").map(String.init)
+
+        guard parts.count > 1 else {
+            return callsign
+        }
+
+        // Common suffixes that indicate the base callsign is before them
+        let knownSuffixes = Set(["P", "M", "MM", "AM", "QRP", "R", "A", "B", "LH", "LGT"])
+
+        // For 2 parts: check if second part is a known suffix or very short (1-2 chars)
+        if parts.count == 2 {
+            let first = parts[0]
+            let second = parts[1]
+
+            // If second is a known suffix, first is the base
+            if knownSuffixes.contains(second.uppercased()) {
+                return first
+            }
+
+            // If second is very short (1-2 chars), it's likely a suffix
+            if second.count <= 2 {
+                return first
+            }
+
+            // If first is very short (1-2 chars), it's likely a country prefix
+            if first.count <= 2 {
+                return second
+            }
+
+            // Otherwise, return the longer one (more likely to be the full callsign)
+            return first.count >= second.count ? first : second
+        }
+
+        // For 3 parts (prefix/call/suffix): middle is the base
+        if parts.count == 3 {
+            return parts[1]
+        }
+
+        // Fallback: return the longest part
+        return parts.max(by: { $0.count < $1.count }) ?? callsign
+    }
 }
 
 // MARK: - CallsignAliasError

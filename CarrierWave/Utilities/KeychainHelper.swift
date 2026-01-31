@@ -116,6 +116,12 @@ extension KeychainHelper {
         static let qrzLastUploadDate = "qrz.last.upload.date"
         static let qrzLastDownloadDate = "qrz.last.download.date"
 
+        // QRZ XML Callbook - username/password auth for callsign lookups
+        // This is separate from the Logbook API key - requires QRZ XML subscription
+        static let qrzCallbookUsername = "qrz.callbook.username"
+        static let qrzCallbookPassword = "qrz.callbook.password"
+        static let qrzCallbookSessionKey = "qrz.callbook.session.key"
+
         // QRZ - session-based auth (deprecated, remove after migration)
         static let qrzSessionKey = "qrz.session.key"
         static let qrzUsername = "qrz.username"

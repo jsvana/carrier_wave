@@ -7,9 +7,10 @@ All notable changes to Carrier Wave will be documented in this file.
 ### Added
 - **Tab Bar Configuration** - Customize which tabs appear and their order
   - Settings → Navigation → Tab Bar
-  - Enable/disable Logger, CW Decoder, and other tabs
-  - Drag to reorder tabs
-  - Shows which tabs will appear in "More" menu when too many enabled
+  - All tabs (Dashboard, Logger, Logs, CW, Map, Activity) can be shown/hidden
+  - Drag to reorder tabs in the tab bar
+  - Hidden tabs appear in the More menu
+  - Map and Activity start hidden by default, accessible from More
 - **Feature Selection in Onboarding** - New step to enable/disable Logger and CW Decoder during initial setup
 
 ### Changed

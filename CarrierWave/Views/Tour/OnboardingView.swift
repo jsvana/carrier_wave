@@ -7,6 +7,7 @@ enum OnboardingStep: Int, CaseIterable {
     case callsign = 0
     case lookupResult
     case connectServices
+    case configureFeatures
     case complete
 
     // MARK: Internal
@@ -16,6 +17,7 @@ enum OnboardingStep: Int, CaseIterable {
         case .callsign: "What's Your Callsign?"
         case .lookupResult: "Welcome!"
         case .connectServices: "Connect Your Services"
+        case .configureFeatures: "Choose Your Features"
         case .complete: "You're All Set!"
         }
     }
@@ -77,6 +79,10 @@ struct OnboardingView: View {
     @State private var isConnectingService = false
     @State private var connectedServices: Set<String> = []
 
+    // Feature toggles
+    @State private var loggerEnabled = true
+    @State private var cwDecoderEnabled = true
+
     private let profileService = UserProfileService.shared
 
     private var stepContent: some View {
@@ -89,6 +95,8 @@ struct OnboardingView: View {
                     lookupResultStep
                 case .connectServices:
                     connectServicesStep
+                case .configureFeatures:
+                    configureFeaturesStep
                 case .complete:
                     completeStep
                 }
@@ -268,6 +276,46 @@ struct OnboardingView: View {
         }
     }
 
+    private var configureFeaturesStep: some View {
+        VStack(spacing: 20) {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 60))
+                .foregroundStyle(Color.accentColor)
+
+            Text("Choose your features")
+                .font(.title2)
+                .fontWeight(.semibold)
+
+            Text("Enable the features you want to use. You can change these later in Settings.")
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+
+            VStack(spacing: 16) {
+                featureToggleCard(
+                    name: "Logger",
+                    icon: "pencil.and.list.clipboard",
+                    description: "Log QSOs during activations with session management, "
+                        + "band plan validation, and POTA spotting.",
+                    isEnabled: $loggerEnabled
+                )
+
+                featureToggleCard(
+                    name: "CW Decoder",
+                    icon: "waveform",
+                    description: "Decode CW audio in real-time with adaptive frequency detection "
+                        + "and callsign extraction.",
+                    isEnabled: $cwDecoderEnabled
+                )
+            }
+
+            Text("Both features are experimental and under active development.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+        }
+    }
+
     private var completeStep: some View {
         VStack(spacing: 20) {
             Image(systemName: "checkmark.circle.fill")
@@ -362,7 +410,16 @@ struct OnboardingView: View {
             .buttonStyle(.borderedProminent)
 
         case .connectServices:
-            Button("Skip") {
+            Button("Next") {
+                withAnimation {
+                    currentStep = .configureFeatures
+                }
+            }
+            .buttonStyle(.borderedProminent)
+
+        case .configureFeatures:
+            Button("Next") {
+                saveFeatureSettings()
                 withAnimation {
                     currentStep = .complete
                 }
@@ -375,6 +432,33 @@ struct OnboardingView: View {
             }
             .buttonStyle(.borderedProminent)
         }
+    }
+
+    private func featureToggleCard(
+        name: String,
+        icon: String,
+        description: String,
+        isEnabled: Binding<Bool>
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Image(systemName: icon)
+                    .foregroundStyle(isEnabled.wrappedValue ? Color.accentColor : .secondary)
+                    .frame(width: 28)
+                Text(name)
+                    .fontWeight(.medium)
+                Spacer()
+                Toggle("", isOn: isEnabled)
+                    .labelsHidden()
+            }
+
+            Text(description)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(Color(.secondarySystemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
     private func profileInfoGrid(_ profile: UserProfile) -> some View {
@@ -584,6 +668,26 @@ struct OnboardingView: View {
                 showingError = true
             }
         }
+    }
+
+    private func saveFeatureSettings() {
+        // Update tab visibility based on feature toggles
+        var hiddenTabs = TabConfiguration.hiddenTabs()
+
+        if loggerEnabled {
+            hiddenTabs.remove(.logger)
+        } else {
+            hiddenTabs.insert(.logger)
+        }
+
+        if cwDecoderEnabled {
+            hiddenTabs.remove(.cwDecoder)
+        } else {
+            hiddenTabs.insert(.cwDecoder)
+        }
+
+        TabConfiguration.saveHidden(hiddenTabs)
+        NotificationCenter.default.post(name: .tabConfigurationChanged, object: nil)
     }
 
     private func completeOnboarding() {

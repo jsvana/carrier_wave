@@ -1028,88 +1028,90 @@ struct LoggerView: View {
 
     private func executeCommand(_ command: LoggerCommand) {
         switch command {
-        case let .frequency(freq):
-            let result = sessionManager?.updateFrequency(freq)
-            ToastManager.shared.commandExecuted("FREQ", result: String(format: "%.3f MHz", freq))
-
-            // Auto-switch mode based on frequency segment (if enabled)
-            if autoModeSwitch, let suggestedMode = result?.suggestedMode {
-                _ = sessionManager?.updateMode(suggestedMode)
-                ToastManager.shared.commandExecuted("MODE", result: "\(suggestedMode) (auto)")
-            }
-
-            // Prompt for QSY spot
-            if result?.shouldPromptForSpot == true {
-                qsyNewFrequency = freq
-                showQSYSpotConfirmation = true
-            }
-
-        case let .mode(newMode):
-            let shouldPromptForSpot = sessionManager?.updateMode(newMode) ?? false
-            ToastManager.shared.commandExecuted("MODE", result: newMode)
-            if shouldPromptForSpot {
-                qsyNewFrequency = sessionManager?.activeSession?.frequency
-                showQSYSpotConfirmation = true
-            }
-
-        case let .spot(comment):
-            Task {
-                await postSpot(comment: comment)
-            }
-
-        case let .rbn(callsign):
-            rbnTargetCallsign = callsign
-            showRBNPanel = true
-
-        case .solar:
-            showSolarPanel = true
-
-        case .weather:
-            showWeatherPanel = true
-
-        case .map:
-            // Check for missing grid configuration
-            let myGrid =
-                sessionManager?.activeSession?.myGrid
-                    ?? UserDefaults.standard.string(forKey: "loggerDefaultGrid")
-
-            if myGrid == nil || myGrid?.isEmpty == true {
-                ToastManager.shared.warning("Your grid is not set - no arcs will be shown")
-            } else {
-                // Check if session QSOs are missing grids
-                let sessionId = sessionManager?.activeSession?.id
-                let sessionQSOs =
-                    sessionId.map { id in
-                        allQSOs.filter { $0.loggingSessionId == id }
-                    } ?? []
-                let qsosWithGrid = sessionQSOs.filter {
-                    $0.theirGrid != nil && !$0.theirGrid!.isEmpty
-                }
-
-                if !sessionQSOs.isEmpty, qsosWithGrid.isEmpty {
-                    ToastManager.shared.warning(
-                        "No QSOs have grids - add QRZ Callbook in Settings → Data"
-                    )
-                } else if sessionQSOs.count > qsosWithGrid.count {
-                    let missing = sessionQSOs.count - qsosWithGrid.count
-                    ToastManager.shared.info(
-                        "\(missing) QSO\(missing == 1 ? "" : "s") missing grid"
-                    )
-                }
-            }
-
-            showMapPanel = true
-
-        case .hidden:
-            showHiddenQSOsSheet = true
-
-        case .help:
-            showHelpAlert = true
-
-        case let .note(text):
-            sessionManager?.appendNote(text)
-            ToastManager.shared.commandExecuted("NOTE", result: "Added to session log")
+        case let .frequency(freq): executeFrequencyCommand(freq)
+        case let .mode(newMode): executeModeCommand(newMode)
+        case let .spot(comment): Task { await postSpot(comment: comment) }
+        case let .rbn(callsign): executeRBNCommand(callsign)
+        case .solar: showSolarPanel = true
+        case .weather: showWeatherPanel = true
+        case .map: executeMapCommand()
+        case .hidden: showHiddenQSOsSheet = true
+        case .help: showHelpAlert = true
+        case let .note(text): executeNoteCommand(text)
         }
+    }
+
+    private func executeFrequencyCommand(_ freq: Double) {
+        let result = sessionManager?.updateFrequency(freq)
+        ToastManager.shared.commandExecuted("FREQ", result: String(format: "%.3f MHz", freq))
+
+        // Auto-switch mode based on frequency segment (if enabled)
+        if autoModeSwitch, let suggestedMode = result?.suggestedMode {
+            _ = sessionManager?.updateMode(suggestedMode)
+            ToastManager.shared.commandExecuted("MODE", result: "\(suggestedMode) (auto)")
+        }
+
+        // Prompt for QSY spot
+        if result?.shouldPromptForSpot == true {
+            qsyNewFrequency = freq
+            showQSYSpotConfirmation = true
+        }
+    }
+
+    private func executeModeCommand(_ newMode: String) {
+        let shouldPromptForSpot = sessionManager?.updateMode(newMode) ?? false
+        ToastManager.shared.commandExecuted("MODE", result: newMode)
+        if shouldPromptForSpot {
+            qsyNewFrequency = sessionManager?.activeSession?.frequency
+            showQSYSpotConfirmation = true
+        }
+    }
+
+    private func executeRBNCommand(_ callsign: String?) {
+        rbnTargetCallsign = callsign
+        showRBNPanel = true
+    }
+
+    private func executeMapCommand() {
+        // Check for missing grid configuration
+        let myGrid =
+            sessionManager?.activeSession?.myGrid
+                ?? UserDefaults.standard.string(forKey: "loggerDefaultGrid")
+
+        if myGrid == nil || myGrid?.isEmpty == true {
+            ToastManager.shared.warning("Your grid is not set - no arcs will be shown")
+        } else {
+            checkSessionGridWarnings()
+        }
+
+        showMapPanel = true
+    }
+
+    private func checkSessionGridWarnings() {
+        let sessionId = sessionManager?.activeSession?.id
+        let sessionQSOs =
+            sessionId.map { id in
+                allQSOs.filter { $0.loggingSessionId == id }
+            } ?? []
+        let qsosWithGrid = sessionQSOs.filter {
+            $0.theirGrid != nil && !$0.theirGrid!.isEmpty
+        }
+
+        if !sessionQSOs.isEmpty, qsosWithGrid.isEmpty {
+            ToastManager.shared.warning(
+                "No QSOs have grids - add QRZ Callbook in Settings → Data"
+            )
+        } else if sessionQSOs.count > qsosWithGrid.count {
+            let missing = sessionQSOs.count - qsosWithGrid.count
+            ToastManager.shared.info(
+                "\(missing) QSO\(missing == 1 ? "" : "s") missing grid"
+            )
+        }
+    }
+
+    private func executeNoteCommand(_ text: String) {
+        sessionManager?.appendNote(text)
+        ToastManager.shared.commandExecuted("NOTE", result: "Added to session log")
     }
 
     private func postSpot(comment: String? = nil) async {
