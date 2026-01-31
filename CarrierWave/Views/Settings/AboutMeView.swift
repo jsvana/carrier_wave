@@ -6,6 +6,8 @@ import SwiftUI
 struct AboutMeView: View {
     // MARK: Internal
 
+    var onRequestOnboarding: (() -> Void)?
+
     var body: some View {
         Form {
             if let profile {
@@ -99,10 +101,22 @@ struct AboutMeView: View {
                 }
             }
             .disabled(isRefreshing)
+
+            Button {
+                onRequestOnboarding?()
+            } label: {
+                HStack {
+                    Image(systemName: "person.badge.key")
+                    Text("Change Callsign")
+                }
+            }
         } header: {
             Text("Actions")
         } footer: {
-            Text("Re-fetches your information from HamDB.org to update your profile.")
+            Text(
+                "Refresh re-fetches your information from HamDB.org. "
+                    + "Change Callsign lets you set up a different callsign."
+            )
         }
     }
 
@@ -116,13 +130,15 @@ struct AboutMeView: View {
                 Text("No Profile Set Up")
                     .font(.headline)
 
-                Text("Your profile will be set up automatically during onboarding, or you can set it up manually.")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
+                Text(
+                    "Your profile will be set up automatically during onboarding, or you can set it up manually."
+                )
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
 
                 Button("Set Up Profile") {
-                    // This would normally trigger onboarding
+                    onRequestOnboarding?()
                 }
                 .buttonStyle(.borderedProminent)
             }

@@ -46,6 +46,7 @@ struct SettingsMainView: View {
     @State private var exportedFile: ExportedFile?
     @State private var showingBugReport = false
     @State private var showIntroTour = false
+    @State private var showOnboarding = false
 
     @AppStorage("debugMode") private var debugMode = false
     @AppStorage("readOnlyMode") private var readOnlyMode = false
@@ -171,6 +172,15 @@ struct SettingsMainView: View {
         .fullScreenCover(isPresented: $showIntroTour) {
             IntroTourView(tourState: tourState)
         }
+        .fullScreenCover(isPresented: $showOnboarding) {
+            OnboardingView(tourState: tourState, potaAuth: potaAuth)
+        }
+        .onChange(of: showOnboarding) { _, isShowing in
+            // Reload profile after onboarding completes
+            if !isShowing {
+                userProfile = UserProfileService.shared.getProfile()
+            }
+        }
     }
 
     // MARK: - Sections
@@ -178,7 +188,9 @@ struct SettingsMainView: View {
     private var profileSection: some View {
         Section {
             NavigationLink {
-                AboutMeView()
+                AboutMeView {
+                    showOnboarding = true
+                }
             } label: {
                 HStack {
                     if let profile = userProfile {
