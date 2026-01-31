@@ -8,7 +8,8 @@ import SwiftUI
 struct LoggerView: View {
     // MARK: Lifecycle
 
-    init(onSessionEnd: (() -> Void)? = nil) {
+    init(tourState: TourState, onSessionEnd: (() -> Void)? = nil) {
+        self.tourState = tourState
         self.onSessionEnd = onSessionEnd
     }
 
@@ -41,7 +42,21 @@ struct LoggerView: View {
                             if sessionManager?.hasActiveSession == true {
                                 callsignInputSection
 
-                                if let info = lookupResult {
+                                // POTA duplicate/new band warning
+                                if let status = potaDuplicateStatus {
+                                    POTAStatusBanner(status: status)
+                                        .transition(
+                                            .asymmetric(
+                                                insertion: .move(edge: .top).combined(
+                                                    with: .opacity
+                                                ),
+                                                removal: .opacity
+                                            )
+                                        )
+                                }
+
+                                // Only show full card when keyboard is not visible
+                                if let info = lookupResult, !callsignFieldFocused {
                                     LoggerCallsignCard(info: info)
                                         .transition(
                                             .asymmetric(
@@ -76,33 +91,7 @@ struct LoggerView: View {
                     }
                 }
             }
-            .navigationTitle(sessionManager?.hasActiveSession == true ? "" : "Logger")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    if sessionManager?.hasActiveSession == true {
-                        Button {
-                            let hadQSOs = (sessionManager?.activeSession?.qsoCount ?? 0) > 0
-                            sessionManager?.endSession()
-                            if hadQSOs {
-                                onSessionEnd?()
-                            }
-                        } label: {
-                            Text("End Session")
-                                .fontWeight(.medium)
-                        }
-                        .tint(.red)
-                    } else {
-                        Button {
-                            showSessionSheet = true
-                        } label: {
-                            Text("Start Session")
-                                .fontWeight(.medium)
-                        }
-                        .tint(.green)
-                    }
-                }
-            }
+            .navigationBarHidden(true)
             .sheet(isPresented: $showSessionSheet) {
                 SessionStartSheet(
                     sessionManager: sessionManager,
@@ -123,6 +112,9 @@ struct LoggerView: View {
                 )
                 .presentationDetents([.height(200)])
             }
+            .sheet(isPresented: $showHiddenQSOsSheet) {
+                HiddenQSOsSheet(sessionId: sessionManager?.activeSession?.id)
+            }
             .onAppear {
                 if sessionManager == nil {
                     sessionManager = LoggingSessionManager(modelContext: modelContext)
@@ -132,6 +124,9 @@ struct LoggerView: View {
             .animation(quickLogMode ? nil : .easeInOut(duration: 0.2), value: showMoreFields)
             .animation(
                 quickLogMode ? nil : .easeInOut(duration: 0.2), value: currentViolation?.message
+            )
+            .animation(
+                quickLogMode ? nil : .easeInOut(duration: 0.2), value: potaDuplicateStatusKey
             )
             .onChange(of: sessionManager?.activeSession?.frequency) { _, _ in
                 dismissedViolation = nil
@@ -186,6 +181,7 @@ struct LoggerView: View {
             ) { _ in
                 keyboardHeight = 0
             }
+            .miniTour(.logger, tourState: tourState)
         }
     }
 
@@ -232,6 +228,7 @@ struct LoggerView: View {
     @State private var showSolarPanel = false
     @State private var showWeatherPanel = false
     @State private var showHelpAlert = false
+    @State private var showHiddenQSOsSheet = false
 
     // Session title editing
     @State private var showTitleEditSheet = false
@@ -242,6 +239,9 @@ struct LoggerView: View {
 
     /// Keyboard tracking
     @State private var keyboardHeight: CGFloat = 0
+
+    /// Tour state for mini-tour
+    private let tourState: TourState
 
     /// Callback when session ends with QSOs logged
     private let onSessionEnd: (() -> Void)?
@@ -261,8 +261,20 @@ struct LoggerView: View {
 
     /// Whether the log button should be enabled
     private var canLog: Bool {
-        sessionManager?.hasActiveSession == true && !callsignInput.isEmpty
-            && callsignInput.count >= 3
+        guard sessionManager?.hasActiveSession == true,
+              !callsignInput.isEmpty,
+              callsignInput.count >= 3
+        else {
+            return false
+        }
+
+        // Don't allow logging your own callsign
+        let myCallsign = sessionManager?.activeSession?.myCallsign.uppercased() ?? ""
+        if !myCallsign.isEmpty, callsignInput.uppercased() == myCallsign {
+            return false
+        }
+
+        return true
     }
 
     /// Current mode (for RST default)
@@ -287,6 +299,46 @@ struct LoggerView: View {
     /// Detected command from input (if any)
     private var detectedCommand: LoggerCommand? {
         LoggerCommand.parse(callsignInput)
+    }
+
+    /// Check if the current callsign input would be a duplicate in the current POTA session
+    private var potaDuplicateStatus: POTACallsignStatus? {
+        guard let session = sessionManager?.activeSession,
+              session.activationType == .pota,
+              !callsignInput.isEmpty,
+              callsignInput.count >= 3,
+              detectedCommand == nil
+        else {
+            return nil
+        }
+
+        let callsign = callsignInput.uppercased()
+        let currentBand = session.band ?? "Unknown"
+
+        // Find all QSOs with this callsign in the current session
+        let matchingQSOs = displayQSOs.filter { $0.callsign.uppercased() == callsign }
+
+        if matchingQSOs.isEmpty {
+            return .firstContact
+        }
+
+        let previousBands = Set(matchingQSOs.map(\.band))
+
+        if previousBands.contains(currentBand) {
+            return .duplicateBand(band: currentBand)
+        } else {
+            return .newBand(previousBands: Array(previousBands).sorted())
+        }
+    }
+
+    /// Key for animating POTA status changes
+    private var potaDuplicateStatusKey: String {
+        switch potaDuplicateStatus {
+        case .none: "none"
+        case .firstContact: "first"
+        case .newBand: "newband"
+        case .duplicateBand: "dupe"
+        }
     }
 
     /// Current band plan violation (if any)
@@ -675,7 +727,11 @@ struct LoggerView: View {
                         .padding(.vertical, 20)
                 } else {
                     ForEach(displayQSOs.prefix(10)) { qso in
-                        LoggerQSORow(qso: qso)
+                        LoggerQSORow(
+                            qso: qso,
+                            sessionQSOs: displayQSOs,
+                            isPOTASession: sessionManager?.activeSession?.activationType == .pota
+                        )
                     }
                 }
             }
@@ -691,48 +747,73 @@ struct LoggerView: View {
     private func activeSessionHeader(_ session: LoggingSession) -> some View {
         VStack(spacing: 4) {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Button {
-                        editingTitle = session.customTitle ?? ""
-                        showTitleEditSheet = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(session.displayTitle)
-                                .font(.headline.monospaced())
-                            Image(systemName: "pencil")
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                        }
-                    }
-                    .buttonStyle(.plain)
-
-                    if let parkName = lookupParkName(session.parkReference) {
-                        Text(parkName)
+                Button {
+                    editingTitle = session.customTitle ?? ""
+                    showTitleEditSheet = true
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(session.displayTitle)
+                            .font(.headline.monospaced())
+                        Image(systemName: "pencil")
                             .font(.caption)
-                            .foregroundStyle(.green)
-                            .lineLimit(1)
+                            .foregroundStyle(.secondary)
                     }
                 }
+                .buttonStyle(.plain)
 
                 Spacer()
 
-                VStack(alignment: .trailing, spacing: 2) {
-                    Text("\(session.qsoCount) QSOs")
-                        .font(.subheadline.weight(.medium))
-                        .foregroundStyle(.green)
+                Text("\(displayQSOs.count) QSOs")
+                    .font(.subheadline.weight(.medium))
+                    .foregroundStyle(.green)
 
-                    Text(session.formattedDuration)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                Button {
+                    let hadQSOs = !displayQSOs.isEmpty
+                    sessionManager?.endSession()
+                    if hadQSOs {
+                        onSessionEnd?()
+                    }
+                } label: {
+                    Text("END")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.red)
+                        .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }
 
             HStack {
+                if let parkName = lookupParkName(session.parkReference) {
+                    Text(parkName)
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                        .lineLimit(1)
+                }
+
                 if let freq = session.frequency {
                     Text(String(format: "%.3f MHz", freq))
                         .font(.caption.monospaced())
                 }
+
+                if let band = session.band {
+                    Text(band)
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.2))
+                        .clipShape(Capsule())
+                }
+
                 Text(session.mode)
+                    .font(.caption.weight(.medium))
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.blue.opacity(0.2))
+                    .clipShape(Capsule())
+
+                Text(session.formattedDuration)
                     .font(.caption.weight(.medium))
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -752,12 +833,6 @@ struct LoggerView: View {
                         parkRef: parkRef,
                         onMarkRead: { commentsService.markAllRead() }
                     )
-                }
-
-                if let band = session.band {
-                    Text(band)
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
         }
@@ -805,7 +880,40 @@ struct LoggerView: View {
             showWeatherPanel = true
 
         case .map:
+            // Check for missing grid configuration
+            let myGrid =
+                sessionManager?.activeSession?.myGrid
+                    ?? UserDefaults.standard.string(forKey: "loggerDefaultGrid")
+
+            if myGrid == nil || myGrid?.isEmpty == true {
+                ToastManager.shared.warning("Your grid is not set - no arcs will be shown")
+            } else {
+                // Check if session QSOs are missing grids
+                let sessionId = sessionManager?.activeSession?.id
+                let sessionQSOs =
+                    sessionId.map { id in
+                        allQSOs.filter { $0.loggingSessionId == id }
+                    } ?? []
+                let qsosWithGrid = sessionQSOs.filter {
+                    $0.theirGrid != nil && !$0.theirGrid!.isEmpty
+                }
+
+                if !sessionQSOs.isEmpty, qsosWithGrid.isEmpty {
+                    ToastManager.shared.warning(
+                        "No QSOs have grids - add QRZ Callbook in Settings → External Data"
+                    )
+                } else if sessionQSOs.count > qsosWithGrid.count {
+                    let missing = sessionQSOs.count - qsosWithGrid.count
+                    ToastManager.shared.info(
+                        "\(missing) QSO\(missing == 1 ? "" : "s") missing grid"
+                    )
+                }
+            }
+
             showMapPanel = true
+
+        case .hidden:
+            showHiddenQSOsSheet = true
 
         case .help:
             showHelpAlert = true
@@ -934,6 +1042,18 @@ struct LoggerView: View {
     }
 }
 
+// MARK: - POTACallsignStatus
+
+/// Status of a callsign within a POTA session
+enum POTACallsignStatus {
+    /// First contact with this callsign
+    case firstContact
+    /// Contact on a new band (valid for POTA)
+    case newBand(previousBands: [String])
+    /// Duplicate on the same band (not valid for POTA)
+    case duplicateBand(band: String)
+}
+
 // MARK: - LoggerQSORow
 
 /// A row displaying a logged QSO
@@ -941,26 +1061,136 @@ struct LoggerQSORow: View {
     // MARK: Internal
 
     let qso: QSO
+    /// All QSOs in the current session (for duplicate detection)
+    var sessionQSOs: [QSO] = []
+    /// Whether this is a POTA session
+    var isPOTASession: Bool = false
 
     var body: some View {
+        Button {
+            showEditSheet = true
+        } label: {
+            rowContent
+        }
+        .buttonStyle(.plain)
+        .sheet(isPresented: $showEditSheet) {
+            QSOEditSheet(qso: qso)
+        }
+        .task {
+            await lookupCallsign()
+        }
+    }
+
+    // MARK: Private
+
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var callsignInfo: CallsignInfo?
+    @State private var showEditSheet = false
+
+    /// Display name from QSO or callsign lookup
+    private var displayName: String? {
+        qso.name ?? callsignInfo?.name
+    }
+
+    /// Display location from QSO or callsign lookup
+    private var displayLocation: String? {
+        if let state = qso.state {
+            return state
+        }
+        if let info = callsignInfo {
+            let parts = [info.state, info.country].compactMap { $0 }
+            if !parts.isEmpty {
+                return parts.joined(separator: ", ")
+            }
+        }
+        return nil
+    }
+
+    /// Determine the POTA status of this QSO's callsign
+    private var potaStatus: POTACallsignStatus {
+        let callsign = qso.callsign.uppercased()
+        let thisBand = qso.band
+
+        // Find all previous QSOs with this callsign (before this one)
+        let previousQSOs = sessionQSOs.filter {
+            $0.callsign.uppercased() == callsign && $0.timestamp < qso.timestamp
+        }
+
+        if previousQSOs.isEmpty {
+            return .firstContact
+        }
+
+        let previousBands = Set(previousQSOs.map(\.band))
+
+        if previousBands.contains(thisBand) {
+            return .duplicateBand(band: thisBand)
+        } else {
+            return .newBand(previousBands: Array(previousBands).sorted())
+        }
+    }
+
+    /// Color for the callsign based on POTA status
+    private var callsignColor: Color {
+        guard isPOTASession else {
+            return .green
+        }
+
+        switch potaStatus {
+        case .firstContact:
+            return .green
+        case .newBand:
+            return .blue
+        case .duplicateBand:
+            return .orange
+        }
+    }
+
+    private var timeFormatter: DateFormatter {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        formatter.timeZone = TimeZone(identifier: "UTC")
+        return formatter
+    }
+
+    private var rowContent: some View {
         HStack(spacing: 12) {
             Text(timeFormatter.string(from: qso.timestamp))
                 .font(.caption.monospaced())
                 .foregroundStyle(.secondary)
                 .frame(width: 50, alignment: .leading)
 
-            Text(qso.callsign)
-                .font(.subheadline.weight(.semibold).monospaced())
-                .foregroundStyle(.green)
+            HStack(spacing: 4) {
+                Text(qso.callsign)
+                    .font(.subheadline.weight(.semibold).monospaced())
+                    .foregroundStyle(callsignColor)
+                    .fixedSize(horizontal: true, vertical: false)
+
+                if let emoji = callsignInfo?.combinedEmoji {
+                    Text(emoji)
+                        .font(.caption)
+                }
+
+                // Show POTA status badges
+                if isPOTASession {
+                    potaStatusBadge
+                }
+            }
+            .fixedSize(horizontal: true, vertical: false)
 
             VStack(alignment: .leading, spacing: 2) {
-                if let name = qso.name {
+                if let name = displayName {
                     Text(name)
                         .font(.caption)
                         .lineLimit(1)
                 }
-                if let state = qso.state {
-                    Text(state)
+                if let note = callsignInfo?.note, !note.isEmpty {
+                    Text(note)
+                        .font(.caption2)
+                        .foregroundStyle(.blue)
+                        .lineLimit(1)
+                } else if let location = displayLocation {
+                    Text(location)
                         .font(.caption2)
                         .foregroundStyle(.secondary)
                 }
@@ -988,13 +1218,234 @@ struct LoggerQSORow: View {
         .padding(.vertical, 6)
     }
 
+    /// Badge showing POTA status
+    @ViewBuilder
+    private var potaStatusBadge: some View {
+        switch potaStatus {
+        case .firstContact:
+            EmptyView()
+        case let .newBand(previousBands):
+            Text("NEW BAND")
+                .font(.caption2.weight(.bold))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Color.blue)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+                .help("Previously worked on: \(previousBands.joined(separator: ", "))")
+        case .duplicateBand:
+            Text("DUPE")
+                .font(.caption2.weight(.bold))
+                .padding(.horizontal, 4)
+                .padding(.vertical, 1)
+                .background(Color.orange)
+                .foregroundStyle(.white)
+                .clipShape(RoundedRectangle(cornerRadius: 3))
+        }
+    }
+
+    private func lookupCallsign() async {
+        let service = CallsignLookupService(modelContext: modelContext)
+        callsignInfo = await service.lookup(qso.callsign)
+    }
+}
+
+// MARK: - QSOEditSheet
+
+/// Sheet for editing an existing QSO
+struct QSOEditSheet: View {
+    // MARK: Internal
+
+    let qso: QSO
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section("Contact") {
+                    HStack {
+                        Text("Callsign")
+                        Spacer()
+                        Text(qso.callsign)
+                            .font(.body.monospaced())
+                            .foregroundStyle(.secondary)
+                    }
+
+                    HStack {
+                        Text("Time")
+                        Spacer()
+                        Text(qso.timestamp, format: .dateTime)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Section("Signal Reports") {
+                    HStack {
+                        Text("Sent")
+                        Spacer()
+                        TextField("599", text: $rstSent)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.numberPad)
+                            .frame(width: 60)
+                    }
+
+                    HStack {
+                        Text("Received")
+                        Spacer()
+                        TextField("599", text: $rstReceived)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.numberPad)
+                            .frame(width: 60)
+                    }
+                }
+
+                Section("Station Info") {
+                    HStack {
+                        Text("Name")
+                        Spacer()
+                        TextField("Name", text: $name)
+                            .multilineTextAlignment(.trailing)
+                    }
+
+                    HStack {
+                        Text("Grid")
+                        Spacer()
+                        TextField("Grid", text: $grid)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.characters)
+                            .frame(width: 80)
+                    }
+
+                    HStack {
+                        Text("Their Park")
+                        Spacer()
+                        TextField("K-1234", text: $theirPark)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.characters)
+                            .frame(width: 100)
+                    }
+                }
+
+                Section("Notes") {
+                    TextField("Notes", text: $notes, axis: .vertical)
+                        .lineLimit(3 ... 6)
+                }
+
+                Section {
+                    Button(role: .destructive) {
+                        hideQSO()
+                    } label: {
+                        HStack {
+                            Spacer()
+                            Text("Delete QSO")
+                            Spacer()
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Edit QSO")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save") {
+                        saveChanges()
+                        dismiss()
+                    }
+                }
+            }
+            .onAppear {
+                loadQSOData()
+            }
+        }
+    }
+
     // MARK: Private
 
-    private var timeFormatter: DateFormatter {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        formatter.timeZone = TimeZone(identifier: "UTC")
-        return formatter
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    @State private var rstSent = ""
+    @State private var rstReceived = ""
+    @State private var name = ""
+    @State private var grid = ""
+    @State private var theirPark = ""
+    @State private var notes = ""
+
+    private func loadQSOData() {
+        rstSent = qso.rstSent ?? "599"
+        rstReceived = qso.rstReceived ?? "599"
+        name = qso.name ?? ""
+        grid = qso.theirGrid ?? ""
+        theirPark = qso.theirParkReference ?? ""
+        notes = qso.notes ?? ""
+    }
+
+    private func saveChanges() {
+        qso.rstSent = rstSent.isEmpty ? nil : rstSent
+        qso.rstReceived = rstReceived.isEmpty ? nil : rstReceived
+        qso.name = name.isEmpty ? nil : name
+        qso.theirGrid = grid.isEmpty ? nil : grid
+        qso.theirParkReference = theirPark.isEmpty ? nil : theirPark
+        qso.notes = notes.isEmpty ? nil : notes
+        try? modelContext.save()
+    }
+
+    private func hideQSO() {
+        qso.isHidden = true
+        try? modelContext.save()
+        dismiss()
+    }
+}
+
+// MARK: - POTAStatusBanner
+
+/// Banner showing POTA duplicate or new band status before logging
+struct POTAStatusBanner: View {
+    let status: POTACallsignStatus
+
+    var body: some View {
+        switch status {
+        case .firstContact:
+            EmptyView()
+
+        case let .newBand(previousBands):
+            HStack(spacing: 8) {
+                Image(systemName: "star.fill")
+                    .foregroundStyle(.blue)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("New Band!")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Previously worked on \(previousBands.joined(separator: ", "))")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding()
+            .background(Color.blue.opacity(0.15))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+
+        case let .duplicateBand(band):
+            HStack(spacing: 8) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .foregroundStyle(.orange)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Duplicate on \(band)")
+                        .font(.subheadline.weight(.semibold))
+                    Text("Already worked this callsign on this band")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                Spacer()
+            }
+            .padding()
+            .background(Color.orange.opacity(0.15))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+        }
     }
 }
 
@@ -1093,10 +1544,132 @@ struct SessionTitleEditSheet: View {
     @FocusState private var isFocused: Bool
 }
 
+// MARK: - HiddenQSOsSheet
+
+/// Sheet showing hidden (deleted) QSOs for the current session with option to restore
+struct HiddenQSOsSheet: View {
+    // MARK: Lifecycle
+
+    init(sessionId: UUID?) {
+        self.sessionId = sessionId
+        _allHiddenQSOs = Query(
+            filter: #Predicate<QSO> { $0.isHidden },
+            sort: \QSO.timestamp,
+            order: .reverse
+        )
+    }
+
+    // MARK: Internal
+
+    let sessionId: UUID?
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if hiddenQSOs.isEmpty {
+                    ContentUnavailableView(
+                        "No Deleted QSOs",
+                        systemImage: "checkmark.circle",
+                        description: Text("All QSOs in this session are visible")
+                    )
+                } else {
+                    List {
+                        ForEach(hiddenQSOs) { qso in
+                            HiddenQSORow(
+                                qso: qso,
+                                onRestore: {
+                                    restoreQSO(qso)
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Deleted QSOs")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
+        }
+    }
+
+    // MARK: Private
+
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var modelContext
+
+    @Query private var allHiddenQSOs: [QSO]
+
+    private var hiddenQSOs: [QSO] {
+        guard let sessionId else {
+            return []
+        }
+        return allHiddenQSOs.filter { $0.loggingSessionId == sessionId }
+            .sorted { $0.timestamp > $1.timestamp }
+    }
+
+    private func restoreQSO(_ qso: QSO) {
+        qso.isHidden = false
+        try? modelContext.save()
+    }
+}
+
+// MARK: - HiddenQSORow
+
+/// A row displaying a hidden QSO with restore button
+struct HiddenQSORow: View {
+    let qso: QSO
+    let onRestore: () -> Void
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(qso.callsign)
+                    .font(.headline.monospaced())
+
+                HStack(spacing: 8) {
+                    Text(qso.timestamp, format: .dateTime.month().day().hour().minute())
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(qso.band)
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.2))
+                        .clipShape(Capsule())
+
+                    Text(qso.mode)
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.2))
+                        .clipShape(Capsule())
+                }
+            }
+
+            Spacer()
+
+            Button {
+                onRestore()
+            } label: {
+                Label("Restore", systemImage: "arrow.uturn.backward")
+                    .font(.subheadline)
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(.vertical, 4)
+    }
+}
+
 // MARK: - Preview
 
 #Preview {
-    LoggerView()
+    LoggerView(tourState: TourState())
         .modelContainer(
             for: [QSO.self, LoggingSession.self],
             inMemory: true

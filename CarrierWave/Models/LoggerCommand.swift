@@ -26,6 +26,9 @@ enum LoggerCommand: Equatable {
     /// Show session map
     case map
 
+    /// Show hidden QSOs
+    case hidden
+
     /// Show help
     case help
 
@@ -45,6 +48,7 @@ enum LoggerCommand: Equatable {
         SOLAR           - Show solar conditions
         WEATHER         - Show weather (or WX)
         MAP             - Show session QSO map
+        HIDDEN          - Show deleted QSOs
         HELP            - Show this help (or ?)
 
         You can also just type a frequency like "14.060"
@@ -76,6 +80,8 @@ enum LoggerCommand: Equatable {
             "Show weather"
         case .map:
             "Show session map"
+        case .hidden:
+            "Show deleted QSOs"
         case .help:
             "Show available commands"
         }
@@ -98,6 +104,8 @@ enum LoggerCommand: Equatable {
             "cloud.sun"
         case .map:
             "map"
+        case .hidden:
+            "eye.slash"
         case .help:
             "questionmark.circle"
         }
@@ -161,6 +169,9 @@ enum LoggerCommand: Equatable {
             return .weather
         case "MAP":
             return .map
+        case "HIDDEN",
+             "DELETED":
+            return .hidden
         case "HELP",
              "?":
             return .help
@@ -289,6 +300,17 @@ extension LoggerCommand {
                     command: "MAP",
                     description: "Show session map",
                     icon: "map"
+                )
+            )
+        }
+
+        // HIDDEN
+        if upper.hasPrefix("HI") || upper.hasPrefix("DE") {
+            suggestions.append(
+                CommandSuggestion(
+                    command: "HIDDEN",
+                    description: "Show deleted QSOs",
+                    icon: "eye.slash"
                 )
             )
         }

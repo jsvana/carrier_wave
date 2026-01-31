@@ -80,7 +80,11 @@ struct LogsListContentView: View {
     // MARK: Private
 
     @Environment(\.modelContext) private var modelContext
-    @Query(sort: \QSO.timestamp, order: .reverse) private var qsos: [QSO]
+    @Query(
+        filter: #Predicate<QSO> { !$0.isHidden },
+        sort: \QSO.timestamp,
+        order: .reverse
+    ) private var qsos: [QSO]
 
     @State private var searchText = ""
     @State private var selectedBand: String?

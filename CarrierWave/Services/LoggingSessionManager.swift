@@ -158,9 +158,25 @@ final class LoggingSessionManager {
     }
 
     /// Update operating frequency
+    /// For POTA sessions, this also posts a QSY spot if the frequency changed
     func updateFrequency(_ frequency: Double) {
-        activeSession?.updateFrequency(frequency)
+        guard let session = activeSession else {
+            return
+        }
+
+        let oldFrequency = session.frequency
+        session.updateFrequency(frequency)
         try? modelContext.save()
+
+        // Post QSY spot for POTA sessions when frequency actually changed
+        if session.activationType == .pota,
+           oldFrequency != nil,
+           oldFrequency != frequency
+        {
+            Task {
+                await postSpot(comment: "QSY", showToast: true)
+            }
+        }
     }
 
     /// Update operating mode
@@ -322,7 +338,7 @@ final class LoggingSessionManager {
 
         // Post an initial spot immediately
         Task {
-            await postAutoSpot()
+            await postSpot()
         }
 
         // Schedule recurring spots every 10 minutes
@@ -331,7 +347,7 @@ final class LoggingSessionManager {
             repeats: true
         ) { [weak self] _ in
             Task { @MainActor in
-                await self?.postAutoSpot()
+                await self?.postSpot()
             }
         }
     }
@@ -362,39 +378,30 @@ final class LoggingSessionManager {
         spotCommentsService.startPolling(activator: callsign, parkRef: parkRef)
     }
 
-    /// Post an auto-spot to POTA
-    private func postAutoSpot() async {
-        guard let session = activeSession,
-              session.activationType == .pota,
-              let parkRef = session.parkReference,
-              let freq = session.frequency
+    /// Post a spot to POTA (used for both auto-spots and QSY spots)
+    private func postSpot(comment: String? = nil, showToast: Bool = false) async {
+        guard let session = activeSession, session.activationType == .pota,
+              let parkRef = session.parkReference, let freq = session.frequency,
+              !session.myCallsign.isEmpty
         else {
-            return
-        }
-
-        let callsign =
-            session.myCallsign ?? UserDefaults.standard.string(
-                forKey: "loggerDefaultCallsign"
-            ) ?? ""
-        guard !callsign.isEmpty else {
             return
         }
 
         do {
             let potaClient = POTAClient(authService: POTAAuthService())
             _ = try await potaClient.postSpot(
-                callsign: callsign,
-                reference: parkRef,
-                frequency: freq * 1_000, // Convert MHz to kHz
-                mode: session.mode ?? "CW",
-                comments: nil
+                callsign: session.myCallsign, reference: parkRef,
+                frequency: freq * 1_000, mode: session.mode, comments: comment
             )
-            SyncDebugLog.shared.info("Auto-spot posted for \(parkRef)", service: .pota)
+            let msg = comment != nil ? "\(comment!) spot posted" : "Auto-spot posted"
+            SyncDebugLog.shared.info("\(msg) for \(parkRef)", service: .pota)
+            if showToast {
+                ToastManager.shared.spotPosted(
+                    park: parkRef, comment: "QSY to \(String(format: "%.3f", freq))"
+                )
+            }
         } catch {
-            SyncDebugLog.shared.error(
-                "Auto-spot failed: \(error.localizedDescription)",
-                service: .pota
-            )
+            SyncDebugLog.shared.error("Spot failed: \(error.localizedDescription)", service: .pota)
         }
     }
 
