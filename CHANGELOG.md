@@ -4,6 +4,8 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+## [1.15.0] - 2026-01-31
+
 ### Added
 - **Tab Bar Configuration** - Customize which tabs appear and their order
   - Settings → Navigation → Tab Bar

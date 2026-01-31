@@ -72,14 +72,18 @@ See [docs/SETUP.md](docs/SETUP.md) for device builds and additional commands.
 
 ## Version Updates
 
-When releasing a new version, update **both** locations:
+When releasing a new version, update **all three** locations:
 
 1. **Xcode project** (`CarrierWave.xcodeproj/project.pbxproj`):
    - `MARKETING_VERSION` - The user-facing version (e.g., "1.2.0")
    - `CURRENT_PROJECT_VERSION` - The build number (increment for each build)
 
 2. **Settings view** (`CarrierWave/Views/Settings/SettingsView.swift`):
-   - Update the hardcoded version string in the "About" section (~line 232)
+   - Update the hardcoded version string in the "About" section (~line 448)
+
+3. **Changelog** (`CHANGELOG.md`):
+   - Rename `[Unreleased]` to `[X.Y.Z] - YYYY-MM-DD` with the new version and current date
+   - Add a new empty `[Unreleased]` section at the top for future changes
 
 ## Changelog
 
