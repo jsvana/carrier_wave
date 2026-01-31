@@ -2,11 +2,11 @@ import Foundation
 import SwiftData
 
 /// Nonisolated helper functions to work around @MainActor Codable conformance issues
-private func decodeConfiguration(from data: Data) -> ChallengeConfiguration? {
+nonisolated private func decodeConfiguration(from data: Data) -> ChallengeConfiguration? {
     try? JSONDecoder().decode(ChallengeConfiguration.self, from: data)
 }
 
-private func encodeConfiguration(_ config: ChallengeConfiguration) throws -> Data {
+nonisolated private func encodeConfiguration(_ config: ChallengeConfiguration) throws -> Data {
     try JSONEncoder().encode(config)
 }
 

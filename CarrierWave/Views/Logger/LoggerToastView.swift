@@ -101,10 +101,10 @@ final class ToastManager {
             currentToast = toast
         }
 
-        dismissTask = Task {
+        dismissTask = Task { @MainActor in
             try? await Task.sleep(nanoseconds: UInt64(toast.duration * 1_000_000_000))
             if !Task.isCancelled {
-                await dismiss()
+                dismiss()
             }
         }
     }

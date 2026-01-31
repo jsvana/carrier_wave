@@ -2,11 +2,11 @@ import Foundation
 import SwiftData
 
 /// Nonisolated helper functions to work around @MainActor Codable conformance issues
-private func decodeProgress(from data: Data) -> ChallengeProgress? {
+nonisolated private func decodeProgress(from data: Data) -> ChallengeProgress? {
     try? JSONDecoder().decode(ChallengeProgress.self, from: data)
 }
 
-private func encodeProgress(_ progress: ChallengeProgress) -> Data? {
+nonisolated private func encodeProgress(_ progress: ChallengeProgress) -> Data? {
     try? JSONEncoder().encode(progress)
 }
 

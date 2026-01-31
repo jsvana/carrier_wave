@@ -18,11 +18,12 @@ enum KeychainError: Error, Sendable {
 struct KeychainHelper: Sendable {
     // MARK: Lifecycle
 
-    private init() {}
+    nonisolated private init() {}
 
     // MARK: Internal
 
-    static let shared = KeychainHelper()
+    // swiftformat:disable:next redundantNonisolated
+    nonisolated static let shared = KeychainHelper()
 
     nonisolated func save(_ data: Data, for key: String) throws {
         let query: [String: Any] = [
@@ -105,61 +106,64 @@ struct KeychainHelper: Sendable {
 // MARK: KeychainHelper.Keys
 
 /// Keychain keys for each service
+/// All keys are nonisolated to allow access from any actor context
 extension KeychainHelper {
+    // swiftformat:disable redundantNonisolated
     enum Keys: Sendable {
         // QRZ - token-based auth (new)
-        static let qrzApiKey = "qrz.api.key"
-        static let qrzCallsign = "qrz.callsign"
-        static let qrzBookIdMap = "qrz.bookid.map" // JSON: {callsign: bookId}
-        static let qrzTotalUploaded = "qrz.total.uploaded"
-        static let qrzTotalDownloaded = "qrz.total.downloaded"
-        static let qrzLastUploadDate = "qrz.last.upload.date"
-        static let qrzLastDownloadDate = "qrz.last.download.date"
+        nonisolated static let qrzApiKey = "qrz.api.key"
+        nonisolated static let qrzCallsign = "qrz.callsign"
+        nonisolated static let qrzBookIdMap = "qrz.bookid.map" // JSON: {callsign: bookId}
+        nonisolated static let qrzTotalUploaded = "qrz.total.uploaded"
+        nonisolated static let qrzTotalDownloaded = "qrz.total.downloaded"
+        nonisolated static let qrzLastUploadDate = "qrz.last.upload.date"
+        nonisolated static let qrzLastDownloadDate = "qrz.last.download.date"
 
         // QRZ XML Callbook - username/password auth for callsign lookups
         // This is separate from the Logbook API key - requires QRZ XML subscription
-        static let qrzCallbookUsername = "qrz.callbook.username"
-        static let qrzCallbookPassword = "qrz.callbook.password"
-        static let qrzCallbookSessionKey = "qrz.callbook.session.key"
+        nonisolated static let qrzCallbookUsername = "qrz.callbook.username"
+        nonisolated static let qrzCallbookPassword = "qrz.callbook.password"
+        nonisolated static let qrzCallbookSessionKey = "qrz.callbook.session.key"
 
         // QRZ - session-based auth (deprecated, remove after migration)
-        static let qrzSessionKey = "qrz.session.key"
-        static let qrzUsername = "qrz.username"
+        nonisolated static let qrzSessionKey = "qrz.session.key"
+        nonisolated static let qrzUsername = "qrz.username"
 
         // POTA
-        static let potaIdToken = "pota.id.token"
-        static let potaTokenExpiry = "pota.token.expiry"
-        static let potaUsername = "pota.username"
-        static let potaPassword = "pota.password"
-        static let potaDownloadProgress = "pota.download.progress" // JSON checkpoint
-        static let potaLastSyncDate = "pota.last.sync.date"
+        nonisolated static let potaIdToken = "pota.id.token"
+        nonisolated static let potaTokenExpiry = "pota.token.expiry"
+        nonisolated static let potaUsername = "pota.username"
+        nonisolated static let potaPassword = "pota.password"
+        nonisolated static let potaDownloadProgress = "pota.download.progress" // JSON checkpoint
+        nonisolated static let potaLastSyncDate = "pota.last.sync.date"
 
         // LoFi
-        static let lofiAuthToken = "lofi.auth.token"
-        static let lofiClientKey = "lofi.client.key"
-        static let lofiClientSecret = "lofi.client.secret"
-        static let lofiCallsign = "lofi.callsign"
-        static let lofiEmail = "lofi.email"
-        static let lofiDeviceLinked = "lofi.device.linked"
-        static let lofiLastSyncMillis = "lofi.last.sync.millis"
+        nonisolated static let lofiAuthToken = "lofi.auth.token"
+        nonisolated static let lofiClientKey = "lofi.client.key"
+        nonisolated static let lofiClientSecret = "lofi.client.secret"
+        nonisolated static let lofiCallsign = "lofi.callsign"
+        nonisolated static let lofiEmail = "lofi.email"
+        nonisolated static let lofiDeviceLinked = "lofi.device.linked"
+        nonisolated static let lofiLastSyncMillis = "lofi.last.sync.millis"
 
         /// HAMRS
-        static let hamrsApiKey = "hamrs.api.key"
+        nonisolated static let hamrsApiKey = "hamrs.api.key"
 
         /// Challenges
-        static let challengesAuthToken = "challenges.auth.token"
+        nonisolated static let challengesAuthToken = "challenges.auth.token"
 
         /// LoTW
-        static let lotwUsername = "lotw.username"
-        static let lotwPassword = "lotw.password"
-        static let lotwLastQSL = "lotw.last.qsl"
-        static let lotwLastQSORx = "lotw.last.qso.rx"
+        nonisolated static let lotwUsername = "lotw.username"
+        nonisolated static let lotwPassword = "lotw.password"
+        nonisolated static let lotwLastQSL = "lotw.last.qsl"
+        nonisolated static let lotwLastQSORx = "lotw.last.qso.rx"
 
         /// Callsign Aliases
-        static let currentCallsign = "user.current.callsign"
-        static let previousCallsigns = "user.previous.callsigns" // JSON array
+        nonisolated static let currentCallsign = "user.current.callsign"
+        nonisolated static let previousCallsigns = "user.previous.callsigns" // JSON array
 
         /// User Profile
-        static let userProfile = "user.profile" // JSON UserProfile
+        nonisolated static let userProfile = "user.profile" // JSON UserProfile
     }
+    // swiftformat:enable redundantNonisolated
 }

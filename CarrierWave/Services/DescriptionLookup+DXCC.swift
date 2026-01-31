@@ -7,12 +7,12 @@ import Foundation
 extension DescriptionLookup {
     /// Look up DXCC entity by entity number
     /// Returns entity with name, or nil if not found
-    static func dxccEntity(forNumber number: Int) -> DXCCEntity? {
+    nonisolated static func dxccEntity(forNumber number: Int) -> DXCCEntity? {
         numberLookup[number]
     }
 
     /// Pre-built lookup table by entity number for O(1) access
-    private static let numberLookup: [Int: DXCCEntity] = {
+    nonisolated private static let numberLookup: [Int: DXCCEntity] = {
         var result: [Int: DXCCEntity] = [:]
         for (_, entity) in dxccEntities {
             result[entity.number] = entity
@@ -26,7 +26,7 @@ extension DescriptionLookup {
     /// Source: ARRL DXCC List - https://www.arrl.org/files/file/DXCC/DXCC_Current.pdf
     /// Prefixes from ITU allocations and cty.dat
     /// Note: Prefixes are checked longest-first to handle special cases like KH6 before K
-    static let dxccEntities: [(prefixes: [String], entity: DXCCEntity)] = [
+    nonisolated static let dxccEntities: [(prefixes: [String], entity: DXCCEntity)] = [
         // ==================== US & Territories ====================
         // US Territories (must check before general US prefixes)
         (["KG4"], DXCCEntity(number: 105, name: "Guantanamo Bay")),

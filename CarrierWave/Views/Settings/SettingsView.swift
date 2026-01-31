@@ -517,7 +517,7 @@ struct SettingsMainView: View {
 
         do {
             let service = DeduplicationService(modelContext: modelContext)
-            let result = try await service.findAndMergeDuplicates(
+            let result = try service.findAndMergeDuplicates(
                 timeWindowMinutes: dedupeTimeWindow
             )
 

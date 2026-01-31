@@ -1160,9 +1160,7 @@ struct LoggerView: View {
             return
         }
 
-        let callsign =
-            session.myCallsign ?? UserDefaults.standard.string(forKey: "loggerDefaultCallsign")
-                ?? ""
+        let callsign = session.myCallsign
         guard !callsign.isEmpty else {
             ToastManager.shared.error("No callsign configured")
             return
@@ -1174,7 +1172,7 @@ struct LoggerView: View {
                 callsign: callsign,
                 reference: parkRef,
                 frequency: freq * 1_000, // Convert MHz to kHz
-                mode: session.mode ?? "CW",
+                mode: session.mode,
                 comments: comment
             )
             if success {
@@ -1262,6 +1260,7 @@ struct LoggerView: View {
             return
         }
 
+        let service = CallsignLookupService(modelContext: modelContext)
         lookupTask = Task {
             // Small delay to avoid excessive lookups while typing
             try? await Task.sleep(for: .milliseconds(300))
@@ -1270,7 +1269,6 @@ struct LoggerView: View {
                 return
             }
 
-            let service = CallsignLookupService(modelContext: modelContext)
             let result = await service.lookupWithResult(primaryCallsign)
 
             await MainActor.run {
@@ -1333,7 +1331,7 @@ struct LoggerView: View {
             return nil
         }
         // Use the POTA parks cache if available
-        return POTAParksCache.shared.name(for: ref)
+        return POTAParksCache.shared.nameSync(for: ref)
     }
 }
 

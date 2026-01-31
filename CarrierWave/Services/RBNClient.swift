@@ -83,26 +83,53 @@ struct RBNSpot: Decodable, Identifiable, Sendable {
 
 // MARK: - RBNSpotsResponse
 
-struct RBNSpotsResponse: Decodable, Sendable {
+struct RBNSpotsResponse: Sendable {
     let total: Int
     let spots: [RBNSpot]
+}
+
+// MARK: Decodable
+
+extension RBNSpotsResponse: Decodable {
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        total = try container.decode(Int.self, forKey: .total)
+        spots = try container.decode([RBNSpot].self, forKey: .spots)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case total
+        case spots
+    }
 }
 
 // MARK: - RBNStats
 
 /// Aggregate statistics from RBN
-struct RBNStats: Decodable, Sendable {
-    enum CodingKeys: String, CodingKey {
+struct RBNStats: Sendable {
+    let totalSpots: Int
+    let activityRate: Double
+    let topBands: [String: Int]
+    let topModes: [String: Int]
+}
+
+// MARK: Decodable
+
+extension RBNStats: Decodable {
+    private enum CodingKeys: String, CodingKey {
         case totalSpots = "total_spots"
         case activityRate = "activity_rate"
         case topBands = "bands"
         case topModes = "modes"
     }
 
-    let totalSpots: Int
-    let activityRate: Double
-    let topBands: [String: Int]
-    let topModes: [String: Int]
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        totalSpots = try container.decode(Int.self, forKey: .totalSpots)
+        activityRate = try container.decode(Double.self, forKey: .activityRate)
+        topBands = try container.decode([String: Int].self, forKey: .topBands)
+        topModes = try container.decode([String: Int].self, forKey: .topModes)
+    }
 }
 
 // MARK: - RBNClient

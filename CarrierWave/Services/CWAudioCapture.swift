@@ -35,8 +35,8 @@ actor CWAudioCapture {
     }
 
     /// Check current microphone permission status
-    static func permissionStatus() -> AVAudioSession.RecordPermission {
-        AVAudioSession.sharedInstance().recordPermission
+    static func permissionStatus() -> AVAudioApplication.recordPermission {
+        AVAudioApplication.shared.recordPermission
     }
 
     /// Start capturing audio from the microphone.
@@ -151,7 +151,7 @@ actor CWAudioCapture {
             try session.setCategory(
                 .playAndRecord,
                 mode: .measurement,
-                options: [.allowBluetooth, .allowBluetoothA2DP]
+                options: [.allowBluetoothHFP, .allowBluetoothA2DP]
             )
             try session.setActive(true)
 

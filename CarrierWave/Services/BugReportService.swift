@@ -78,7 +78,8 @@ final class BugReportService {
     }
 
     func collectDeviceInfo(debugMode: Bool) -> DeviceInfo {
-        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
+        let appVersion =
+            Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "Unknown"
         let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "Unknown"
         let iosVersion = UIDevice.current.systemVersion
         let deviceModel = deviceModelName()
@@ -144,9 +145,10 @@ final class BugReportService {
 
     func formatReport(_ context: ReportContext) -> String {
         let currentCallsignDisplay = context.callsignInfo.currentCallsign ?? "Not configured"
-        let previousCallsignsDisplay = context.callsignInfo.previousCallsigns.isEmpty
-            ? "None"
-            : context.callsignInfo.previousCallsigns.joined(separator: ", ")
+        let previousCallsignsDisplay =
+            context.callsignInfo.previousCallsigns.isEmpty
+                ? "None"
+                : context.callsignInfo.previousCallsigns.joined(separator: ", ")
 
         return """
         BUG REPORT
@@ -205,7 +207,7 @@ final class BugReportService {
         uname(&systemInfo)
         let identifier = withUnsafePointer(to: &systemInfo.machine) {
             $0.withMemoryRebound(to: CChar.self, capacity: 1) {
-                String(validatingUTF8: $0) ?? "Unknown"
+                String(validatingCString: $0) ?? "Unknown"
             }
         }
         return mapDeviceIdentifier(identifier)

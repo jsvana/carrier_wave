@@ -228,7 +228,7 @@ actor GoertzelSignalProcessor {
         var sampleIndex = 0
         var blockStartTime = timestamp
 
-        var workingSamples = leftoverSamples + samples
+        let workingSamples = leftoverSamples + samples
         leftoverSamples = []
 
         while sampleIndex + blockSize <= workingSamples.count {

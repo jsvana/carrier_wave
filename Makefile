@@ -1,4 +1,4 @@
-.PHONY: build build-device test devices install launch deploy clean lint format format-check setup-hooks release
+.PHONY: build build-device test devices install launch deploy clean lint format format-check setup-hooks release warnings
 
 DEVICE_NAME := theseus
 BUNDLE_ID := com.jsvana.FullDuplex
@@ -75,3 +75,12 @@ ifndef VERSION
 	$(error VERSION is required. Usage: make release VERSION=1.15.0)
 endif
 	./scripts/release.sh $(VERSION)
+
+# Show all build warnings (sorted and deduplicated)
+warnings:
+	@xcodebuild -project $(PROJECT) -scheme $(SCHEME) \
+		-destination 'platform=iOS Simulator,name=$(SIMULATOR)' \
+		build 2>&1 | \
+		grep -E "warning:" | \
+		sed 's|^.*/CarrierWave/|CarrierWave/|' | \
+		sort -u

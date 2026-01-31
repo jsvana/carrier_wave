@@ -3,35 +3,36 @@ import Foundation
 // MARK: - MorseCode
 
 /// Morse code lookup table and utilities
-enum MorseCode {
+enum MorseCode: Sendable {
     // MARK: - Timing Constants
 
+    // swiftformat:disable redundantNonisolated
     /// Standard Morse timing relationships
     /// All times are relative to one "unit" (the length of a dit)
-    enum Timing {
+    enum Timing: Sendable {
         /// Dit length = 1 unit
-        static let ditUnits: Double = 1.0
+        nonisolated static let ditUnits: Double = 1.0
 
         /// Dah length = 3 units
-        static let dahUnits: Double = 3.0
+        nonisolated static let dahUnits: Double = 3.0
 
         /// Inter-element gap (within character) = 1 unit
-        static let elementGapUnits: Double = 1.0
+        nonisolated static let elementGapUnits: Double = 1.0
 
         /// Inter-character gap = 3 units
-        static let charGapUnits: Double = 3.0
+        nonisolated static let charGapUnits: Double = 3.0
 
         /// Inter-word gap = 7 units
-        static let wordGapUnits: Double = 7.0
+        nonisolated static let wordGapUnits: Double = 7.0
 
         /// Calculate unit duration in seconds from WPM
         /// PARIS standard: "PARIS" = 50 units, so at W WPM, unit = 1.2/W seconds
-        static func unitDuration(forWPM wpm: Int) -> TimeInterval {
+        nonisolated static func unitDuration(forWPM wpm: Int) -> TimeInterval {
             1.2 / Double(wpm)
         }
 
         /// Calculate WPM from unit duration
-        static func wpm(fromUnitDuration duration: TimeInterval) -> Int {
+        nonisolated static func wpm(fromUnitDuration duration: TimeInterval) -> Int {
             guard duration > 0 else {
                 return 20
             }
@@ -44,7 +45,7 @@ enum MorseCode {
     /// Standard International Morse Code mapping
     /// Key: morse pattern (. = dit, - = dah)
     /// Value: decoded character
-    static let morseToChar: [String: String] = [
+    nonisolated static let morseToChar: [String: String] = [
         // Letters
         ".-": "A",
         "-...": "B",
@@ -117,7 +118,7 @@ enum MorseCode {
     ]
 
     /// Character to Morse mapping (reverse of morseToChar)
-    static let charToMorse: [String: String] = {
+    nonisolated static let charToMorse: [String: String] = {
         var result: [String: String] = [:]
         for (morse, char) in morseToChar where !char.hasPrefix("<") {
             // Skip prosigns for reverse lookup (use letter form)
@@ -129,7 +130,7 @@ enum MorseCode {
     // MARK: - Common QSO Abbreviations
 
     /// Common CW abbreviations used in amateur radio QSOs
-    static let abbreviations: [String: String] = [
+    nonisolated static let abbreviations: [String: String] = [
         "CQ": "Calling any station",
         "DE": "From (this is)",
         "K": "Go ahead / over",
@@ -186,14 +187,15 @@ enum MorseCode {
     /// Decode a morse pattern to a character
     /// - Parameter pattern: Morse pattern string (e.g., ".-" for A)
     /// - Returns: Decoded character or nil if not found
-    static func decode(_ pattern: String) -> String? {
+    nonisolated static func decode(_ pattern: String) -> String? {
         morseToChar[pattern]
     }
 
     /// Encode a character to morse
     /// - Parameter char: Character to encode
     /// - Returns: Morse pattern or nil if not encodable
-    static func encode(_ char: Character) -> String? {
+    nonisolated static func encode(_ char: Character) -> String? {
         charToMorse[String(char).uppercased()]
     }
+    // swiftformat:enable redundantNonisolated
 }

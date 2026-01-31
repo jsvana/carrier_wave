@@ -395,7 +395,7 @@ struct ActivationSectionView: View {
                         .font(.subheadline.monospaced())
                 }
 
-                if let parkName = POTAParksCache.shared.name(for: parkReference.uppercased()) {
+                if let parkName = POTAParksCache.shared.nameSync(for: parkReference.uppercased()) {
                     Text(parkName)
                         .font(.caption)
                         .foregroundStyle(.green)

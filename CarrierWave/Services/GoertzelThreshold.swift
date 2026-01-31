@@ -3,31 +3,35 @@ import Foundation
 // MARK: - GoertzelThreshold
 
 /// Adaptive threshold for Goertzel magnitude-based key detection
-struct GoertzelThreshold {
+struct GoertzelThreshold: Sendable {
+    // MARK: Lifecycle
+
+    nonisolated init() {}
+
     // MARK: Internal
 
     /// Current key state
-    var currentKeyState: Bool {
+    nonisolated var currentKeyState: Bool {
         isKeyDown
     }
 
     /// Whether still in calibration period
-    var isCalibrating: Bool {
+    nonisolated var isCalibrating: Bool {
         blockCount < calibrationBlocks
     }
 
     /// Current noise floor level
-    var currentNoiseFloor: Float {
+    nonisolated var currentNoiseFloor: Float {
         noiseFloor
     }
 
     /// Current signal peak level
-    var currentSignalPeak: Float {
+    nonisolated var currentSignalPeak: Float {
         signalPeak
     }
 
     /// Signal-to-noise ratio
-    var signalToNoiseRatio: Float {
+    nonisolated var signalToNoiseRatio: Float {
         guard noiseFloor > 0.0001 else {
             return 0
         }
@@ -35,7 +39,7 @@ struct GoertzelThreshold {
     }
 
     /// Process a magnitude value and detect key state changes
-    mutating func process(
+    nonisolated mutating func process(
         magnitude: Float,
         blockDuration: Double,
         blockStartTime: TimeInterval
@@ -94,7 +98,7 @@ struct GoertzelThreshold {
     }
 
     /// Reset threshold state
-    mutating func reset() {
+    nonisolated mutating func reset() {
         signalPeak = 0
         noiseFloor = 0.01
         smoothedMagnitude = 0
@@ -146,7 +150,7 @@ struct GoertzelThreshold {
     private let noiseDecay: Float = 0.99
     private let activeDecay: Float = 0.95
 
-    private func calculateEffectiveOnThreshold() -> Float {
+    nonisolated private func calculateEffectiveOnThreshold() -> Float {
         let snr = signalToNoiseRatio
         if snr > 10 {
             return baseOnThreshold
@@ -158,7 +162,7 @@ struct GoertzelThreshold {
         }
     }
 
-    private mutating func updateConfirmationCounters(
+    nonisolated private mutating func updateConfirmationCounters(
         ratio: Float, onThreshold: Float, offThreshold: Float
     ) {
         if ratio > onThreshold {
@@ -173,7 +177,7 @@ struct GoertzelThreshold {
         }
     }
 
-    private mutating func processStateTransitions(
+    nonisolated private mutating func processStateTransitions(
         effectiveMagnitude: Float,
         timeSinceChange: TimeInterval,
         blockStartTime: TimeInterval
@@ -216,7 +220,7 @@ struct GoertzelThreshold {
         }
     }
 
-    private mutating func checkTransmissionEnd(blockStartTime: TimeInterval) {
+    nonisolated private mutating func checkTransmissionEnd(blockStartTime: TimeInterval) {
         if isInTransmission, !isKeyDown {
             let silenceDuration = blockStartTime - lastKeyEventTime
             if silenceDuration > transmissionEndTimeout {
@@ -225,7 +229,9 @@ struct GoertzelThreshold {
         }
     }
 
-    private mutating func updateSignalEstimates(magnitude: Float, blockStartTime: TimeInterval) {
+    nonisolated private mutating func updateSignalEstimates(
+        magnitude: Float, blockStartTime: TimeInterval
+    ) {
         if magnitude > signalPeak {
             signalPeak = magnitude
         } else {

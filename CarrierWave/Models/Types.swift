@@ -24,7 +24,7 @@ enum ServiceType: String, Codable, CaseIterable {
 
     // MARK: Internal
 
-    var displayName: String {
+    nonisolated var displayName: String {
         switch self {
         case .qrz: "QRZ"
         case .pota: "POTA"
@@ -34,7 +34,7 @@ enum ServiceType: String, Codable, CaseIterable {
         }
     }
 
-    var supportsUpload: Bool {
+    nonisolated var supportsUpload: Bool {
         switch self {
         case .qrz,
              .pota,

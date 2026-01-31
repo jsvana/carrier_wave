@@ -22,17 +22,17 @@ struct POTASpot: Decodable, Identifiable, Sendable {
     let name: String?
     let locationDesc: String?
 
-    var id: Int64 {
+    nonisolated var id: Int64 {
         spotId
     }
 
     /// Parse frequency string to kHz
-    var frequencyKHz: Double? {
+    nonisolated var frequencyKHz: Double? {
         Double(frequency)
     }
 
     /// Parse spot time to Date
-    var timestamp: Date? {
+    nonisolated var timestamp: Date? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date = formatter.date(from: spotTime) {
@@ -44,7 +44,7 @@ struct POTASpot: Decodable, Identifiable, Sendable {
     }
 
     /// Time ago string
-    var timeAgo: String {
+    nonisolated var timeAgo: String {
         guard let timestamp else {
             return ""
         }
@@ -69,12 +69,12 @@ struct POTASpotComment: Decodable, Identifiable, Sendable {
     let spotTime: String
     let source: String?
 
-    var id: Int64 {
+    nonisolated var id: Int64 {
         spotId
     }
 
     /// Parse spot time to Date
-    var timestamp: Date? {
+    nonisolated var timestamp: Date? {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         if let date = formatter.date(from: spotTime) {
@@ -85,7 +85,7 @@ struct POTASpotComment: Decodable, Identifiable, Sendable {
     }
 
     /// Time ago string
-    var timeAgo: String {
+    nonisolated var timeAgo: String {
         guard let timestamp else {
             return ""
         }

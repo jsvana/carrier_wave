@@ -10,40 +10,31 @@ extension SyncService {
         let qsosNeedingUpload = try? fetchQSOsNeedingUpload()
         let timeout = syncTimeoutSeconds
         var potaMaintenanceSkipped = false
+        var results: [ServiceType: Result<Int, Error>] = [:]
 
-        let results = await withTaskGroup(of: (ServiceType, Result<Int, Error>).self) { group in
-            // QRZ upload
-            if qrzClient.hasApiKey() {
-                let qrzQSOs = qsosNeedingUpload?.filter { $0.needsUpload(to: .qrz) } ?? []
-                if !qrzQSOs.isEmpty {
-                    group.addTask {
-                        await self.uploadQRZBatch(qsos: qrzQSOs, timeout: timeout)
-                    }
-                }
-            }
-
-            // POTA upload (skip during maintenance window)
-            if potaAuthService.isAuthenticated {
-                if POTAClient.isInMaintenanceWindow() {
-                    potaMaintenanceSkipped = true
-                } else {
-                    let potaQSOs =
-                        qsosNeedingUpload?.filter {
-                            $0.needsUpload(to: .pota) && $0.parkReference?.isEmpty == false
-                        } ?? []
-                    if !potaQSOs.isEmpty {
-                        group.addTask {
-                            await self.uploadPOTABatch(qsos: potaQSOs, timeout: timeout)
-                        }
-                    }
-                }
-            }
-
-            var results: [ServiceType: Result<Int, Error>] = [:]
-            for await (service, result) in group {
+        // QRZ upload
+        if qrzClient.hasApiKey() {
+            let qrzQSOs = qsosNeedingUpload?.filter { $0.needsUpload(to: .qrz) } ?? []
+            if !qrzQSOs.isEmpty {
+                let (service, result) = await uploadQRZBatch(qsos: qrzQSOs, timeout: timeout)
                 results[service] = result
             }
-            return results
+        }
+
+        // POTA upload (skip during maintenance window)
+        if potaAuthService.isAuthenticated {
+            if POTAClient.isInMaintenanceWindow() {
+                potaMaintenanceSkipped = true
+            } else {
+                let potaQSOs =
+                    qsosNeedingUpload?.filter {
+                        $0.needsUpload(to: .pota) && $0.parkReference?.isEmpty == false
+                    } ?? []
+                if !potaQSOs.isEmpty {
+                    let (service, result) = await uploadPOTABatch(qsos: potaQSOs, timeout: timeout)
+                    results[service] = result
+                }
+            }
         }
 
         return (results: results, potaMaintenanceSkipped: potaMaintenanceSkipped)
@@ -116,8 +107,8 @@ extension SyncService {
         if totalSkipped > 0 {
             let callsign = qrzClient.getCallsign() ?? "unknown"
             SyncDebugLog.shared.warning(
-                "Skipped \(totalSkipped) QSOs from other callsigns (QRZ account: \(callsign)). " +
-                    "Go to Settings > Callsign Aliases to delete non-primary callsign QSOs.",
+                "Skipped \(totalSkipped) QSOs from other callsigns (QRZ account: \(callsign)). "
+                    + "Go to Settings > Callsign Aliases to delete non-primary callsign QSOs.",
                 service: .qrz
             )
         }

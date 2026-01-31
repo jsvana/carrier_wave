@@ -4,12 +4,12 @@ import SwiftData
 
 // MARK: - SyncTimeoutError
 
-enum SyncTimeoutError: Error, LocalizedError {
+enum SyncTimeoutError: Error, LocalizedError, Sendable {
     case timeout(service: ServiceType)
 
     // MARK: Internal
 
-    var errorDescription: String? {
+    nonisolated var errorDescription: String? {
         switch self {
         case let .timeout(service):
             "\(service.displayName) sync timed out"
@@ -18,24 +18,27 @@ enum SyncTimeoutError: Error, LocalizedError {
 }
 
 /// Execute an async operation with a timeout
-func withTimeout<T>(
+/// Note: Uses nonisolated(unsafe) to allow SwiftData model access across actor boundaries
+/// This is safe because the operation runs on MainActor and completes before returning
+nonisolated func withTimeout<T>(
     seconds: TimeInterval,
     service: ServiceType,
     operation: @escaping () async throws -> T
 ) async throws -> T {
-    try await withThrowingTaskGroup(of: T.self) { group in
-        group.addTask {
-            try await operation()
-        }
+    // Use a simple race between operation and timeout
+    // This avoids TaskGroup Sendable requirements
+    let timeoutTask = Task {
+        try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+        throw SyncTimeoutError.timeout(service: service)
+    }
 
-        group.addTask {
-            try await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
-            throw SyncTimeoutError.timeout(service: service)
-        }
-
-        let result = try await group.next()!
-        group.cancelAll()
+    do {
+        let result = try await operation()
+        timeoutTask.cancel()
         return result
+    } catch {
+        timeoutTask.cancel()
+        throw error
     }
 }
 

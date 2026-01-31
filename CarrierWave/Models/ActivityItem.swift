@@ -52,7 +52,7 @@ final class ActivityItem {
 
 // MARK: - ActivityDetails
 
-struct ActivityDetails: Codable, Sendable {
+struct ActivityDetails: Sendable {
     // Generic fields that apply to multiple activity types
     var entityName: String? // DXCC entity name
     var entityCode: String? // DXCC entity code
@@ -72,12 +72,69 @@ struct ActivityDetails: Codable, Sendable {
     // MARK: - Nonisolated Codable Helpers
 
     /// Decode from data in a nonisolated context (for use with @Model classes)
-    static func decode(from data: Data) -> ActivityDetails? {
+    nonisolated static func decode(from data: Data) -> ActivityDetails? {
         try? JSONDecoder().decode(ActivityDetails.self, from: data)
     }
 
     /// Encode to data in a nonisolated context (for use with @Model classes)
-    func encode() -> Data {
+    nonisolated func encode() -> Data {
         (try? JSONEncoder().encode(self)) ?? Data()
+    }
+}
+
+// MARK: Codable
+
+extension ActivityDetails: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case entityName
+        case entityCode
+        case band
+        case mode
+        case distanceKm
+        case workedCallsign
+        case parkReference
+        case parkName
+        case qsoCount
+        case streakDays
+        case challengeName
+        case tierName
+        case recordType
+        case recordValue
+    }
+
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        entityName = try container.decodeIfPresent(String.self, forKey: .entityName)
+        entityCode = try container.decodeIfPresent(String.self, forKey: .entityCode)
+        band = try container.decodeIfPresent(String.self, forKey: .band)
+        mode = try container.decodeIfPresent(String.self, forKey: .mode)
+        distanceKm = try container.decodeIfPresent(Double.self, forKey: .distanceKm)
+        workedCallsign = try container.decodeIfPresent(String.self, forKey: .workedCallsign)
+        parkReference = try container.decodeIfPresent(String.self, forKey: .parkReference)
+        parkName = try container.decodeIfPresent(String.self, forKey: .parkName)
+        qsoCount = try container.decodeIfPresent(Int.self, forKey: .qsoCount)
+        streakDays = try container.decodeIfPresent(Int.self, forKey: .streakDays)
+        challengeName = try container.decodeIfPresent(String.self, forKey: .challengeName)
+        tierName = try container.decodeIfPresent(String.self, forKey: .tierName)
+        recordType = try container.decodeIfPresent(String.self, forKey: .recordType)
+        recordValue = try container.decodeIfPresent(String.self, forKey: .recordValue)
+    }
+
+    nonisolated func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encodeIfPresent(entityName, forKey: .entityName)
+        try container.encodeIfPresent(entityCode, forKey: .entityCode)
+        try container.encodeIfPresent(band, forKey: .band)
+        try container.encodeIfPresent(mode, forKey: .mode)
+        try container.encodeIfPresent(distanceKm, forKey: .distanceKm)
+        try container.encodeIfPresent(workedCallsign, forKey: .workedCallsign)
+        try container.encodeIfPresent(parkReference, forKey: .parkReference)
+        try container.encodeIfPresent(parkName, forKey: .parkName)
+        try container.encodeIfPresent(qsoCount, forKey: .qsoCount)
+        try container.encodeIfPresent(streakDays, forKey: .streakDays)
+        try container.encodeIfPresent(challengeName, forKey: .challengeName)
+        try container.encodeIfPresent(tierName, forKey: .tierName)
+        try container.encodeIfPresent(recordType, forKey: .recordType)
+        try container.encodeIfPresent(recordValue, forKey: .recordValue)
     }
 }

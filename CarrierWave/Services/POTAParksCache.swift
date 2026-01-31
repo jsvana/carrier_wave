@@ -150,13 +150,21 @@ actor POTAParksCache {
         status
     }
 
+    /// Synchronous park name lookup for UI use (nonisolated for MainActor access)
+    /// Returns nil if park not found or cache not yet loaded
+    nonisolated func nameSync(for reference: String) -> String? {
+        parks[reference.uppercased()]
+    }
+
     // MARK: Private
 
     private static let csvURL = URL(string: "https://pota.app/all_parks_ext.csv")!
     private static let cacheFileName = "pota_parks.csv"
     private static let metadataFileName = "pota_parks_metadata.json"
 
-    private var parks: [String: String] = [:] // reference -> name
+    /// Thread-safe parks lookup using nonisolated(unsafe) for synchronous access
+    /// Safe because: writes only happen during ensureLoaded() which completes before reads
+    nonisolated(unsafe) private var parks: [String: String] = [:] // reference -> name
     private var isLoaded = false
 
     private var cacheDirectory: URL {

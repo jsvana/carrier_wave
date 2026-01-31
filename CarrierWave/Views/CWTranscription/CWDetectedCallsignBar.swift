@@ -118,57 +118,74 @@ struct CWHighlightedText: View {
     let elements: [CWTextElement]
 
     var body: some View {
-        elements.reduce(Text("")) { result, element in
-            result + text(for: element)
-        }
+        Text(attributedString)
     }
 
     // MARK: Private
 
-    private func text(for element: CWTextElement) -> Text {
+    private var attributedString: AttributedString {
+        var result = AttributedString()
+        for element in elements {
+            result.append(attributedText(for: element))
+        }
+        return result
+    }
+
+    private func attributedText(for element: CWTextElement) -> AttributedString {
         switch element {
         case let .text(str):
-            Text(str)
-                .foregroundColor(.primary)
+            var attr = AttributedString(str)
+            attr.foregroundColor = .primary
+            return attr
 
         case let .callsign(str, role):
-            Text(str)
-                .foregroundColor(color(for: role))
-                .fontWeight(.semibold)
+            var attr = AttributedString(str)
+            attr.foregroundColor = color(for: role)
+            attr.font = .body.weight(.semibold)
+            return attr
 
         case let .prosign(str):
-            Text(str)
-                .foregroundColor(.secondary)
+            var attr = AttributedString(str)
+            attr.foregroundColor = .secondary
+            return attr
 
         case let .signalReport(str):
-            Text(str)
-                .foregroundColor(.orange)
-                .fontWeight(.medium)
+            var attr = AttributedString(str)
+            attr.foregroundColor = .orange
+            attr.font = .body.weight(.medium)
+            return attr
 
         case let .grid(str):
-            Text(str)
-                .foregroundColor(.cyan)
-                .fontWeight(.medium)
+            var attr = AttributedString(str)
+            attr.foregroundColor = .cyan
+            attr.font = .body.weight(.medium)
+            return attr
 
         case let .power(str):
-            Text(str)
-                .foregroundColor(.yellow)
-                .fontWeight(.medium)
+            var attr = AttributedString(str)
+            attr.foregroundColor = .yellow
+            attr.font = .body.weight(.medium)
+            return attr
 
         case let .name(str):
-            Text(str)
-                .foregroundColor(.mint)
-                .fontWeight(.medium)
+            var attr = AttributedString(str)
+            attr.foregroundColor = .mint
+            attr.font = .body.weight(.medium)
+            return attr
 
         case let .suggestion(original, suggested, _):
             // Show original with superscript suggestion hint
-            Text(original)
-                .foregroundColor(.primary)
-                .underline(color: .blue.opacity(0.4))
-                + Text("→\(suggested)")
-                .font(.caption2)
-                .foregroundColor(.blue)
-                .baselineOffset(6)
+            var originalAttr = AttributedString(original)
+            originalAttr.foregroundColor = .primary
+            originalAttr.underlineStyle = .single
+            originalAttr.underlineColor = .blue
+
+            var suggestionAttr = AttributedString("→\(suggested)")
+            suggestionAttr.font = .caption2
+            suggestionAttr.foregroundColor = .blue
+            suggestionAttr.baselineOffset = 6
+
+            return originalAttr + suggestionAttr
         }
     }
 

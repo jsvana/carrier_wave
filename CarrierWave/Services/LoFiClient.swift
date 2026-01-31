@@ -646,7 +646,6 @@ final class LoFiClient {
 
         if qsos.count != operation.qsoCount {
             let opTitle = operation.title ?? "untitled"
-            let potaRef = operation.potaRef?.reference ?? "none"
             let diff = operation.qsoCount - qsos.count
 
             // Calculate operation date range

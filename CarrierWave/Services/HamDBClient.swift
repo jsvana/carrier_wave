@@ -98,14 +98,27 @@ enum HamDBError: LocalizedError {
 // MARK: - HamDBResponse
 
 /// Root response from HamDB API
-struct HamDBResponse: Codable {
+struct HamDBResponse: Sendable {
     let hamdb: HamDBData
+}
+
+// MARK: Decodable
+
+extension HamDBResponse: Decodable {
+    nonisolated init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        hamdb = try container.decode(HamDBData.self, forKey: .hamdb)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case hamdb
+    }
 }
 
 // MARK: - HamDBData
 
 /// Container for HamDB data
-struct HamDBData: Codable {
+struct HamDBData: Codable, Sendable {
     let version: String?
     let callsign: HamDBLicense?
     let messages: HamDBMessages?
@@ -114,7 +127,7 @@ struct HamDBData: Codable {
 // MARK: - HamDBMessages
 
 /// Status messages from HamDB
-struct HamDBMessages: Codable {
+struct HamDBMessages: Codable, Sendable {
     let status: String?
 }
 
@@ -177,14 +190,14 @@ struct HamDBLicense: Codable, Sendable {
     let frn: String?
 
     /// Full name (first + last)
-    var fullName: String? {
+    nonisolated var fullName: String? {
         let parts = [fname, name].compactMap { $0?.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
         return parts.isEmpty ? nil : parts.joined(separator: " ")
     }
 
     /// Parse the license class code into our LicenseClass enum
-    var parsedLicenseClass: LicenseClass? {
+    nonisolated var parsedLicenseClass: LicenseClass? {
         guard let classCode = self.class?.uppercased() else {
             return nil
         }

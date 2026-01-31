@@ -494,10 +494,7 @@ final class LoggingSessionManager {
             return
         }
 
-        let callsign =
-            session.myCallsign ?? UserDefaults.standard.string(
-                forKey: "loggerDefaultCallsign"
-            ) ?? ""
+        let callsign = session.myCallsign
         guard !callsign.isEmpty else {
             return
         }

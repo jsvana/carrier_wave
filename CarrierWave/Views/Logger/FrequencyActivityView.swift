@@ -180,7 +180,6 @@ struct FrequencyActivityView: View {
     private var activityVisualization: some View {
         GeometryReader { geometry in
             let width = geometry.size.width - 32
-            let centerX = width / 2
 
             ZStack {
                 // Baseline

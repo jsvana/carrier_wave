@@ -95,8 +95,9 @@ final class ClubsSyncService: ObservableObject {
     }
 
     private func updateClubFromDetails(_ details: ClubDetailDTO) throws {
+        let detailsId = details.id
         let descriptor = FetchDescriptor<Club>(
-            predicate: #Predicate { $0.id == details.id }
+            predicate: #Predicate { $0.id == detailsId }
         )
 
         let club: Club

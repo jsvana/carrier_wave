@@ -239,8 +239,10 @@ struct POTAActivationsContentView: View {
 
     private func startMaintenanceTimer() {
         updateMaintenanceTime()
-        maintenanceTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { _ in
-            updateMaintenanceTime()
+        maintenanceTimer = Timer.scheduledTimer(withTimeInterval: 60, repeats: true) { [self] _ in
+            Task { @MainActor in
+                updateMaintenanceTime()
+            }
         }
     }
 

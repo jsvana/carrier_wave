@@ -3,7 +3,7 @@ import Foundation
 // MARK: - CallsignInfoSource
 
 /// Source of callsign information
-enum CallsignInfoSource: String, Codable {
+enum CallsignInfoSource: String, Codable, Sendable {
     /// From a Polo notes list (local, offline)
     case poloNotes
     /// From QRZ XML callbook API
@@ -15,10 +15,10 @@ enum CallsignInfoSource: String, Codable {
 // MARK: - CallsignInfo
 
 /// Information about a callsign from lookup services
-struct CallsignInfo: Codable, Identifiable, Equatable {
+struct CallsignInfo: Codable, Identifiable, Equatable, Sendable {
     // MARK: Lifecycle
 
-    init(
+    nonisolated init(
         callsign: String,
         name: String? = nil,
         note: String? = nil,
@@ -90,28 +90,28 @@ struct CallsignInfo: Codable, Identifiable, Equatable {
     let matchingSources: [String]?
 
     /// Unique identifier (the callsign)
-    var id: String {
+    nonisolated var id: String {
         callsign
     }
 
     /// Full location string (city, state, country)
-    var fullLocation: String? {
+    nonisolated var fullLocation: String? {
         let parts = [qth, state, country].compactMap { $0 }
         return parts.isEmpty ? nil : parts.joined(separator: ", ")
     }
 
     /// Whether this info is from a local source (fast, offline)
-    var isLocal: Bool {
+    nonisolated var isLocal: Bool {
         source == .poloNotes
     }
 
     /// Age of this lookup in seconds
-    var age: TimeInterval {
+    nonisolated var age: TimeInterval {
         Date().timeIntervalSince(lookupDate)
     }
 
     /// Combined emoji string from all sources
-    var combinedEmoji: String? {
+    nonisolated var combinedEmoji: String? {
         if let emojis = allEmojis, !emojis.isEmpty {
             return emojis.joined()
         }

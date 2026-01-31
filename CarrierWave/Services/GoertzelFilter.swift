@@ -4,7 +4,7 @@ import Foundation
 
 /// Goertzel algorithm implementation for efficient single-frequency detection
 /// More computationally efficient than FFT when detecting only one frequency
-struct GoertzelFilter {
+struct GoertzelFilter: Sendable {
     // MARK: Lifecycle
 
     /// Create a Goertzel filter for a specific frequency
@@ -12,7 +12,7 @@ struct GoertzelFilter {
     ///   - targetFrequency: The frequency to detect (Hz)
     ///   - sampleRate: Audio sample rate (Hz)
     ///   - blockSize: Number of samples per block (affects frequency resolution)
-    init(targetFrequency: Double, sampleRate: Double, blockSize: Int) {
+    nonisolated init(targetFrequency: Double, sampleRate: Double, blockSize: Int) {
         self.targetFrequency = targetFrequency
         self.sampleRate = sampleRate
         self.blockSize = blockSize
@@ -38,7 +38,7 @@ struct GoertzelFilter {
     /// Process a block of samples and return the magnitude at the target frequency
     /// - Parameter samples: Audio samples (should be exactly blockSize samples)
     /// - Returns: Magnitude at the target frequency (normalized by block size)
-    func processSamples(_ samples: [Float]) -> Float {
+    nonisolated func processSamples(_ samples: [Float]) -> Float {
         var s1 = 0.0
         var s2 = 0.0
 
@@ -60,7 +60,7 @@ struct GoertzelFilter {
     /// Process samples and return both real and imaginary components
     /// - Parameter samples: Audio samples
     /// - Returns: Tuple of (real, imaginary) components
-    func processComplex(_ samples: [Float]) -> (real: Double, imag: Double) {
+    nonisolated func processComplex(_ samples: [Float]) -> (real: Double, imag: Double) {
         var s1 = 0.0
         var s2 = 0.0
 

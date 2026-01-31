@@ -3,7 +3,7 @@ import Foundation
 // MARK: - MorseElement
 
 /// A decoded morse element (dit, dah, or gap)
-enum MorseElement: Equatable {
+enum MorseElement: Equatable, Sendable {
     case dit
     case dah
     case elementGap // Gap within character
@@ -12,7 +12,7 @@ enum MorseElement: Equatable {
 
     // MARK: Internal
 
-    var symbol: String {
+    nonisolated var symbol: String {
         switch self {
         case .dit: "."
         case .dah: "-"
@@ -21,12 +21,25 @@ enum MorseElement: Equatable {
         case .wordGap: "  "
         }
     }
+
+    nonisolated static func == (lhs: MorseElement, rhs: MorseElement) -> Bool {
+        switch (lhs, rhs) {
+        case (.dit, .dit),
+             (.dah, .dah),
+             (.elementGap, .elementGap),
+             (.charGap, .charGap),
+             (.wordGap, .wordGap):
+            true
+        default:
+            false
+        }
+    }
 }
 
 // MARK: - DecodedOutput
 
 /// Output from the morse decoder
-enum DecodedOutput: Equatable {
+enum DecodedOutput: Equatable, Sendable {
     /// A character was decoded
     case character(String)
 

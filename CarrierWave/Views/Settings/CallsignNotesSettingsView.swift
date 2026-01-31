@@ -251,10 +251,10 @@ struct AddCallsignNotesSourceSheet: View {
                         .autocorrectionDisabled()
                         .keyboardType(.URL)
                 } footer: {
-                    Text("Enter a URL to a Polo-style notes file. ")
-                        + Text(
-                            "Each line should have a callsign followed by optional emoji and note text."
-                        )
+                    Text(
+                        "Enter a URL to a Polo-style notes file. "
+                            + "Each line should have a callsign followed by optional emoji and note text."
+                    )
                 }
             }
             .navigationTitle("Add Source")

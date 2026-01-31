@@ -5,7 +5,7 @@ import SwiftData
 // MARK: - CallsignLookupError
 
 /// Errors that can occur during callsign lookup
-enum CallsignLookupError: LocalizedError, Equatable {
+enum CallsignLookupError: LocalizedError, Equatable, Sendable {
     /// No QRZ API key configured
     case noQRZApiKey
     /// QRZ session authentication failed
@@ -53,7 +53,7 @@ enum CallsignLookupError: LocalizedError, Equatable {
 // MARK: - CallsignLookupResult
 
 /// Result of a callsign lookup with detailed status
-struct CallsignLookupResult: Equatable {
+struct CallsignLookupResult: Equatable, Sendable {
     /// The callsign info if found
     let info: CallsignInfo?
     /// Error if lookup failed (nil if found or still searching)
@@ -64,22 +64,24 @@ struct CallsignLookupResult: Equatable {
     let poloNotesChecked: Bool
 
     /// Whether any info was found
-    var found: Bool {
+    nonisolated var found: Bool {
         info != nil
     }
 
     /// Create a successful result
-    static func success(_ info: CallsignInfo) -> CallsignLookupResult {
+    nonisolated static func success(_ info: CallsignInfo) -> CallsignLookupResult {
         CallsignLookupResult(info: info, error: nil, qrzAttempted: false, poloNotesChecked: true)
     }
 
     /// Create a result from QRZ lookup
-    static func fromQRZ(_ info: CallsignInfo) -> CallsignLookupResult {
+    nonisolated static func fromQRZ(_ info: CallsignInfo) -> CallsignLookupResult {
         CallsignLookupResult(info: info, error: nil, qrzAttempted: true, poloNotesChecked: true)
     }
 
     /// Create a not found result
-    static func notFound(qrzAttempted: Bool, poloNotesChecked: Bool) -> CallsignLookupResult {
+    nonisolated static func notFound(qrzAttempted: Bool, poloNotesChecked: Bool)
+        -> CallsignLookupResult
+    {
         CallsignLookupResult(
             info: nil,
             error: .notFound,
@@ -89,7 +91,7 @@ struct CallsignLookupResult: Equatable {
     }
 
     /// Create an error result
-    static func error(
+    nonisolated static func error(
         _ error: CallsignLookupError,
         qrzAttempted: Bool = false,
         poloNotesChecked: Bool = false
@@ -109,7 +111,8 @@ struct CallsignLookupResult: Equatable {
 /// Uses a two-tier lookup strategy:
 /// 1. Polo notes lists (local, fast, offline-capable)
 /// 2. QRZ XML callbook API (remote, comprehensive)
-actor CallsignLookupService {
+@MainActor
+final class CallsignLookupService {
     // MARK: Lifecycle
 
     init(modelContext: ModelContext? = nil) {
@@ -227,8 +230,8 @@ actor CallsignLookupService {
     }
 
     /// Check if any Polo notes sources are configured
-    func hasPoloNotesSources() async -> Bool {
-        let sources = await fetchAllSourcesOnMainActor()
+    func hasPoloNotesSources() -> Bool {
+        let sources = fetchAllSourcesOnMainActor()
         return !sources.isEmpty
     }
 
@@ -313,7 +316,7 @@ actor CallsignLookupService {
 
     private func loadPoloNotes() async {
         // Fetch all sources with titles on main actor (SwiftData requirement)
-        let sources = await fetchAllSourcesOnMainActor()
+        let sources = fetchAllSourcesOnMainActor()
 
         guard !sources.isEmpty else {
             return
@@ -372,7 +375,6 @@ actor CallsignLookupService {
         poloNotesLoadedAt = Date()
     }
 
-    @MainActor
     private func fetchAllSourcesOnMainActor() -> [NotesSource] {
         guard let context = modelContext else {
             return []

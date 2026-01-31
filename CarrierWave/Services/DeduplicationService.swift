@@ -11,7 +11,8 @@ struct DeduplicationResult {
 
 // MARK: - DeduplicationService
 
-actor DeduplicationService {
+@MainActor
+final class DeduplicationService {
     // MARK: Lifecycle
 
     init(modelContext: ModelContext) {
@@ -21,7 +22,7 @@ actor DeduplicationService {
     // MARK: Internal
 
     /// Find and merge duplicate QSOs within the given time window
-    func findAndMergeDuplicates(timeWindowMinutes: Int = 5) async throws -> DeduplicationResult {
+    func findAndMergeDuplicates(timeWindowMinutes: Int = 5) throws -> DeduplicationResult {
         // Fetch all QSOs sorted by timestamp
         let descriptor = FetchDescriptor<QSO>(sortBy: [SortDescriptor(\.timestamp)])
         let allQSOs = try modelContext.fetch(descriptor)
