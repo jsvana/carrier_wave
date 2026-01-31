@@ -23,6 +23,9 @@ enum LoggerCommand: Equatable {
     /// Show weather panel
     case weather
 
+    /// Show session map
+    case map
+
     /// Show help
     case help
 
@@ -41,6 +44,7 @@ enum LoggerCommand: Equatable {
                           e.g., RBN W1AW (or just RBN for your spots)
         SOLAR           - Show solar conditions
         WEATHER         - Show weather (or WX)
+        MAP             - Show session QSO map
         HELP            - Show this help (or ?)
 
         You can also just type a frequency like "14.060"
@@ -70,6 +74,8 @@ enum LoggerCommand: Equatable {
             "Show solar conditions"
         case .weather:
             "Show weather"
+        case .map:
+            "Show session map"
         case .help:
             "Show available commands"
         }
@@ -90,6 +96,8 @@ enum LoggerCommand: Equatable {
             "sun.max"
         case .weather:
             "cloud.sun"
+        case .map:
+            "map"
         case .help:
             "questionmark.circle"
         }
@@ -151,6 +159,8 @@ enum LoggerCommand: Equatable {
         case "WEATHER",
              "WX":
             return .weather
+        case "MAP":
+            return .map
         case "HELP",
              "?":
             return .help
@@ -268,6 +278,17 @@ extension LoggerCommand {
                     command: "WEATHER",
                     description: "Show weather",
                     icon: "cloud.sun"
+                )
+            )
+        }
+
+        // MAP
+        if upper.hasPrefix("MA") {
+            suggestions.append(
+                CommandSuggestion(
+                    command: "MAP",
+                    description: "Show session map",
+                    icon: "map"
                 )
             )
         }

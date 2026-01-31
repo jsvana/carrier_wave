@@ -76,11 +76,31 @@ struct LoggerView: View {
                     }
                 }
             }
-            .navigationTitle("Logger")
+            .navigationTitle(sessionManager?.hasActiveSession == true ? "" : "Logger")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    sessionMenuButton
+                    if sessionManager?.hasActiveSession == true {
+                        Button {
+                            let hadQSOs = (sessionManager?.activeSession?.qsoCount ?? 0) > 0
+                            sessionManager?.endSession()
+                            if hadQSOs {
+                                onSessionEnd?()
+                            }
+                        } label: {
+                            Text("End Session")
+                                .fontWeight(.medium)
+                        }
+                        .tint(.red)
+                    } else {
+                        Button {
+                            showSessionSheet = true
+                        } label: {
+                            Text("Start Session")
+                                .fontWeight(.medium)
+                        }
+                        .tint(.green)
+                    }
                 }
             }
             .sheet(isPresented: $showSessionSheet) {
@@ -116,8 +136,19 @@ struct LoggerView: View {
             .onChange(of: sessionManager?.activeSession?.frequency) { _, _ in
                 dismissedViolation = nil
             }
-            .onChange(of: sessionManager?.activeSession?.mode) { _, _ in
+            .onChange(of: sessionManager?.activeSession?.mode) { _, newMode in
                 dismissedViolation = nil
+                // Reset RST defaults when mode changes
+                if newMode != nil {
+                    let mode = newMode!.uppercased()
+                    let threeDigitModes = [
+                        "CW", "RTTY", "PSK", "PSK31", "FT8", "FT4", "JT65", "JT9", "DATA",
+                        "DIGITAL",
+                    ]
+                    let newDefault = threeDigitModes.contains(mode) ? "599" : "59"
+                    rstSent = newDefault
+                    rstReceived = newDefault
+                }
             }
             .overlay(alignment: .bottom) {
                 panelOverlays
@@ -196,6 +227,7 @@ struct LoggerView: View {
 
     // Command panels
     @State private var showRBNPanel = false
+    @State private var showMapPanel = false
     @State private var rbnTargetCallsign: String?
     @State private var showSolarPanel = false
     @State private var showWeatherPanel = false
@@ -236,6 +268,20 @@ struct LoggerView: View {
     /// Current mode (for RST default)
     private var currentMode: String {
         sessionManager?.activeSession?.mode ?? "CW"
+    }
+
+    /// Whether current mode uses 3-digit RST (CW/digital) vs 2-digit RS (phone)
+    private var isCWMode: Bool {
+        let mode = currentMode.uppercased()
+        let threeDigitModes = [
+            "CW", "RTTY", "PSK", "PSK31", "FT8", "FT4", "JT65", "JT9", "DATA", "DIGITAL",
+        ]
+        return threeDigitModes.contains(mode)
+    }
+
+    /// Default RST based on current mode
+    private var defaultRST: String {
+        isCWMode ? "599" : "59"
     }
 
     /// Detected command from input (if any)
@@ -340,10 +386,25 @@ struct LoggerView: View {
                 .padding()
                 .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+
+            if showMapPanel {
+                SwipeToDismissPanel(isPresented: $showMapPanel) {
+                    SessionMapPanelView(
+                        sessionId: sessionManager?.activeSession?.id,
+                        myGrid: sessionManager?.activeSession?.myGrid
+                            ?? UserDefaults.standard.string(forKey: "loggerDefaultGrid")
+                    ) {
+                        showMapPanel = false
+                    }
+                }
+                .padding()
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showRBNPanel)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showSolarPanel)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showWeatherPanel)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: showMapPanel)
     }
 
     /// Session header - shows active session info or "no session" prompt
@@ -379,38 +440,6 @@ struct LoggerView: View {
         }
         .padding()
         .background(Color(.secondarySystemGroupedBackground))
-    }
-
-    // MARK: - Session Menu
-
-    private var sessionMenuButton: some View {
-        Menu {
-            if sessionManager?.hasActiveSession == true {
-                Button {
-                    let hadQSOs = (sessionManager?.activeSession?.qsoCount ?? 0) > 0
-                    sessionManager?.endSession()
-                    if hadQSOs {
-                        onSessionEnd?()
-                    }
-                } label: {
-                    Label("End Session", systemImage: "stop.fill")
-                }
-
-                Button {
-                    showSessionSheet = true
-                } label: {
-                    Label("New Session", systemImage: "plus")
-                }
-            } else {
-                Button {
-                    showSessionSheet = true
-                } label: {
-                    Label("Start Session", systemImage: "play.fill")
-                }
-            }
-        } label: {
-            Image(systemName: "ellipsis.circle")
-        }
     }
 
     // MARK: - Callsign Input
@@ -485,10 +514,10 @@ struct LoggerView: View {
     private var qsoFormSection: some View {
         HStack(spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
-                Text("RST/S")
+                Text("Sent")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("599", text: $rstSent)
+                TextField(defaultRST, text: $rstSent)
                     .font(.title3.monospaced())
                     .multilineTextAlignment(.center)
                     .keyboardType(.numberPad)
@@ -498,10 +527,10 @@ struct LoggerView: View {
             }
 
             VStack(alignment: .leading, spacing: 4) {
-                Text("RST/R")
+                Text("Rcvd")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                TextField("599", text: $rstReceived)
+                TextField(defaultRST, text: $rstReceived)
                     .font(.title3.monospaced())
                     .multilineTextAlignment(.center)
                     .keyboardType(.numberPad)
@@ -775,6 +804,9 @@ struct LoggerView: View {
         case .weather:
             showWeatherPanel = true
 
+        case .map:
+            showMapPanel = true
+
         case .help:
             showHelpAlert = true
         }
@@ -868,8 +900,8 @@ struct LoggerView: View {
 
         _ = sessionManager?.logQSO(
             callsign: callsignInput,
-            rstSent: rstSent.isEmpty ? "599" : rstSent,
-            rstReceived: rstReceived.isEmpty ? "599" : rstReceived,
+            rstSent: rstSent.isEmpty ? defaultRST : rstSent,
+            rstReceived: rstReceived.isEmpty ? defaultRST : rstReceived,
             theirGrid: gridToUse,
             theirParkReference: theirPark.isEmpty ? nil : theirPark,
             notes: notes.isEmpty ? nil : notes,
@@ -889,13 +921,8 @@ struct LoggerView: View {
         operatorName = ""
 
         // Reset RST to defaults based on mode
-        if currentMode == "CW" {
-            rstSent = "599"
-            rstReceived = "599"
-        } else {
-            rstSent = "59"
-            rstReceived = "59"
-        }
+        rstSent = defaultRST
+        rstReceived = defaultRST
     }
 
     private func lookupParkName(_ reference: String?) -> String? {

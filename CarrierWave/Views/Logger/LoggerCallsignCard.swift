@@ -17,10 +17,7 @@ struct LoggerCallsignCard: View {
                         Text(info.callsign)
                             .font(.title2.weight(.bold).monospaced())
 
-                        if let emoji = info.emoji {
-                            Text(emoji)
-                                .font(.title2)
-                        }
+                        notesDisplay
                     }
 
                     if let name = info.name {
@@ -55,6 +52,8 @@ struct LoggerCallsignCard: View {
 
     // MARK: Private
 
+    @AppStorage("callsignNotesDisplayMode") private var notesDisplayMode = "emoji"
+
     private var hasDetails: Bool {
         info.grid != nil || info.state != nil || info.country != nil
     }
@@ -67,6 +66,31 @@ struct LoggerCallsignCard: View {
             "from QRZ"
         case .hamdb:
             "from HamDB"
+        }
+    }
+
+    @ViewBuilder
+    private var notesDisplay: some View {
+        if notesDisplayMode == "sources" {
+            // Show source names as chips
+            if let sources = info.matchingSources, !sources.isEmpty {
+                HStack(spacing: 4) {
+                    ForEach(sources, id: \.self) { source in
+                        Text(source)
+                            .font(.caption2)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Color.blue.opacity(0.2))
+                            .clipShape(Capsule())
+                    }
+                }
+            }
+        } else {
+            // Show combined emoji
+            if let emoji = info.combinedEmoji {
+                Text(emoji)
+                    .font(.title2)
+            }
         }
     }
 
@@ -181,7 +205,7 @@ struct CompactCallsignBar: View {
 
     var body: some View {
         HStack(spacing: 8) {
-            if let emoji = info.emoji {
+            if let emoji = info.combinedEmoji {
                 Text(emoji)
                     .font(.body)
             }

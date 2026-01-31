@@ -38,7 +38,8 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `CWConversation.swift` | CW conversation and message models for chat display |
 | `CallsignInfo.swift` | Callsign lookup result with name, note, emoji, source |
 | `LoggingSession.swift` | Logging session model with activation type, frequency, mode |
-| `LoggerCommand.swift` | Command enum for logger input (FREQ, MODE, SPOT, RBN, SOLAR, WEATHER) |
+| `LoggerCommand.swift` | Command enum for logger input (FREQ, MODE, SPOT, RBN, SOLAR, WEATHER, MAP) |
+| `CallsignNotesSource.swift` | SwiftData model for user-configured callsign notes file sources |
 | `BandPlan.swift` | US amateur radio band plan data with license class privileges |
 | `UserProfile.swift` | User's amateur radio profile (callsign, name, QTH, grid, license) |
 
@@ -141,6 +142,7 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `LicenseWarningBanner.swift` | Band plan violation warning banner |
 | `LoggerToastView.swift` | Toast notification system for logger |
 | `LoggerKeyboardAccessory.swift` | Number row and command buttons above keyboard |
+| `SessionMapPanelView.swift` | Map panel showing session QSOs for MAP command |
 
 ## Views - CW Transcription (`CarrierWave/Views/CWTranscription/`)
 | File | Purpose |
@@ -233,6 +235,7 @@ This index maps files to their purpose. Use it to locate files by feature instea
 | `BugReportView.swift` | Bug report form with dpaste upload and Discord instructions |
 | `CallsignAliasesSettingsView.swift` | Manage current and previous callsigns |
 | `SettingsSections.swift` | Sync Sources section with service navigation links |
+| `CallsignNotesSettingsView.swift` | Manage callsign notes file sources (URL + title) |
 
 ## Views - Map (`CarrierWave/Views/Map/`)
 | File | Purpose |

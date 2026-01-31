@@ -79,9 +79,9 @@ actor CallsignLookupService {
         cache[callsign.uppercased()]
     }
 
-    /// Preload Polo notes from all clubs
+    /// Preload Polo notes from all sources (clubs and user-configured)
     func preloadPoloNotes() async {
-        await loadPoloNotesFromClubs()
+        await loadPoloNotes()
     }
 
     /// Clear all caches
@@ -92,6 +92,21 @@ actor CallsignLookupService {
     }
 
     // MARK: Private
+
+    // MARK: - Types
+
+    /// Entry from a notes source with source title and optional emoji/note
+    private struct NotesEntry {
+        let title: String
+        let emoji: String?
+        let note: String?
+    }
+
+    /// A source with its title for tracking
+    private struct NotesSource {
+        let url: URL
+        let title: String
+    }
 
     // MARK: - Private State
 
@@ -118,7 +133,7 @@ actor CallsignLookupService {
     private func lookupInPoloNotes(_ callsign: String) async -> CallsignInfo? {
         // Reload Polo notes if stale or empty
         if poloNotesCache.isEmpty || isPoloNotesCacheStale() {
-            await loadPoloNotesFromClubs()
+            await loadPoloNotes()
         }
 
         return poloNotesCache[callsign]
@@ -132,40 +147,98 @@ actor CallsignLookupService {
         return Date().timeIntervalSince(loadedAt) > 300
     }
 
-    private func loadPoloNotesFromClubs() async {
-        // Fetch club URLs on main actor (SwiftData requirement)
-        let urls = await fetchClubURLsOnMainActor()
+    private func loadPoloNotes() async {
+        // Fetch all sources with titles on main actor (SwiftData requirement)
+        let sources = await fetchAllSourcesOnMainActor()
 
-        guard !urls.isEmpty else {
+        guard !sources.isEmpty else {
             return
         }
 
-        // Load and merge all notes (can run on any thread)
-        let merged = await PoloNotesParser.load(from: urls)
+        // Load all sources and track entries by source
+        var entriesByCallsign: [String: [NotesEntry]] = [:]
+
+        await withTaskGroup(of: (String, [String: CallsignInfo]).self) { group in
+            for source in sources {
+                group.addTask {
+                    let entries = await (try? PoloNotesParser.load(from: source.url)) ?? [:]
+                    return (source.title, entries)
+                }
+            }
+
+            for await (sourceTitle, entries) in group {
+                for (callsign, info) in entries {
+                    var existing = entriesByCallsign[callsign] ?? []
+                    existing.append(
+                        NotesEntry(title: sourceTitle, emoji: info.emoji, note: info.note)
+                    )
+                    entriesByCallsign[callsign] = existing
+                }
+            }
+        }
+
+        // Merge entries into CallsignInfo with all emojis and source titles
+        var merged: [String: CallsignInfo] = [:]
+        for (callsign, entries) in entriesByCallsign {
+            let allEmojis = entries.compactMap(\.emoji).filter { !$0.isEmpty }
+            let sourceTitles = entries.map(\.title)
+            let lastNote = entries.last?.note
+
+            merged[callsign] = CallsignInfo(
+                callsign: callsign,
+                note: lastNote,
+                emoji: allEmojis.first,
+                source: .poloNotes,
+                allEmojis: allEmojis.isEmpty ? nil : allEmojis,
+                matchingSources: sourceTitles
+            )
+        }
+
         poloNotesCache = merged
         poloNotesLoadedAt = Date()
     }
 
     @MainActor
-    private func fetchClubURLsOnMainActor() -> [URL] {
+    private func fetchAllSourcesOnMainActor() -> [NotesSource] {
         guard let context = modelContext else {
             return []
         }
 
-        do {
-            let descriptor = FetchDescriptor<Club>()
-            let clubs = try context.fetch(descriptor)
+        var sources: [NotesSource] = []
 
-            return clubs.compactMap { club -> URL? in
-                guard !club.poloNotesListURL.isEmpty else {
-                    return nil
+        // Fetch from clubs
+        do {
+            let clubDescriptor = FetchDescriptor<Club>()
+            let clubs = try context.fetch(clubDescriptor)
+
+            for club in clubs {
+                if !club.poloNotesListURL.isEmpty,
+                   let url = URL(string: club.poloNotesListURL)
+                {
+                    sources.append(NotesSource(url: url, title: club.name))
                 }
-                return URL(string: club.poloNotesListURL)
             }
         } catch {
             print("[CallsignLookup] Failed to load clubs: \(error)")
-            return []
         }
+
+        // Fetch from user-configured sources
+        do {
+            let sourceDescriptor = FetchDescriptor<CallsignNotesSource>(
+                predicate: #Predicate { $0.isEnabled }
+            )
+            let userSources = try context.fetch(sourceDescriptor)
+
+            for source in userSources {
+                if let url = URL(string: source.url) {
+                    sources.append(NotesSource(url: url, title: source.title))
+                }
+            }
+        } catch {
+            print("[CallsignLookup] Failed to load callsign notes sources: \(error)")
+        }
+
+        return sources
     }
 
     // MARK: - Cache Management

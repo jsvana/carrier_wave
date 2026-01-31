@@ -29,7 +29,9 @@ struct CallsignInfo: Codable, Identifiable, Equatable {
         grid: String? = nil,
         licenseClass: String? = nil,
         source: CallsignInfoSource,
-        lookupDate: Date = Date()
+        lookupDate: Date = Date(),
+        allEmojis: [String]? = nil,
+        matchingSources: [String]? = nil
     ) {
         self.callsign = callsign.uppercased()
         self.name = name
@@ -42,6 +44,8 @@ struct CallsignInfo: Codable, Identifiable, Equatable {
         self.licenseClass = licenseClass
         self.source = source
         self.lookupDate = lookupDate
+        self.allEmojis = allEmojis
+        self.matchingSources = matchingSources
     }
 
     // MARK: Internal
@@ -79,6 +83,12 @@ struct CallsignInfo: Codable, Identifiable, Equatable {
     /// When this lookup was performed
     let lookupDate: Date
 
+    /// All emojis from matching sources (for merged display)
+    let allEmojis: [String]?
+
+    /// Source titles that matched this callsign
+    let matchingSources: [String]?
+
     /// Unique identifier (the callsign)
     var id: String {
         callsign
@@ -98,6 +108,14 @@ struct CallsignInfo: Codable, Identifiable, Equatable {
     /// Age of this lookup in seconds
     var age: TimeInterval {
         Date().timeIntervalSince(lookupDate)
+    }
+
+    /// Combined emoji string from all sources
+    var combinedEmoji: String? {
+        if let emojis = allEmojis, !emojis.isEmpty {
+            return emojis.joined()
+        }
+        return emoji
     }
 }
 

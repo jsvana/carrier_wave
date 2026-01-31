@@ -23,6 +23,7 @@ struct CarrierWaveApp: App {
             Club.self,
             ActivityItem.self,
             LoggingSession.self,
+            CallsignNotesSource.self,
         ])
         let modelConfiguration = ModelConfiguration(
             schema: schema,

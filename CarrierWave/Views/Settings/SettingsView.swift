@@ -59,6 +59,7 @@ struct SettingsMainView: View {
     @AppStorage("loggerKeepScreenOn") private var keepScreenOn = true
     @AppStorage("loggerQuickLogMode") private var quickLogMode = false
     @AppStorage("potaAutoSpotEnabled") private var potaAutoSpotEnabled = false
+    @AppStorage("callsignNotesDisplayMode") private var notesDisplayMode = "emoji"
 
     @StateObject private var iCloudMonitor = ICloudMonitor()
     @State private var qrzIsConfigured = false
@@ -225,12 +226,18 @@ struct SettingsMainView: View {
             Toggle("Show frequency activity", isOn: $showActivityPanel)
             Toggle("Keep screen on", isOn: $keepScreenOn)
             Toggle("Quick Log Mode", isOn: $quickLogMode)
+
+            Picker("Notes display", selection: $notesDisplayMode) {
+                Text("Emoji").tag("emoji")
+                Text("Source names").tag("sources")
+            }
         } header: {
             Text("Logger")
         } footer: {
             Text(
                 "Quick Log Mode disables animations for faster QSO entry. "
-                    + "Keep screen on prevents device sleep during sessions."
+                    + "Keep screen on prevents device sleep during sessions. "
+                    + "Notes display controls how callsign notes are shown."
             )
         }
     }
@@ -326,6 +333,12 @@ struct SettingsMainView: View {
 
     private var dataSection: some View {
         Section {
+            NavigationLink {
+                CallsignNotesSettingsView()
+            } label: {
+                Label("Callsign Notes", systemImage: "note.text")
+            }
+
             NavigationLink {
                 ExternalDataView()
             } label: {

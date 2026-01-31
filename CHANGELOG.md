@@ -8,6 +8,22 @@ All notable changes to Carrier Wave will be documented in this file.
 - **iPad Settings Navigation** - Changing sidebar tab now properly exits Settings submenus
 
 ### Added
+- **Configurable Callsign Notes Files** - Add custom Polo-style notes files in Settings
+  - Configure title and URL for each source
+  - Sources fetched and cached, refreshed daily
+  - Enable/disable individual sources
+  - View entry count and last fetch status
+- **Merged Callsign Notes Display** - When callsign appears in multiple notes sources
+  - All emojis from matching sources shown together
+  - Last source's note text used for display
+  - Tracks which sources matched for reference
+- **Notes Display Mode Toggle** - Choose how callsign notes are displayed
+  - Emoji mode: Shows combined emoji from all matching sources
+  - Source names mode: Shows source titles as chips
+- **MAP Command** - View session QSOs on a map
+  - Type `MAP` in the logger input to show session map panel
+  - Displays QSO locations with geodesic paths from your location
+  - Swipe-to-dismiss panel like RBN/Solar/Weather
 - **Editable Session Title** - Tap the session title to customize it
   - Custom title persists across app restarts
   - Clear custom title to revert to default (callsign + activation type)
@@ -42,6 +58,14 @@ All notable changes to Carrier Wave will be documented in this file.
 - LoFi sync test script (`scripts/lofi-sync-test.swift`) for local testing
 
 ### Changed
+- **Improved RST Labels** - Changed from "RST/S" and "RST/R" to "Sent" and "Rcvd" for clarity
+- **RST Defaults by Mode** - RST defaults to 599 for CW/digital modes, 59 for phone modes
+  - Automatically updates when changing modes during a session
+  - Resets appropriately after logging each QSO
+- **End Session Button** - Replaced 3-dot menu with a dedicated "End Session" button
+  - Shows red "End Session" when session is active
+  - Shows green "Start Session" when no session
+  - Navigation title hidden during active sessions to save space
 - Onboarding profile setup now skipped if callsign is already configured
 - Add "Later" button to onboarding flow to defer profile setup
 
