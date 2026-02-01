@@ -292,6 +292,17 @@ When reviewing code for performance, verify:
 - [ ] Map: Annotations limited to viewport, clustering enabled
 - [ ] Tabs: Heavy content deferred until visible
 
+### Hidden QSOs
+- [ ] All QSO queries include `!$0.isHidden` predicate
+- [ ] Statistics exclude hidden QSOs
+- [ ] No in-memory filtering of `isHidden`
+
+### Large Collections
+- [ ] No linear scans of unbounded collections
+- [ ] Batch processing for bulk operations
+- [ ] Fetch limits used where appropriate
+- [ ] Pagination for long lists
+
 ---
 
 ## Measuring Performance
@@ -319,6 +330,104 @@ When investigating slowdowns:
    - Delayed response to taps
    - Stuttering animations
    - Slow tab switches
+
+---
+
+## Hidden QSOs
+
+Hidden (soft-deleted) QSOs must never impact UI performance. They exist only for data recovery.
+
+**Requirements:**
+- Hidden QSOs must be excluded from all queries via `#Predicate { !$0.isHidden }`
+- Never include hidden QSOs in counts, statistics, or aggregations
+- Scrolling, searching, and filtering must operate only on visible QSOs
+- The hidden QSOs view (Settings → Developer → Hidden QSOs) is the only place they appear
+
+**Patterns to follow:**
+```swift
+// Always filter out hidden QSOs in queries
+@Query(
+    filter: #Predicate<QSO> { !$0.isHidden },
+    sort: \QSO.timestamp,
+    order: .reverse
+)
+private var visibleQSOs: [QSO]
+
+// Statistics should exclude hidden QSOs
+func calculateStats() -> Stats {
+    let descriptor = FetchDescriptor<QSO>(
+        predicate: #Predicate { !$0.isHidden }
+    )
+    // ...
+}
+```
+
+**Avoid:**
+- Fetching all QSOs and filtering `isHidden` in memory
+- Including hidden QSOs in any user-facing aggregation
+- Counting hidden QSOs toward totals or progress
+
+---
+
+## Large Collections
+
+Expect users to have tens or hundreds of thousands of QSOs. Design for scale.
+
+**Requirements:**
+- Never scan entire collections - use indexed queries with predicates
+- No linear operations (O(n)) on full QSO sets in view bodies
+- Work in batches for bulk operations
+- Use SwiftData indexes on frequently queried fields
+
+**Patterns to follow:**
+```swift
+// Use predicates to filter at the database level
+let descriptor = FetchDescriptor<QSO>(
+    predicate: #Predicate { qso in
+        qso.parkReference == targetPark && !qso.isHidden
+    },
+    sortBy: [SortDescriptor(\.timestamp, order: .reverse)]
+)
+descriptor.fetchLimit = 100  // Limit results when possible
+
+// Batch operations
+let batchSize = 100
+for startIndex in stride(from: 0, to: items.count, by: batchSize) {
+    let endIndex = min(startIndex + batchSize, items.count)
+    let batch = Array(items[startIndex..<endIndex])
+    await processBatch(batch)
+}
+
+// Use pagination for large lists
+@Query(sort: \QSO.timestamp, order: .reverse)
+private var qsos: [QSO]
+
+// Only render visible portion
+ForEach(qsos.prefix(visibleCount)) { qso in
+    QSORow(qso: qso)
+}
+```
+
+**Indexing:**
+SwiftData models should have indexes on frequently queried fields:
+```swift
+@Model
+final class QSO {
+    // These fields are frequently used in predicates
+    @Attribute(.spotlight) var callsign: String  // Indexed for search
+    var timestamp: Date  // Sorted frequently
+    var parkReference: String?  // Filtered by park
+    var isHidden: Bool  // Filtered in every query
+    // ...
+}
+```
+
+**Avoid:**
+- `allQSOs.filter { ... }` in view bodies
+- `allQSOs.count` when you only need to check if empty
+- Loading all QSOs to find a single match
+- Sorting entire collections when only showing top N
+- Any O(n) or O(n²) operations on unbounded collections
 
 ---
 

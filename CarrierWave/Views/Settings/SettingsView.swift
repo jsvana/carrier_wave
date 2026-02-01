@@ -353,6 +353,12 @@ struct SettingsMainView: View {
                     Label("Sync Debug Log", systemImage: "doc.text.magnifyingglass")
                 }
 
+                NavigationLink {
+                    AllHiddenQSOsView()
+                } label: {
+                    Label("Hidden QSOs", systemImage: "eye.slash")
+                }
+
                 Button(role: .destructive) {
                     showingClearAllConfirmation = true
                 } label: {
@@ -797,4 +803,170 @@ struct ShareSheet: UIViewControllerRepresentable {
     }
 
     func updateUIViewController(_ uiViewController: UIActivityViewController, context: Context) {}
+}
+
+// MARK: - AllHiddenQSOsView
+
+/// View showing all hidden (deleted) QSOs across the app with option to restore
+struct AllHiddenQSOsView: View {
+    // MARK: Internal
+
+    var body: some View {
+        Group {
+            if hiddenQSOs.isEmpty {
+                ContentUnavailableView(
+                    "No Hidden QSOs",
+                    systemImage: "checkmark.circle",
+                    description: Text("All QSOs are visible")
+                )
+            } else {
+                List {
+                    Section {
+                        ForEach(hiddenQSOs) { qso in
+                            AllHiddenQSORow(qso: qso) {
+                                restoreQSO(qso)
+                            }
+                        }
+                    } header: {
+                        Text("\(hiddenQSOs.count) hidden QSO\(hiddenQSOs.count == 1 ? "" : "s")")
+                    } footer: {
+                        Text(
+                            "Hidden QSOs are excluded from sync and statistics. "
+                                + "Restore them to include them again."
+                        )
+                    }
+
+                    if !hiddenQSOs.isEmpty {
+                        Section {
+                            Button("Restore All") {
+                                showRestoreAllConfirmation = true
+                            }
+
+                            Button("Permanently Delete All", role: .destructive) {
+                                showDeleteAllConfirmation = true
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .navigationTitle("Hidden QSOs")
+        .alert("Restore All?", isPresented: $showRestoreAllConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Restore All") {
+                restoreAllQSOs()
+            }
+        } message: {
+            Text("This will restore \(hiddenQSOs.count) hidden QSO(s) and include them in sync.")
+        }
+        .alert("Permanently Delete All?", isPresented: $showDeleteAllConfirmation) {
+            Button("Cancel", role: .cancel) {}
+            Button("Delete All", role: .destructive) {
+                permanentlyDeleteAllQSOs()
+            }
+        } message: {
+            Text(
+                "This will permanently delete \(hiddenQSOs.count) hidden QSO(s). "
+                    + "This cannot be undone."
+            )
+        }
+    }
+
+    // MARK: Private
+
+    @Environment(\.modelContext) private var modelContext
+
+    @Query(
+        filter: #Predicate<QSO> { $0.isHidden },
+        sort: \QSO.timestamp,
+        order: .reverse
+    )
+    private var hiddenQSOs: [QSO]
+
+    @State private var showRestoreAllConfirmation = false
+    @State private var showDeleteAllConfirmation = false
+
+    private func restoreQSO(_ qso: QSO) {
+        qso.isHidden = false
+        try? modelContext.save()
+    }
+
+    private func restoreAllQSOs() {
+        for qso in hiddenQSOs {
+            qso.isHidden = false
+        }
+        try? modelContext.save()
+    }
+
+    private func permanentlyDeleteAllQSOs() {
+        for qso in hiddenQSOs {
+            modelContext.delete(qso)
+        }
+        try? modelContext.save()
+    }
+}
+
+// MARK: - AllHiddenQSORow
+
+/// A row displaying a hidden QSO with restore button
+struct AllHiddenQSORow: View {
+    // MARK: Internal
+
+    let qso: QSO
+    let onRestore: () -> Void
+
+    var body: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 4) {
+                Text(qso.callsign)
+                    .font(.headline.monospaced())
+
+                HStack(spacing: 8) {
+                    Text(qso.timestamp, format: .dateTime.month().day().hour().minute())
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+
+                    Text(qso.band)
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.2))
+                        .clipShape(Capsule())
+
+                    Text(qso.mode)
+                        .font(.caption)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.blue.opacity(0.2))
+                        .clipShape(Capsule())
+                }
+
+                if let park = qso.parkReference {
+                    Text(park)
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+            }
+
+            Spacer()
+
+            Button {
+                onRestore()
+            } label: {
+                Label("Restore", systemImage: "arrow.uturn.backward")
+                    .font(.subheadline)
+            }
+            .buttonStyle(.bordered)
+        }
+        .padding(.vertical, 4)
+    }
+
+    // MARK: Private
+
+    /// Shared date formatter for performance
+    private static let dateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "MMM d, HH:mm"
+        return formatter
+    }()
 }

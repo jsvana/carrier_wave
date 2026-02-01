@@ -188,13 +188,25 @@ struct LoggerView: View {
                     }
                 }
                 Button("Delete Session", role: .destructive) {
-                    sessionManager?.deleteCurrentSession()
+                    showDeleteSessionSheet = true
                 }
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text(
                     "End keeps your \(displayQSOs.count) QSOs for sync. "
                         + "Delete hides them permanently."
+                )
+            }
+            .sheet(isPresented: $showDeleteSessionSheet) {
+                DeleteSessionConfirmationSheet(
+                    qsoCount: displayQSOs.count,
+                    onConfirm: {
+                        sessionManager?.deleteCurrentSession()
+                        showDeleteSessionSheet = false
+                    },
+                    onCancel: {
+                        showDeleteSessionSheet = false
+                    }
                 )
             }
             .alert("Post QSY Spot?", isPresented: $showQSYSpotConfirmation) {
@@ -302,6 +314,7 @@ struct LoggerView: View {
 
     /// Session end/delete confirmation
     @State private var showEndSessionConfirmation = false
+    @State private var showDeleteSessionSheet = false
 
     // QSY spot confirmation
     @State private var showQSYSpotConfirmation = false
@@ -1989,6 +2002,97 @@ struct HiddenQSORow: View {
             .buttonStyle(.bordered)
         }
         .padding(.vertical, 4)
+    }
+}
+
+// MARK: - DeleteSessionConfirmationSheet
+
+/// Sheet requiring user to type "delete" to confirm session deletion
+struct DeleteSessionConfirmationSheet: View {
+    // MARK: Internal
+
+    let qsoCount: Int
+    let onConfirm: () -> Void
+    let onCancel: () -> Void
+
+    var body: some View {
+        NavigationStack {
+            VStack(spacing: 24) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 48))
+                    .foregroundStyle(.red)
+
+                VStack(spacing: 8) {
+                    Text("Delete Session?")
+                        .font(.title2.weight(.bold))
+
+                    Text(
+                        "This will hide \(qsoCount) QSO\(qsoCount == 1 ? "" : "s") permanently. "
+                            + "They will not sync to any services."
+                    )
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                }
+
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Type \"delete\" to confirm:")
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+
+                    TextField("", text: $confirmationText)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.body.monospaced())
+                        .padding()
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 8)
+                                .stroke(
+                                    isConfirmationValid ? Color.red : Color.clear,
+                                    lineWidth: 2
+                                )
+                        )
+                        .focused($isTextFieldFocused)
+                }
+
+                Spacer()
+
+                VStack(spacing: 12) {
+                    Button(role: .destructive) {
+                        onConfirm()
+                    } label: {
+                        Text("Delete Session")
+                            .font(.headline)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 14)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(.red)
+                    .disabled(!isConfirmationValid)
+
+                    Button("Cancel", role: .cancel) {
+                        onCancel()
+                    }
+                }
+            }
+            .padding()
+            .navigationBarHidden(true)
+            .onAppear {
+                isTextFieldFocused = true
+            }
+        }
+        .presentationDetents([.medium])
+    }
+
+    // MARK: Private
+
+    @State private var confirmationText = ""
+    @FocusState private var isTextFieldFocused: Bool
+
+    private var isConfirmationValid: Bool {
+        confirmationText.lowercased() == "delete"
     }
 }
 

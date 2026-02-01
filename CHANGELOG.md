@@ -4,6 +4,15 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+### Added
+- **Hidden QSOs Management** - View and restore hidden (deleted) QSOs in Settings → Developer → Hidden QSOs
+  - See all hidden QSOs across the app
+  - Restore individual QSOs or all at once
+  - Option to permanently delete hidden QSOs
+
+### Changed
+- **Delete Session Confirmation** - Session deletion now requires typing "delete" to confirm, preventing accidental data loss
+
 ### Fixed
 - **Settings Crash on Launch** - Fixed crash when navigating to service settings (QRZ, POTA, LoFi, etc.) due to missing SyncService environment object
 - **Logger Submit Crash** - Fixed crash when pressing Return in logger callsign field while keyboard is dismissing
