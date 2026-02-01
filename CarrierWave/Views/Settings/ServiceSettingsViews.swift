@@ -94,6 +94,8 @@ struct QRZApiKeySheet: View {
 struct QRZSettingsView: View {
     // MARK: Internal
 
+    var syncService: SyncService?
+
     var body: some View {
         List {
             if isAuthenticated {
@@ -135,7 +137,7 @@ struct QRZSettingsView: View {
                 }
             }
 
-            if debugMode, isAuthenticated {
+            if debugMode, isAuthenticated, syncService != nil {
                 Section {
                     Button {
                         Task { await forceRedownload() }
@@ -184,7 +186,6 @@ struct QRZSettingsView: View {
     // MARK: Private
 
     @AppStorage("debugMode") private var debugMode = false
-    @EnvironmentObject private var syncService: SyncService
     @State private var isAuthenticated = false
     @State private var callsign: String?
     @State private var showingLogin = false
@@ -208,6 +209,9 @@ struct QRZSettingsView: View {
 
     @MainActor
     private func forceRedownload() async {
+        guard let syncService else {
+            return
+        }
         isRedownloading = true
         redownloadResult = nil
 
@@ -230,6 +234,7 @@ struct POTASettingsView: View {
     @ObservedObject var potaAuth: POTAAuthService
 
     let tourState: TourState
+    var syncService: SyncService?
 
     var body: some View {
         List {
@@ -303,7 +308,7 @@ struct POTASettingsView: View {
                 }
             }
 
-            if debugMode, potaAuth.isAuthenticated {
+            if debugMode, potaAuth.isAuthenticated, syncService != nil {
                 Section {
                     Button {
                         Task { await forceRedownload() }
@@ -352,7 +357,6 @@ struct POTASettingsView: View {
     // MARK: Private
 
     @AppStorage("debugMode") private var debugMode = false
-    @EnvironmentObject private var syncService: SyncService
     @State private var username = ""
     @State private var password = ""
     @State private var isTesting = false
@@ -394,6 +398,9 @@ struct POTASettingsView: View {
 
     @MainActor
     private func forceRedownload() async {
+        guard let syncService else {
+            return
+        }
         isRedownloading = true
         redownloadResult = nil
 

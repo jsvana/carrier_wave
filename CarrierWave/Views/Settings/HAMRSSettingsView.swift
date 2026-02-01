@@ -3,6 +3,8 @@ import SwiftUI
 struct HAMRSSettingsView: View {
     // MARK: Internal
 
+    var syncService: SyncService?
+
     var body: some View {
         List {
             if isConfigured {
@@ -69,7 +71,7 @@ struct HAMRSSettingsView: View {
                 }
             }
 
-            if debugMode, isConfigured {
+            if debugMode, isConfigured, syncService != nil {
                 Section {
                     Button {
                         Task { await forceRedownload() }
@@ -114,7 +116,6 @@ struct HAMRSSettingsView: View {
     // MARK: Private
 
     @AppStorage("debugMode") private var debugMode = false
-    @EnvironmentObject private var syncService: SyncService
     @State private var apiKey = ""
     @State private var isConfigured = false
     @State private var isValidating = false
@@ -158,6 +159,9 @@ struct HAMRSSettingsView: View {
     }
 
     private func forceRedownload() async {
+        guard let syncService else {
+            return
+        }
         isRedownloading = true
         redownloadResult = nil
         defer { isRedownloading = false }

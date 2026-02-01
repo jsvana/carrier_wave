@@ -5,6 +5,8 @@ import SwiftUI
 struct LoTWSettingsView: View {
     // MARK: Internal
 
+    var syncService: SyncService?
+
     var body: some View {
         List {
             if isAuthenticated {
@@ -47,7 +49,7 @@ struct LoTWSettingsView: View {
                 }
             }
 
-            if debugMode, isAuthenticated {
+            if debugMode, isAuthenticated, syncService != nil {
                 Section {
                     Button {
                         Task { await forceRedownload() }
@@ -100,7 +102,6 @@ struct LoTWSettingsView: View {
     // MARK: Private
 
     @AppStorage("debugMode") private var debugMode = false
-    @EnvironmentObject private var syncService: SyncService
     @State private var isAuthenticated = false
     @State private var username = ""
     @State private var showingLogin = false
@@ -126,6 +127,9 @@ struct LoTWSettingsView: View {
     }
 
     private func forceRedownload() async {
+        guard let syncService else {
+            return
+        }
         isRedownloading = true
         redownloadResult = nil
         defer { isRedownloading = false }

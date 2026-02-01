@@ -52,22 +52,14 @@ struct MoreTabView: View {
 
     @State private var hiddenTabs: [AppTab] = []
 
-    @ViewBuilder
     private var settingsContent: some View {
-        if let syncService {
-            SettingsMainView(
-                potaAuth: potaAuthService,
-                destination: $settingsDestination,
-                tourState: tourState,
-                isInNavigationContext: true
-            )
-            .environmentObject(syncService)
-        } else {
-            // SyncService not yet available - show loading state to prevent
-            // crashes in child views that expect @EnvironmentObject<SyncService>
-            ProgressView("Loading...")
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-        }
+        SettingsMainView(
+            potaAuth: potaAuthService,
+            destination: $settingsDestination,
+            tourState: tourState,
+            syncService: syncService,
+            isInNavigationContext: true
+        )
     }
 
     @ViewBuilder

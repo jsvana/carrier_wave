@@ -14,6 +14,7 @@ struct SettingsMainView: View {
     @Binding var destination: SettingsDestination?
 
     let tourState: TourState
+    var syncService: SyncService?
 
     /// When true, the view is already inside a navigation context (e.g., "More" tab)
     /// and should not add its own NavigationStack
@@ -115,15 +116,15 @@ struct SettingsMainView: View {
         .navigationDestination(for: SettingsDestination.self) { dest in
             switch dest {
             case .qrz:
-                QRZSettingsView()
+                QRZSettingsView(syncService: syncService)
             case .pota:
-                POTASettingsView(potaAuth: potaAuth, tourState: tourState)
+                POTASettingsView(potaAuth: potaAuth, tourState: tourState, syncService: syncService)
             case .lofi:
-                LoFiSettingsView(tourState: tourState)
+                LoFiSettingsView(tourState: tourState, syncService: syncService)
             case .hamrs:
-                HAMRSSettingsView()
+                HAMRSSettingsView(syncService: syncService)
             case .lotw:
-                LoTWSettingsView()
+                LoTWSettingsView(syncService: syncService)
             case .icloud:
                 ICloudSettingsView()
             }

@@ -4,6 +4,10 @@ All notable changes to Carrier Wave will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- **Settings Crash on Launch** - Fixed crash when navigating to service settings (QRZ, POTA, LoFi, etc.) due to missing SyncService environment object
+- **Logger Submit Crash** - Fixed crash when pressing Return in logger callsign field while keyboard is dismissing
+
 ## [1.15.3] - 2026-01-31
 
 ### Fixed

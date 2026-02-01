@@ -47,6 +47,7 @@ struct LoFiSettingsView: View {
     // MARK: Internal
 
     let tourState: TourState
+    var syncService: SyncService?
 
     var body: some View {
         List {
@@ -64,7 +65,7 @@ struct LoFiSettingsView: View {
                 }
             }
 
-            if debugMode, isLinked {
+            if debugMode, isLinked, syncService != nil {
                 Section {
                     Button {
                         Task { await forceRedownload() }
@@ -110,7 +111,6 @@ struct LoFiSettingsView: View {
     // MARK: Private
 
     @AppStorage("debugMode") private var debugMode = false
-    @EnvironmentObject private var syncService: SyncService
     @State private var callsign = ""
     @State private var email = ""
     @State private var isConfigured = false
@@ -275,6 +275,9 @@ struct LoFiSettingsView: View {
 
     @MainActor
     private func forceRedownload() async {
+        guard let syncService else {
+            return
+        }
         isRedownloading = true
         redownloadResult = nil
 

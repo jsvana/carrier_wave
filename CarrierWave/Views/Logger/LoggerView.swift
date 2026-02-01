@@ -630,7 +630,11 @@ struct LoggerView: View {
                     .foregroundStyle(detectedCommand != nil ? .purple : .primary)
                     .focused($callsignFieldFocused)
                     .onSubmit {
-                        handleInputSubmit()
+                        // Defer to next run loop to avoid UICollectionView crash
+                        // when keyboard dismiss triggers List updates simultaneously
+                        DispatchQueue.main.async {
+                            handleInputSubmit()
+                        }
                     }
                     .onChange(of: callsignInput) { _, newValue in
                         onCallsignChanged(newValue)
